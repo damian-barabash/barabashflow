@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pl" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>BarabashFlow — Dmytrii Barabash</title>
+  <meta name="description" content="Portfolio: strony internetowe i platformy. Websites and internet platforms. Сайты и интернет-платформы." />
+  <meta name="theme-color" content="#f6f4ee" />
+
+  <link rel="icon" type="image/png" href="assets/img/logo.png" />
+  <link rel="apple-touch-icon" href="assets/img/logo.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Saira+Extended:wght@200;300;400;500&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="assets/css/main.css?v=2026-05-25q" />
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.163.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.163.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="assets/js/theme.js?v=2026-05-25q"></script>
+</head>
+<body class="is-loading">
+
+  <!-- Editorial corner ticks -->
+  <div class="frame-ticks" aria-hidden="true">
+    <span></span><span></span><span></span><span></span>
+  </div>
+
+  <div class="app">
+
+    <!-- ── Top bar ────────────────────────────────────────────── -->
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="BarabashFlow">
+        <img class="brand-logo" src="assets/img/logo.png?v=2026-05-25i" alt="" draggable="false" />
+        <span class="brand-name">Barabashflow</span>
+        <span class="brand-rule" aria-hidden="true"></span>
+        <span class="brand-suffix">
+          Portfolio<span class="brand-sep">·</span>MMXXVI
+        </span>
+      </a>
+
+      <nav class="nav" aria-label="Site navigation">
+        <span class="status" aria-label="Availability">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span class="status-text" data-i18n="meta.available">Dostępny</span>
+        </span>
+
+        <span class="nav-divider" aria-hidden="true"></span>
+
+        <div class="nav-group lang" aria-label="Language switcher"></div>
+
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme" title="Theme">
+          <svg viewBox="0 0 20 20" fill="none" id="theme-icon" aria-hidden="true">
+            <!-- moon for light theme, sun for dark — switched in JS -->
+            <path d="M14.5 11.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <button class="icon-btn" id="contact-link" type="button" aria-label="Kontakt" title="Kontakt">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M3.5 5.5h13v9h-13zM3.5 5.5l6.5 5 6.5-5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </nav>
+    </header>
+
+    <!-- ── Hero (portrait + display + meta) ──────────────────── -->
+    <section class="hero fade-in">
+      <span class="portrait" id="owner-portrait" data-empty="true" aria-hidden="true"></span>
+      <div class="hero-stack">
+        <h1 class="hero-title" id="hero-title">Strony internetowe <em>i platformy</em></h1>
+        <div class="hero-meta">
+          <span class="hero-sub" id="hero-sub"></span>
+          <span class="meta-sep" aria-hidden="true">—</span>
+          <span data-i18n="meta.location">Warszawa → Świat</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Graph stage ──────────────────────────────────────────── -->
+    <main class="stage" id="graph-canvas">
+      <div class="stage-inner" id="stage-inner">
+        <svg id="graph-edges" aria-hidden="true"></svg>
+        <div id="logo-stage" aria-hidden="true">
+          <span id="logo-fallback">BF</span>
+          <span id="logo-status"></span>
+        </div>
+        <!-- nodes injected by main.js -->
+      </div>
+      <span class="zoom-indicator" id="zoom-indicator">100%</span>
+    </main>
+
+    <!-- ── Footer (editorial 3-col: index · CTA · location) ───── -->
+    <footer class="footer">
+      <div class="footer-side footer-left">
+        <span class="footer-mono strong">MMXXVI</span>
+        <span class="footer-mono muted">/ N° 01</span>
+      </div>
+
+      <button type="button" class="cta" id="cta">
+        <span class="cta-label">Zlecić projekt</span>
+        <svg class="cta-arrow" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <div class="footer-side footer-right">
+        <span class="footer-mono muted" data-i18n="meta.location">Warszawa → Świat</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ── Project modal ────────────────────────────────────────── -->
+  <div class="modal-root" id="modal-project" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal">
+      <button class="modal-close" data-close-modal aria-label="Zamknij" type="button">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div class="modal-scroll">
+        <div class="modal-media" aria-hidden="true"></div>
+        <div class="modal-body">
+          <div class="modal-cat"></div>
+          <h2 class="modal-title"></h2>
+          <p class="modal-desc"></p>
+          <div class="modal-actions">
+            <a class="btn primary modal-visit" target="_blank" rel="noopener noreferrer" data-i18n="modal.visit">Otwórz projekt</a>
+            <button type="button" class="btn" data-close-modal data-i18n="modal.close">Zamknij</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Contact modal ────────────────────────────────────────── -->
+  <div class="modal-root contact-modal" id="modal-contact" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal">
+      <button class="modal-close" data-close-modal aria-label="Zamknij" type="button">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div class="modal-scroll">
+        <div class="modal-body">
+          <div class="modal-cat" data-i18n="contact.eyebrow">Współpraca</div>
+          <h2 class="modal-title" data-i18n="contact.title">Porozmawiajmy</h2>
+          <p class="contact-intro"></p>
+          <form class="form" id="contact-form" autocomplete="on" novalidate>
+            <div class="field">
+              <label for="cf-name" data-i18n="contact.name">Imię</label>
+              <input id="cf-name" name="name" type="text" required maxlength="120" autocomplete="name" />
+            </div>
+            <div class="field">
+              <label for="cf-email" data-i18n="contact.email">E-mail</label>
+              <input id="cf-email" name="email" type="email" required maxlength="160" autocomplete="email" />
+            </div>
+            <div class="field">
+              <label for="cf-msg" data-i18n="contact.message">Wiadomość</label>
+              <textarea id="cf-msg" name="message" required maxlength="4000" rows="4"></textarea>
+            </div>
+            <div class="form-status"></div>
+            <div class="modal-actions">
+              <button type="button" class="btn" data-close-modal data-i18n="modal.close">Zamknij</button>
+              <button type="submit" class="btn primary" data-i18n="contact.submit">Wyślij</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Cookie consent popup (bottom-right, first visit only) ─ -->
+  <aside class="cookie-bot" id="cookie-bot" aria-hidden="true" aria-live="polite">
+    <div class="cookie-card">
+      <button class="cookie-close" type="button" aria-label="Zamknij" data-cookie-close>×</button>
+      <p class="cookie-text">
+        Używamy kukisów, żeby zapamiętać motyw i język. Bez śledzenia, bez zewnętrznych skryptów.
+      </p>
+      <div class="cookie-actions">
+        <button class="cookie-accept" id="cookie-accept" type="button">Akceptuję</button>
+        <button class="cookie-policy" id="cookie-policy-open" type="button">Polityka</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Cookie policy modal (opened from popup) ─────────────── -->
+  <div class="modal-root" id="modal-cookies" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal cookie-policy-modal">
+      <button class="modal-close" data-close-modal aria-label="Zamknij" type="button">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div class="modal-scroll">
+        <div class="modal-body">
+          <div class="modal-cat">Polityka cookies</div>
+          <h2 class="modal-title">Pliki cookie i dane lokalne</h2>
+          <div class="cookie-policy-body">
+            <p>BarabashFlow szanuje Twoją prywatność. Strona używa wyłącznie <strong>kukisów przeglądarki</strong> (mechanizm pamięci lokalnej) — żadnych ciasteczek śledzących, żadnych zewnętrznych skryptów analitycznych, żadnych third-party.</p>
+
+            <h4>Co zapamiętujemy</h4>
+            <ul>
+              <li>motyw (jasny / ciemny) — <code>bf:theme</code></li>
+              <li>język interfejsu (PL / EN / RU) — <code>bf:locale</code></li>
+              <li>Twoją zgodę na ten dialog — <code>bf:cookies-accepted</code></li>
+              <li>zamknięcie okienka maskotki w bieżącej sesji — <code>bf:mascot-dismissed</code> (kukis sesyjny, znika po zamknięciu karty)</li>
+            </ul>
+
+            <h4>Czego NIE używamy</h4>
+            <ul>
+              <li>Google Analytics, Facebook Pixel, Hotjar ani innych narzędzi analitycznych zewnętrznych firm.</li>
+              <li>Kukisów reklamowych.</li>
+              <li>Kukisów śledzących między stronami.</li>
+              <li>Nie sprzedajemy, nie wymieniamy ani nie udostępniamy Twoich danych nikomu.</li>
+            </ul>
+
+            <h4>Twoje wiadomości</h4>
+            <p>Gdy wyślesz wiadomość przez formularz kontaktowy lub okienko maskotki, Twój adres e-mail i treść trafiają wyłącznie do skrzynki właściciela strony, w celu odpowiedzi na zapytanie. Dane przechowywane są w bazie Supabase z restrykcyjnymi politykami RLS — czyta je tylko właściciel.</p>
+
+            <h4>Jak wyczyścić zapisane dane</h4>
+            <p>W każdej chwili możesz wyczyścić kukisy w ustawieniach swojej przeglądarki. Strona nadal będzie działać — po prostu zapomni Twoje preferencje motywu i języka. Ten dialog zgody pojawi się ponownie.</p>
+
+            <h4>Kontakt</h4>
+            <p>W razie pytań lub żądań związanych z danymi — formularz kontaktowy na stronie głównej lub adres e-mail właściciela.</p>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn primary" data-close-modal>Rozumiem</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Mascot bot (bottom-left helper) ─────────────────────── -->
+  <aside class="mascot-bot" id="mascot-bot" aria-hidden="true" aria-live="polite">
+    <div class="mascot-card">
+      <button class="mascot-close" type="button" aria-label="Zamknij" data-mascot-close>
+        <svg viewBox="0 0 14 14" fill="none" width="11" height="11">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <div class="mascot-row">
+        <div class="mascot-avatar">
+          <img src="assets/img/maskot.png?v=2026-05-25n" alt="" draggable="false" />
+        </div>
+
+        <div class="mascot-body">
+          <!-- State A: greeting + form -->
+          <div class="mascot-stage" data-stage="ask">
+            <p class="mascot-bubble" id="mascot-greeting" aria-live="polite"></p>
+            <form class="mascot-form" id="mascot-form" novalidate>
+              <label class="sr-only" for="mascot-q">Pytanie</label>
+              <input id="mascot-q" name="question" type="text" autocomplete="off" maxlength="600" required />
+              <label class="sr-only" for="mascot-email">E-mail</label>
+              <input id="mascot-email" name="email" type="email" autocomplete="email" maxlength="160" required />
+              <div class="mascot-foot">
+                <button type="submit" class="mascot-send" id="mascot-send"></button>
+                <span class="mascot-status" id="mascot-status"></span>
+              </div>
+            </form>
+          </div>
+
+          <!-- State B: success -->
+          <div class="mascot-stage" data-stage="done" hidden>
+            <h4 class="mascot-success-title" id="mascot-success-title"></h4>
+            <p class="mascot-success-text"  id="mascot-success-text"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <script type="module" src="assets/js/main.js?v=2026-05-25q"></script>
+</body>
+</html>
