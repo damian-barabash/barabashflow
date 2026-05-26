@@ -2,12 +2,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-25q';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-26b';
 import {
   LOCALES, getLocale, setLocale, onLocaleChange,
   t, pickField, applyDom,
-} from './i18n.js?v=2026-05-25q';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-25q';
+} from './i18n.js?v=2026-05-26b';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-26b';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false },
@@ -204,7 +204,15 @@ function applyAutoFit() {
   for (const n of state.nodes) {
     maxAbs = Math.max(maxAbs, Math.abs(n.baseX), Math.abs(n.baseY));
   }
-  const fit = 1 / Math.max(1, maxAbs * 1.06);
+  let fit = 1 / Math.max(1, maxAbs * 1.06);
+  // On narrow viewports nodes are still oversized vs. available space —
+  // pull the camera back further so the graph reads as a whole. The 3D
+  // logo + node thumbs are big in absolute px and don't scale with viewport
+  // width by themselves.
+  const w = window.innerWidth;
+  if (w <= 480)       fit *= 0.62;
+  else if (w <= 760)  fit *= 0.72;
+  else if (w <= 1024) fit *= 0.88;
   state.viewZoom = fit;
   state.viewPanX = 0;
   state.viewPanY = 0;
@@ -603,6 +611,50 @@ function setupViewZoomPan() {
   };
   stage.addEventListener('pointerup', endPan);
   stage.addEventListener('pointercancel', endPan);
+
+  // ── Pinch-to-zoom (two fingers) ──────────────────────────────────────
+  // pointer events don't expose multi-touch gesture cleanly, so use raw
+  // touch events. When a second finger lands we cancel single-finger pan
+  // and switch to pinch mode; on touchend we hand control back.
+  let pinchDistStart = 0;
+  let pinchZoomStart = 1;
+  const dist = (ts) => Math.hypot(
+    ts[0].clientX - ts[1].clientX,
+    ts[0].clientY - ts[1].clientY,
+  );
+
+  stage.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      // kill any active single-finger pan
+      if (panning) endPan({ pointerId: panPid });
+      pinchDistStart = dist(e.touches);
+      pinchZoomStart = state.viewZoom;
+      state.userViewSet = true;
+      inner.classList.add('is-interacting');
+    }
+  }, { passive: false });
+
+  stage.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && pinchDistStart > 0) {
+      e.preventDefault();
+      const d = dist(e.touches);
+      const factor = d / pinchDistStart;
+      state.viewZoom = Math.max(0.25, Math.min(3.0, pinchZoomStart * factor));
+      applyViewTransform();
+    }
+  }, { passive: false });
+
+  const endPinch = () => {
+    if (pinchDistStart > 0) {
+      pinchDistStart = 0;
+      setTimeout(() => inner.classList.remove('is-interacting'), 180);
+    }
+  };
+  stage.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) endPinch();
+  });
+  stage.addEventListener('touchcancel', endPinch);
 }
 
 // Wide-screen mouse parallax — the whole stage drifts a few pixels with

@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-05-26a';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-26a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-05-26b';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-26b';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'bf-admin-auth' },
@@ -70,9 +70,29 @@ async function init() {
   if (session) await onSignedIn(session.user);
   else showAuth();
 
-  sb.auth.onAuthStateChange((_evt, sess) => {
-    if (sess?.user) onSignedIn(sess.user);
-    else showAuth();
+  sb.auth.onAuthStateChange((evt, sess) => {
+    // SIGNED_OUT / no session — drop back to login screen.
+    if (evt === 'SIGNED_OUT' || !sess?.user) {
+      state.user = null;
+      showAuth();
+      return;
+    }
+    // TOKEN_REFRESHED / USER_UPDATED fire automatically every few minutes and
+    // on tab visibility changes. We must NOT re-run refreshAll() here — it
+    // calls renderGraph(), which rebuilds every .node from DB values and
+    // wipes any unsaved live-binding edits in the editor's currently-open
+    // project. Just keep state.user fresh and bail.
+    if (evt === 'TOKEN_REFRESHED' || evt === 'USER_UPDATED') {
+      state.user = sess.user;
+      return;
+    }
+    // First real sign-in (INITIAL_SESSION on cold load, SIGNED_IN after
+    // login). If we're already signed in as the same user, skip the reload.
+    if (state.user && state.user.id === sess.user.id) {
+      state.user = sess.user;
+      return;
+    }
+    onSignedIn(sess.user);
   });
 }
 
@@ -295,9 +315,13 @@ function renderGraph() {
   inner.querySelectorAll('.node').forEach((n) => n.remove());
 
   for (const p of state.projects) {
-    const el = buildAdminNodeEl(p);
+    // If this project is currently being edited, show the draft values on
+    // the node instead of the DB values — so a re-render won't visually
+    // revert unsaved tweaks (title / category / accent / visibility).
+    const live = (state.draft && state.draft.id === p.id) ? { ...p, ...state.draft } : p;
+    const el = buildAdminNodeEl(live);
     inner.appendChild(el);
-    placeNode(el, p.position_x, p.position_y);
+    placeNode(el, live.position_x, live.position_y);
     bindAdminNodeDrag(el, p.id);
   }
 
