@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-05-25q';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-25q';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-05-26a';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-26a';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'bf-admin-auth' },
@@ -131,7 +131,12 @@ function bindShellUI() {
       const tab = b.dataset.tab;
       $$('.tab-btn').forEach((x) => x.classList.toggle('is-active', x === b));
       $$('.panel-page').forEach((p) => p.classList.toggle('is-active', p.dataset.panel === tab));
-      if (tab === 'work') redrawEdges();
+      if (tab === 'work') {
+        // Defensive: re-apply current draft to the selected node, in case the
+        // display:none → display:block cycle dropped any live-binding writes.
+        syncDraftToGraphNode();
+        redrawEdges();
+      }
     });
   });
 
@@ -797,6 +802,22 @@ function buildEditor(p) {
   $('#ed-delete').addEventListener('click', deleteProjectFromEditor);
 
   redrawEdges();
+}
+
+function syncDraftToGraphNode() {
+  if (!state.draft) return;
+  const d = state.draft;
+  const id = d.id ?? '__new__';
+  const node = $(`.node[data-project-id="${id}"]`);
+  if (!node) return;
+  if (d.accent_color) node.style.setProperty('--node-accent', d.accent_color);
+  const cat = $('.node-cat', node);
+  if (cat) cat.textContent =
+    d.category_pl || d.category_en || d.category_ru || categoryFallback(d.category_key);
+  const title = $('.node-title', node);
+  if (title) title.textContent =
+    d.title_pl || d.title_en || d.title_ru || d.slug;
+  node.classList.toggle('is-pending', !d.is_published);
 }
 
 function updateNodeAccent(id, hex) {
