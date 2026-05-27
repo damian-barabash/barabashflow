@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27g';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27g';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27i';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27i';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // Share storageKey with admin.html so signing in once unlocks both pages.
@@ -503,9 +503,11 @@ function bindSend() {
   });
 
   $('#send-template').addEventListener('change', () => applyTemplateToForm(true));
+  $('#send-templates-manage').addEventListener('click', () => openTemplatesManager());
   $('#send-clear-recipients').addEventListener('click', () => {
     state.selectedRecipients.clear();
     state._pasteEmails.clear();
+    state._replyContext = null;  // drop In-Reply-To/References — fresh send
     $('#send-paste').value = '';
     renderRecipientChips();
     renderCrmPicklist();
@@ -543,13 +545,21 @@ function bindSend() {
 
 function renderTemplates() {
   const sel = $('#send-template');
+  // Preserve current selection across re-renders (after CRUD on templates).
+  const keepValue = sel.value;
   sel.innerHTML = '<option value="">— bez szablonu —</option>';
   for (const t of state.templates) {
     const opt = document.createElement('option');
     opt.value = t.id;
     opt.textContent = `${t.name} · ${t.kind}`;
-    if (t.is_default) opt.selected = true;
     sel.appendChild(opt);
+  }
+  // Default is intentionally "— bez szablonu —" (empty value) — user picks
+  // explicitly. Restore previous selection if it still exists.
+  if (keepValue && state.templates.some((t) => t.id === keepValue)) {
+    sel.value = keepValue;
+  } else {
+    sel.value = '';
   }
   applyTemplateToForm(false);
 }
@@ -690,8 +700,8 @@ function wrapBrandedLocal(subject, bodyHtml) {
 </tr></table>
 </td></tr>
 <tr><td style="padding:32px 36px 12px;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:15px;line-height:1.6;color:#0e0e0e;">${replaced}</td></tr>
-<tr><td style="padding:24px 36px 36px;font-family:Menlo,Consolas,monospace;font-size:10px;letter-spacing:0.16em;color:#7a7a73;text-transform:uppercase;border-top:1px solid #d6d3c8;">
-<table width="100%"><tr><td>office@barabashflow.pl</td><td align="right"><a href="${SITE}" style="color:#7a7a73;text-decoration:none;">barabashflow.pl ↗</a></td></tr></table>
+<tr><td align="center" style="padding:24px 36px 36px;font-family:Menlo,Consolas,monospace;font-size:10px;letter-spacing:0.16em;color:#7a7a73;text-transform:uppercase;border-top:1px solid #d6d3c8;line-height:1.9;">
+<span style="white-space:nowrap;">office@barabashflow.pl</span>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="${SITE}" style="color:#7a7a73;text-decoration:none;white-space:nowrap;">barabashflow.pl&nbsp;↗</a>
 </td></tr>
 </table>
 <div style="margin-top:18px;font-family:Menlo,Consolas,monospace;font-size:9px;letter-spacing:0.18em;color:#9a9a93;text-transform:uppercase;">Dmytrii Barabash · Warszawa · PL</div>
@@ -737,6 +747,8 @@ async function sendMail(dryRun) {
         locale: state.selectedLocale,
         throttle_ms,
         dry_run: dryRun,
+        in_reply_to: state._replyContext?.in_reply_to || null,
+        refs: state._replyContext?.refs || null,
       }),
     });
     fill.style.width = '100%';
@@ -765,12 +777,12 @@ async function sendMail(dryRun) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class InboxPanel {
-  // kindFilter: 'submission' | 'inbound'
+  // kindFilter: 'submission' (form/mascot — no threading) | 'inbound' (emails — Gmail-style threading)
   constructor(rootEl, kindFilter) {
     this.root = rootEl;
     this.kindFilter = kindFilter;
     this.subFilter = 'all';
-    this.selectedId = null;
+    this.selectedKey = null;   // thread_key for inbound, message id for submission
     this.bind();
   }
   bind() {
@@ -790,14 +802,9 @@ class InboxPanel {
       banner('Odświeżono', 'ok');
     });
   }
-  data() {
-    return state.inbox.filter((m) => m._kind === this.kindFilter);
-  }
-  render() {
-    const list = this.root.querySelector('.inbox-list');
-    if (!list) return;
-    list.innerHTML = '';
-    const filtered = this.data().filter((m) => {
+  // All messages of this panel kind, after sub-filter.
+  filteredMessages() {
+    return state.inbox.filter((m) => m._kind === this.kindFilter).filter((m) => {
       switch (this.subFilter) {
         case 'unread':  return !m.is_read;
         case 'replied': return m.is_replied;
@@ -806,88 +813,154 @@ class InboxPanel {
         default:        return true;
       }
     });
-    if (filtered.length === 0) {
+  }
+  // Group inbound by thread_key (oldest-first inside, newest-first across).
+  // For submissions, each message is its own "thread of 1".
+  groupedThreads() {
+    const msgs = this.filteredMessages();
+    if (this.kindFilter === 'submission') {
+      // Singleton "threads" — preserve flat behavior.
+      return msgs.map((m) => ({
+        key: m.id, messages: [m], latest: m, anyUnread: !m.is_read, allReplied: m.is_replied,
+      }));
+    }
+    // Inbound — group by thread_key, fall back to message id if missing.
+    const groups = new Map();
+    for (const m of msgs) {
+      const key = m.raw.thread_key || m.raw.message_id || m.id;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(m);
+    }
+    const threads = [];
+    for (const [key, list] of groups) {
+      list.sort((a, b) => new Date(a.received_at) - new Date(b.received_at));
+      threads.push({
+        key,
+        messages: list,
+        latest: list[list.length - 1],
+        anyUnread: list.some((m) => !m.is_read),
+        allReplied: list.every((m) => m.is_replied),
+      });
+    }
+    threads.sort((a, b) => new Date(b.latest.received_at) - new Date(a.latest.received_at));
+    return threads;
+  }
+  // Strip leading Re:/Fwd: chain so threads share one subject.
+  cleanSubject(s) {
+    return String(s || '').replace(/^\s*(re|odp|fwd|fw)\s*:\s*/gi, '').trim() || '(brak tematu)';
+  }
+  render() {
+    const list = this.root.querySelector('.inbox-list');
+    if (!list) return;
+    list.innerHTML = '';
+    const threads = this.groupedThreads();
+    if (threads.length === 0) {
       list.innerHTML = '<div class="empty-state">Pusto w tym filtrze.</div>';
       this.renderPane();
       return;
     }
-    for (const m of filtered) {
+    for (const t of threads) {
       const item = document.createElement('div');
       const cls = ['inbox-item'];
-      if (!m.is_read)                  cls.push('is-unread');
-      if (m.is_replied)                cls.push('is-replied');
-      if (this.selectedId === m.id)    cls.push('is-selected');
+      if (t.anyUnread)                  cls.push('is-unread');
+      if (t.allReplied)                 cls.push('is-replied');
+      if (this.selectedKey === t.key)   cls.push('is-selected');
       item.className = cls.join(' ');
-      const sourceTag = m._kind === 'inbound' ? 'inbound'
-        : (m.source === 'mascot-bot' ? 'mascot' : 'form');
+      const sourceTag = t.latest._kind === 'inbound' ? 'inbound'
+        : (t.latest.source === 'mascot-bot' ? 'mascot' : 'form');
+      const subj = this.cleanSubject(t.latest.subject);
+      const countBadge = t.messages.length > 1
+        ? `<span class="thread-count">${t.messages.length}</span>` : '';
       item.innerHTML = `
-        <div class="inbox-from">${escapeHtml(m.from_name || m.from_email || '—')}</div>
-        <div class="inbox-subject">${escapeHtml(m.subject)}</div>
+        <div class="inbox-from">${escapeHtml(t.latest.from_name || t.latest.from_email || '—')}${countBadge}</div>
+        <div class="inbox-subject">${escapeHtml(subj)}</div>
         <div class="inbox-meta">
-          <span>${formatDate(m.received_at)}</span>
+          <span>${formatDate(t.latest.received_at)}</span>
           <span class="inbox-source is-${sourceTag}">${sourceTag}</span>
         </div>
       `;
-      item.addEventListener('click', () => this.open(m));
+      item.addEventListener('click', () => this.openThread(t));
       list.appendChild(item);
     }
     this.renderPane();
   }
-  async open(m) {
-    this.selectedId = m.id;
-    if (!m.is_read) {
-      if (m._kind === 'submission') {
-        await sb.from('contact_submissions').update({ is_read: true }).eq('id', m.raw.id);
-      } else {
-        await sb.from('mail_inbound').update({ is_read: true }).eq('id', m.raw.id);
+  async openThread(t) {
+    this.selectedKey = t.key;
+    // Mark all messages in the thread as read.
+    const unreadIds = { sub: [], in: [] };
+    for (const m of t.messages) {
+      if (!m.is_read) {
+        if (m._kind === 'submission') unreadIds.sub.push(m.raw.id);
+        else                          unreadIds.in.push(m.raw.id);
+        m.is_read = true;
       }
-      m.is_read = true;
-      paintBadge('#msgs-badge',  state.inbox.filter((x) => x._kind === 'submission' && !x.is_read).length);
-      paintBadge('#inbox-badge', state.inbox.filter((x) => x._kind === 'inbound'    && !x.is_read).length);
     }
+    if (unreadIds.sub.length) await sb.from('contact_submissions').update({ is_read: true }).in('id', unreadIds.sub);
+    if (unreadIds.in.length)  await sb.from('mail_inbound').update({ is_read: true }).in('id', unreadIds.in);
+    paintBadge('#msgs-badge',  state.inbox.filter((x) => x._kind === 'submission' && !x.is_read).length);
+    paintBadge('#inbox-badge', state.inbox.filter((x) => x._kind === 'inbound'    && !x.is_read).length);
     this.render();
   }
   renderPane() {
     const pane = this.root.querySelector('.inbox-pane');
     if (!pane) return;
-    const m = this.data().find((x) => x.id === this.selectedId);
-    if (!m) {
+    const t = this.groupedThreads().find((x) => x.key === this.selectedKey);
+    if (!t) {
       const empty = this.kindFilter === 'inbound'
-        ? 'Wybierz e-mail, by zobaczyć szczegóły.'
+        ? 'Wybierz e-mail, by zobaczyć rozmowę.'
         : 'Wybierz wiadomość, by zobaczyć szczegóły.';
       pane.innerHTML = `<div class="empty-state">${empty}</div>`;
       return;
     }
-    const sourceTag = m._kind === 'inbound' ? 'inbound'
-      : (m.source === 'mascot-bot' ? 'mascot' : 'form');
-    const bodyContent = m.body_html
-      ? sanitizeHtml(m.body_html)
-      : `<pre style="margin:0;font-family:var(--font-body);font-size:14px;white-space:pre-wrap;">${escapeHtml(m.body_text || '(pusta wiadomość)')}</pre>`;
+    const latest = t.latest;
+    const sourceTag = latest._kind === 'inbound' ? 'inbound'
+      : (latest.source === 'mascot-bot' ? 'mascot' : 'form');
+    const headSubject = this.cleanSubject(latest.subject);
+
+    // Render every message in chronological order, each with its own mini-head + body.
+    const messagesHtml = t.messages.map((m) => {
+      const bodyContent = m.body_html
+        ? sanitizeHtml(m.body_html)
+        : `<pre style="margin:0;font-family:var(--font-body);font-size:14px;white-space:pre-wrap;">${escapeHtml(m.body_text || '(pusta wiadomość)')}</pre>`;
+      return `
+        <article class="thread-msg">
+          <header class="thread-msg-head">
+            <div>
+              <span class="thread-msg-from">${escapeHtml(m.from_name || m.from_email)}</span>
+              <span class="thread-msg-email">&lt;${escapeHtml(m.from_email)}&gt;</span>
+            </div>
+            <span class="thread-msg-when">${formatDate(m.received_at, true)}</span>
+          </header>
+          <div class="thread-msg-body">${bodyContent}</div>
+        </article>
+      `;
+    }).join('');
+
     pane.innerHTML = `
       <div class="pane-head">
         <div>
-          <div class="pane-from">${escapeHtml(m.from_name || m.from_email)}</div>
-          <div class="pane-email">${escapeHtml(m.from_email)}</div>
-          <div class="pane-subject">${escapeHtml(m.subject)}</div>
+          <div class="pane-subject">${escapeHtml(headSubject)}</div>
+          <div class="pane-from" style="font-size:14px;margin-top:4px;">${escapeHtml(latest.from_name || latest.from_email)}</div>
+          <div class="pane-email">${escapeHtml(latest.from_email)}</div>
         </div>
         <div class="pane-when">
-          ${formatDate(m.received_at, true)}<br>
-          <span class="inbox-source is-${sourceTag}" style="display:inline-block;margin-top:6px;">${sourceTag}</span>
+          ${t.messages.length > 1 ? `<span class="thread-count" style="margin-right:8px;">${t.messages.length}</span>` : ''}
+          <span class="inbox-source is-${sourceTag}">${sourceTag}</span>
         </div>
       </div>
-      <div class="pane-body">${bodyContent}</div>
+      <div class="thread-msgs">${messagesHtml}</div>
       <div class="pane-actions">
         <button class="btn primary pane-reply" type="button">Odpowiedz</button>
-        <button class="btn pane-add-crm" type="button" ${m.client_id ? 'disabled' : ''}>${m.client_id ? 'Już w CRM' : 'Dodaj do CRM'}</button>
-        <button class="btn pane-toggle-replied" type="button">${m.is_replied ? 'Cofnij: odpowiedział' : 'Oznacz: odpowiedział'}</button>
+        <button class="btn pane-add-crm" type="button" ${latest.client_id ? 'disabled' : ''}>${latest.client_id ? 'Już w CRM' : 'Dodaj do CRM'}</button>
+        <button class="btn pane-toggle-replied" type="button">${t.allReplied ? 'Cofnij: odpowiedział' : 'Oznacz: odpowiedział'}</button>
         <span class="spread"></span>
-        <button class="btn danger pane-delete" type="button">Usuń</button>
+        <button class="btn danger pane-delete" type="button">Usuń wątek</button>
       </div>
     `;
-    pane.querySelector('.pane-reply').addEventListener('click', () => replyToMessage(m));
-    pane.querySelector('.pane-add-crm').addEventListener('click', () => addToCrm(m));
-    pane.querySelector('.pane-toggle-replied').addEventListener('click', () => toggleReplied(m));
-    pane.querySelector('.pane-delete').addEventListener('click', () => deleteMessage(m));
+    pane.querySelector('.pane-reply').addEventListener('click', () => replyToThread(t));
+    pane.querySelector('.pane-add-crm').addEventListener('click', () => addToCrm(latest));
+    pane.querySelector('.pane-toggle-replied').addEventListener('click', () => toggleThreadReplied(t));
+    pane.querySelector('.pane-delete').addEventListener('click', () => deleteThread(t));
   }
 }
 
@@ -953,6 +1026,7 @@ async function deleteMessage(m) {
 }
 
 function replyToMessage(m) {
+  // Submissions only (no threading). Reply via Rozsyłka without IMAP headers.
   switchTab('send');
   state.selectedRecipients.clear();
   state.selectedRecipients.set(m.from_email, {
@@ -960,18 +1034,240 @@ function replyToMessage(m) {
     name: m.from_name,
     client_id: m.client_id,
   });
-  const tpl = state.templates.find((t) => t.kind === 'reply');
+  state._replyContext = null;
   const sel = $('#send-template');
-  if (tpl) { sel.value = tpl.id; }
-  else     { sel.value = ''; }
+  sel.value = '';
   applyTemplateToForm(true);
-  // Override subject with Re:
   const original = m.subject || '';
-  const subj = original.startsWith('Re:') ? original : `Re: ${original}`;
-  $('#send-subject').value = subj;
+  $('#send-subject').value = original.startsWith('Re:') ? original : `Re: ${original}`;
   refreshPreview();
   renderCrmPicklist();
   renderRecipientChips();
+}
+
+function replyToThread(thread) {
+  // Inbound thread reply. Target the LATEST message; pass In-Reply-To +
+  // References so Gmail / Outlook keep the conversation grouped.
+  switchTab('send');
+  const latest = thread.latest;
+  state.selectedRecipients.clear();
+  state.selectedRecipients.set(latest.from_email, {
+    email: latest.from_email,
+    name: latest.from_name,
+    client_id: latest.client_id,
+  });
+  // Build References chain: existing refs + latest message_id, deduped.
+  const refs = new Set(Array.isArray(latest.raw.refs) ? latest.raw.refs : []);
+  if (latest.raw.in_reply_to) refs.add(latest.raw.in_reply_to);
+  if (latest.raw.message_id)  refs.add(latest.raw.message_id);
+  state._replyContext = {
+    in_reply_to: latest.raw.message_id || null,
+    refs: [...refs],
+  };
+  const sel = $('#send-template');
+  sel.value = '';
+  applyTemplateToForm(true);
+  const subj = String(latest.subject || '').replace(/^\s*re\s*:\s*/i, '');
+  $('#send-subject').value = `Re: ${subj}`;
+  refreshPreview();
+  renderCrmPicklist();
+  renderRecipientChips();
+}
+
+async function toggleThreadReplied(thread) {
+  const next = !thread.allReplied;
+  const ids = { sub: [], in: [] };
+  for (const m of thread.messages) {
+    if (m._kind === 'submission') ids.sub.push(m.raw.id);
+    else                          ids.in.push(m.raw.id);
+    m.is_replied = next;
+    m.is_read = true;
+  }
+  if (ids.sub.length) await sb.from('contact_submissions').update({ is_replied: next, is_read: true }).in('id', ids.sub);
+  if (ids.in.length)  await sb.from('mail_inbound').update({ is_replied: next, is_read: true }).in('id', ids.in);
+  renderInbox();
+}
+
+async function deleteThread(thread) {
+  if (!confirm(`Usunąć ${thread.messages.length > 1 ? `wątek (${thread.messages.length} wiadomości)` : 'wiadomość'}?`)) return;
+  const ids = { sub: [], in: [] };
+  for (const m of thread.messages) {
+    if (m._kind === 'submission') ids.sub.push(m.raw.id);
+    else                          ids.in.push(m.raw.id);
+  }
+  if (ids.sub.length) await sb.from('contact_submissions').delete().in('id', ids.sub);
+  if (ids.in.length)  await sb.from('mail_inbound').delete().in('id', ids.in);
+  if (msgsPanel)  msgsPanel.selectedKey  = null;
+  if (inboxPanel) inboxPanel.selectedKey = null;
+  await loadInbox();
+  renderInbox();
+  banner('Usunięto', 'ok');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Templates manager
+// ═══════════════════════════════════════════════════════════════════════════
+
+function openTemplatesManager() {
+  const modal = $('#modal-root');
+  const win = $('#modal-window');
+  win.innerHTML = `
+    <div class="eyebrow">Szablony</div>
+    <h3 style="margin:6px 0 12px 0;font-family:var(--font-display);font-weight:300;font-size:22px;">Zarządzaj szablonami</h3>
+    <p class="coords" style="margin:0 0 14px 0;">Zmienne dostępne w treści i temacie: <code>{{name}}</code>, <code>{{email}}</code>, <code>{{subject}}</code>.</p>
+    <div class="tmpl-list" id="tmpl-list"></div>
+    <div class="button-row" style="margin-top:18px;">
+      <span class="spread"></span>
+      <button class="btn" id="tmpl-close" type="button">Zamknij</button>
+      <button class="btn primary" id="tmpl-add" type="button">+ Nowy szablon</button>
+    </div>
+  `;
+  renderTemplateList();
+  $('#tmpl-add', win).addEventListener('click', () => openTemplateEditor(null));
+  $('#tmpl-close', win).addEventListener('click', closeModal);
+  modal.querySelector('.modal-backdrop').onclick = closeModal;
+  modal.hidden = false;
+}
+
+function renderTemplateList() {
+  const wrap = $('#tmpl-list');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  if (state.templates.length === 0) {
+    wrap.innerHTML = '<div class="empty-state">Brak szablonów. Kliknij „+ Nowy szablon".</div>';
+    return;
+  }
+  for (const t of state.templates) {
+    const row = document.createElement('div');
+    row.className = 'tmpl-row';
+    row.innerHTML = `
+      <div class="tmpl-row-main">
+        <div class="tmpl-row-name">${escapeHtml(t.name)}</div>
+        <div class="tmpl-row-meta">
+          <span class="tmpl-kind">${escapeHtml(t.kind)}</span>
+          <span class="tmpl-slug">${escapeHtml(t.slug)}</span>
+        </div>
+        <div class="tmpl-row-subject">${escapeHtml(t.subject_pl || '—')}</div>
+      </div>
+      <div class="tmpl-row-actions">
+        <button class="btn small" data-edit type="button">Edytuj</button>
+        <button class="btn small danger" data-del type="button">Usuń</button>
+      </div>
+    `;
+    row.querySelector('[data-edit]').addEventListener('click', () => openTemplateEditor(t));
+    row.querySelector('[data-del]').addEventListener('click', async () => {
+      if (!confirm(`Usunąć szablon „${t.name}"?`)) return;
+      const { error } = await sb.from('mail_templates').delete().eq('id', t.id);
+      if (error) { banner(error.message, 'error'); return; }
+      await loadTemplates();
+      renderTemplates();
+      renderTemplateList();
+      banner('Usunięto', 'ok');
+    });
+    wrap.appendChild(row);
+  }
+}
+
+function openTemplateEditor(t) {
+  const modal = $('#modal-root');
+  const win = $('#modal-window');
+  const isNew = !t;
+  const initial = t || {
+    name: '', slug: '', kind: 'custom',
+    subject_pl: '', subject_en: '', subject_ru: '',
+    body_pl: '', body_en: '', body_ru: '',
+  };
+  win.innerHTML = `
+    <div class="eyebrow">${isNew ? 'Nowy szablon' : 'Edycja szablonu'}</div>
+    <h3 style="margin:6px 0 16px 0;font-family:var(--font-display);font-weight:300;font-size:22px;">${escapeHtml(initial.name || 'Bez nazwy')}</h3>
+    <div class="row-2">
+      <div class="field">
+        <label class="field-label">Nazwa (widoczna tylko w panelu)</label>
+        <input id="tpl-name" value="${attr(initial.name)}" />
+      </div>
+      <div class="field">
+        <label class="field-label">Slug (URL-friendly id)</label>
+        <input id="tpl-slug" value="${attr(initial.slug)}" placeholder="np. welcome, broadcast-update" />
+      </div>
+      <div class="field">
+        <label class="field-label">Rodzaj</label>
+        <select id="tpl-kind">
+          <option value="welcome">welcome</option>
+          <option value="broadcast">broadcast</option>
+          <option value="reply">reply</option>
+          <option value="followup">followup</option>
+          <option value="custom">custom</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label">Temat (PL · EN · RU)</label>
+      <div class="lang-trio">
+        <div class="field-input" data-lang="PL"><input id="tpl-subject-pl" value="${attr(initial.subject_pl)}" placeholder="Polski" /></div>
+        <div class="field-input" data-lang="EN"><input id="tpl-subject-en" value="${attr(initial.subject_en)}" placeholder="English" /></div>
+        <div class="field-input" data-lang="RU"><input id="tpl-subject-ru" value="${attr(initial.subject_ru)}" placeholder="Русский" /></div>
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label">Treść HTML — Polski</label>
+      <textarea id="tpl-body-pl" rows="6">${escapeHtml(initial.body_pl)}</textarea>
+    </div>
+    <div class="field">
+      <label class="field-label">Treść HTML — English</label>
+      <textarea id="tpl-body-en" rows="6">${escapeHtml(initial.body_en)}</textarea>
+    </div>
+    <div class="field">
+      <label class="field-label">Treść HTML — Русский</label>
+      <textarea id="tpl-body-ru" rows="6">${escapeHtml(initial.body_ru)}</textarea>
+    </div>
+    <div class="button-row" style="margin-top:18px;">
+      <button class="btn" id="tpl-back" type="button">← Wróć</button>
+      <span class="spread"></span>
+      <button class="btn" id="tpl-cancel" type="button">Anuluj</button>
+      <button class="btn primary" id="tpl-save" type="button">${isNew ? 'Utwórz' : 'Zapisz'}</button>
+    </div>
+  `;
+  $('#tpl-kind', win).value = initial.kind || 'custom';
+  $('#tpl-back', win).addEventListener('click', () => openTemplatesManager());
+  $('#tpl-cancel', win).addEventListener('click', closeModal);
+  modal.querySelector('.modal-backdrop').onclick = closeModal;
+  $('#tpl-save', win).addEventListener('click', async () => {
+    const name = $('#tpl-name', win).value.trim();
+    const slug = $('#tpl-slug', win).value.trim().toLowerCase();
+    if (!name) { banner('Brak nazwy', 'error'); return; }
+    if (!slug || !/^[a-z0-9-]+$/.test(slug)) { banner('Slug: tylko a-z, 0-9, -', 'error'); return; }
+    const payload = {
+      name,
+      slug,
+      kind: $('#tpl-kind', win).value,
+      subject_pl: $('#tpl-subject-pl', win).value.trim() || null,
+      subject_en: $('#tpl-subject-en', win).value.trim() || null,
+      subject_ru: $('#tpl-subject-ru', win).value.trim() || null,
+      body_pl:    $('#tpl-body-pl', win).value || '',
+      body_en:    $('#tpl-body-en', win).value || null,
+      body_ru:    $('#tpl-body-ru', win).value || null,
+    };
+    if (!payload.subject_pl) { banner('Brak tematu (PL)', 'error'); return; }
+    if (!payload.body_pl)    { banner('Brak treści (PL)', 'error'); return; }
+    banner('Zapisywanie…', null);
+    try {
+      if (isNew) {
+        const { error } = await sb.from('mail_templates').insert(payload);
+        if (error) throw error;
+      } else {
+        const { error } = await sb.from('mail_templates').update(payload).eq('id', t.id);
+        if (error) throw error;
+      }
+      await loadTemplates();
+      renderTemplates();
+      openTemplatesManager();   // back to list view
+      banner('Zapisano', 'ok');
+    } catch (err) {
+      console.error(err);
+      banner(err.message || 'Błąd', 'error');
+    }
+  });
+  modal.hidden = false;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
