@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27a';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27b';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27b';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // Share storageKey with admin.html so signing in once unlocks both pages.
@@ -39,7 +39,12 @@ const state = {
 init().catch((err) => {
   console.error('[mail] init failed', err);
   document.body.classList.remove('is-booting');
-  $('#boot-splash').innerHTML = `<div class="boot-text" style="color:#d83a3a;">Błąd inicjalizacji: ${escapeHtml(err.message || String(err))}</div>`;
+  // Bulletproof error overlay — independent of admin.css / mail.css loading.
+  document.body.innerHTML = `<div style="padding:40px;font-family:Menlo,Consolas,monospace;font-size:13px;line-height:1.6;color:#0e0e0e;background:#f6f4ee;min-height:100vh;box-sizing:border-box;">
+    <h2 style="font-family:Georgia,serif;font-weight:300;font-size:22px;margin:0 0 14px 0;">Błąd inicjalizacji Mejli</h2>
+    <pre style="white-space:pre-wrap;background:#fff;border:1px solid #d6d3c8;padding:14px;color:#d83a3a;margin:0 0 14px 0;">${String(err?.message || err).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</pre>
+    <p style="margin:0;">Otwórz DevTools → Console dla pełnego stack-trace. Wróć do <a href="/admin.html" style="color:#0e0e0e;">/admin.html</a>.</p>
+  </div>`;
 });
 
 async function init() {
@@ -63,7 +68,12 @@ async function init() {
 
   $('#session-email').textContent = session.user.email;
   document.body.classList.remove('is-booting');
-  $('#shell').hidden = false;
+  // .shell has `display: none` in admin.css — needs `is-active` to flex-show.
+  // Also clear the `hidden` attribute (was set in HTML so the unauth flow
+  // doesn't flash the empty shell before redirect).
+  const shell = $('#shell');
+  shell.hidden = false;
+  shell.classList.add('is-active');
 
   bindShellUI();
   bindThemeToggle();
