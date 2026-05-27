@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27c';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27c';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27d';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27d';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // Share storageKey with admin.html so signing in once unlocks both pages.
@@ -679,17 +679,17 @@ function wrapBrandedLocal(subject, bodyHtml) {
     .replace(/\{\{name\}\}/g, 'Imię')
     .replace(/\{\{email\}\}/g, 'test@example.com');
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(subject)}</title></head>
-<body style="margin:0;padding:0;background:#eeebe1;font-family:Georgia,'Times New Roman',serif;color:#0e0e0e;">
+<body style="margin:0;padding:0;background:#eeebe1;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#0e0e0e;">
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eeebe1;">
 <tr><td align="center" style="padding:32px 16px;">
 <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#f6f4ee;border:1px solid #d6d3c8;">
 <tr><td style="padding:28px 36px 16px;border-bottom:1px solid #d6d3c8;">
 <table width="100%"><tr>
-<td style="vertical-align:middle;"><img src="${LOGO}" width="28" height="34" alt="BF" style="display:inline-block;vertical-align:middle;margin-right:10px;"><span style="font-family:Georgia,serif;font-size:16px;letter-spacing:0.04em;color:#0e0e0e;">BarabashFlow</span></td>
+<td style="vertical-align:middle;"><img src="${LOGO}" width="28" height="34" alt="BF" style="display:inline-block;vertical-align:middle;margin-right:10px;"><span style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;font-weight:500;letter-spacing:0.04em;color:#0e0e0e;">BarabashFlow</span></td>
 <td align="right" style="font-family:Menlo,Consolas,monospace;font-size:10px;letter-spacing:0.18em;color:#7a7a73;text-transform:uppercase;">Studio · MMXXVI</td>
 </tr></table>
 </td></tr>
-<tr><td style="padding:32px 36px 12px;font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:1.6;color:#0e0e0e;">${replaced}</td></tr>
+<tr><td style="padding:32px 36px 12px;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:15px;line-height:1.6;color:#0e0e0e;">${replaced}</td></tr>
 <tr><td style="padding:24px 36px 36px;font-family:Menlo,Consolas,monospace;font-size:10px;letter-spacing:0.16em;color:#7a7a73;text-transform:uppercase;border-top:1px solid #d6d3c8;">
 <table width="100%"><tr><td>office@barabashflow.pl</td><td align="right"><a href="${SITE}" style="color:#7a7a73;text-decoration:none;">barabashflow.pl ↗</a></td></tr></table>
 </td></tr>
