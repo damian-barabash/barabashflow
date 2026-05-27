@@ -30,6 +30,28 @@ a.brand:hover { opacity: 0.78; }
   transform: translateX(-50%) translateY(0);
 }
 
+/* ── Section cards — admin.css's `.section` is bg-less (it relies on a
+   parent `.settings-card`/`.side-panel` for the surface). On Mejle, sections
+   sit directly on the dotted page bg, so wrap each one in a card. Sections
+   inside the modal keep their flat look (modal already provides the card). */
+.send-side > .section,
+.send-main > .section,
+.panel-page > .section {
+  background: var(--surface);
+  border: 1px solid var(--hair-2);
+  padding: 16px 20px;
+}
+.send-side > .section + .section,
+.send-main > .section + .section { margin-top: 14px; }
+
+/* Toolbars that wrap controls (CRM search row, inbox filter row, etc.) */
+.crm-toolbar,
+.inbox-toolbar {
+  background: var(--surface);
+  border: 1px solid var(--hair-2);
+  padding: 14px 16px;
+}
+
 /* ── Opaque buttons on Mejle page — admin.css has `.btn { background: transparent }`
    which lets the dotted page bg show through. On a busy backdrop it reads
    noisy, so override here for the Mejle page only. ─────────────────────── */
