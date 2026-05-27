@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27d';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27d';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27e';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27e';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // Share storageKey with admin.html so signing in once unlocks both pages.
@@ -694,7 +694,7 @@ function wrapBrandedLocal(subject, bodyHtml) {
 <table width="100%"><tr><td>office@barabashflow.pl</td><td align="right"><a href="${SITE}" style="color:#7a7a73;text-decoration:none;">barabashflow.pl ↗</a></td></tr></table>
 </td></tr>
 </table>
-<div style="margin-top:18px;font-family:Menlo,Consolas,monospace;font-size:9px;letter-spacing:0.18em;color:#9a9a93;text-transform:uppercase;">Damian Barabash · Warszawa · PL</div>
+<div style="margin-top:18px;font-family:Menlo,Consolas,monospace;font-size:9px;letter-spacing:0.18em;color:#9a9a93;text-transform:uppercase;">Dmytrii Barabash · Warszawa · PL</div>
 </td></tr>
 </table>
 </body></html>`;
@@ -994,7 +994,7 @@ function setupTabAway() {
   const lines = [
     'Wróć do skrzynki', 'Maile czekają', 'Jeszcze jeden szablon…',
     'CRM bez ciebie cichnie', 'Klient odpisał, sprawdź',
-    'Damian, gdzie idziesz?', 'Skrzynka nie sortuje się sama',
+    'Dmytrii, gdzie idziesz?', 'Skrzynka nie sortuje się sama',
   ];
   let last = -1, cycler = 0;
   const pick = () => {

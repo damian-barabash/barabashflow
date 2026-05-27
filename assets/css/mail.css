@@ -30,6 +30,17 @@ a.brand:hover { opacity: 0.78; }
   transform: translateX(-50%) translateY(0);
 }
 
+/* ── Opaque buttons on Mejle page — admin.css has `.btn { background: transparent }`
+   which lets the dotted page bg show through. On a busy backdrop it reads
+   noisy, so override here for the Mejle page only. ─────────────────────── */
+.btn { background: var(--surface); }
+.btn:hover { background: var(--bg-tint); }
+.btn.primary { background: var(--ink); color: var(--bg); }
+.btn.primary:hover { background: var(--ink); opacity: 0.92; }
+.btn.danger { background: var(--surface); }
+.btn.danger:hover { background: var(--bg-tint); }
+.btn.ghost { background: var(--bg-tint); }
+
 /* ── Bare .eyebrow + .spread + .placeholder-glyph (admin.css scopes them
    under .side-panel / .button-row). Used standalone in modals + panes. ── */
 .eyebrow {
@@ -100,15 +111,15 @@ body:not(.is-booting) .boot-splash { display: none; }
   letter-spacing: 0.20em;
   text-transform: uppercase;
   padding: 7px 12px;
-  background: transparent;
+  background: var(--surface);
   color: var(--ink-2);
-  border: 1px solid var(--hair);
+  border: 1px solid var(--hair-2);
   border-right: 0;
   cursor: pointer;
   transition: background 120ms, color 120ms;
 }
-.seg-btn:last-child { border-right: 1px solid var(--hair); }
-.seg-btn:hover { color: var(--ink); }
+.seg-btn:last-child { border-right: 1px solid var(--hair-2); }
+.seg-btn:hover { color: var(--ink); background: var(--bg-tint); }
 .seg-btn.is-active {
   background: var(--ink);
   color: var(--surface);
@@ -276,16 +287,26 @@ body:not(.is-booting) .boot-splash { display: none; }
 }
 .recip-chip button:hover { color: var(--ink); }
 
-#send-template { width: 100%; padding: 8px 10px; }
-#send-throttle { width: 100%; }
-
-#send-subject { width: 100%; padding: 10px 12px; font-size: 14px; }
+/* Form inputs across Mejle — always solid white so the dotted page bg
+   doesn't bleed through. (admin.css inputs are bg-less by default.) */
+#send-template,
+#send-throttle,
+#send-subject,
+#crm-search,
+#send-crm-search {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--hair-2);
+  color: var(--ink);
+}
+#send-template { padding: 8px 10px; }
+#send-subject  { padding: 10px 12px; font-size: 14px; }
 
 .rte-toolbar {
   display: flex; gap: 0;
-  border: 1px solid var(--hair);
+  border: 1px solid var(--hair-2);
   border-bottom: 0;
-  background: var(--surface-2);
+  background: var(--bg-tint);
 }
 .rte-toolbar button {
   background: transparent;
