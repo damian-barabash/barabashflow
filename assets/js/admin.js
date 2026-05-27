@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-05-26b';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-26b';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-05-27a';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27a';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'bf-admin-auth' },
@@ -110,10 +110,18 @@ async function onSignedIn(user) {
 }
 
 async function refreshAll() {
-  await Promise.all([loadSettings(), loadProjects(), loadInbox()]);
+  await Promise.all([loadSettings(), loadProjects(), loadMailCounts()]);
   renderSettings();
   renderGraph();
-  renderInbox();
+
+  // If we were redirected here from /mail.html (auth gate), now that the
+  // user is signed in, send them back. Validate it's a same-origin relative
+  // path so we don't open up to open-redirect abuse.
+  const params = new URLSearchParams(location.search);
+  const next = params.get('next');
+  if (next && /^\/[a-z0-9_\-./]+$/i.test(next)) {
+    window.location.replace(next);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -226,14 +234,18 @@ async function loadProjects() {
   state.connections = conns || [];
 }
 
-async function loadInbox() {
-  const { data, error } = await sb
-    .from('contact_submissions')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(200);
-  if (error) { console.error(error); return; }
-  state.inbox = data || [];
+// Combined unread count for the Mejle badge — sum of pending form/mascot
+// submissions + unread inbound emails. Cheap COUNT-only query.
+async function loadMailCounts() {
+  const [subs, ins] = await Promise.all([
+    sb.from('contact_submissions').select('id', { count: 'exact', head: true }).eq('is_read', false),
+    sb.from('mail_inbound').select('id', { count: 'exact', head: true }).eq('is_read', false),
+  ]);
+  const total = (subs.count || 0) + (ins.count || 0);
+  const badge = $('#mejle-badge');
+  if (!badge) return;
+  if (total > 0) { badge.style.display = ''; badge.textContent = String(total); }
+  else badge.style.display = 'none';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1108,85 +1120,7 @@ async function deleteProjectFromEditor() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Inbox
-// ═══════════════════════════════════════════════════════════════════════════
-
-function renderInbox() {
-  const list = $('#inbox-list');
-  const unread = state.inbox.filter((m) => !m.is_read).length;
-  const badge = $('#unread-badge');
-  if (unread) { badge.textContent = String(unread); badge.style.display = ''; }
-  else        { badge.style.display = 'none'; }
-
-  if (!state.inbox.length) {
-    list.innerHTML = '<div class="empty-state">Skrzynka pusta</div>';
-    return;
-  }
-  list.innerHTML = '';
-  for (const m of state.inbox) {
-    const row = document.createElement('div');
-    const cls = ['message'];
-    if (!m.is_read)  cls.push('unread');
-    if (m.is_replied) cls.push('replied');
-    row.className = cls.join(' ');
-    const sourceTag = m.source === 'mascot-bot'
-      ? '<span class="message-source">maskotka</span>'
-      : '';
-    row.innerHTML = `
-      <div class="message-head">
-        <div class="message-from">
-          <span class="message-name">${escapeHtml(m.name)}</span>
-          <span class="message-email">${escapeHtml(m.email)}</span>
-          ${sourceTag}
-        </div>
-        <span class="message-time">${formatDate(m.created_at)}</span>
-      </div>
-      <div class="message-body">${escapeHtml(m.message)}</div>
-      <div class="message-actions">
-        <a class="btn" href="mailto:${encodeURIComponent(m.email)}?subject=${encodeURIComponent('Re: BarabashFlow')}">Odpowiedz</a>
-        <button class="btn ${m.is_replied ? 'ghost' : 'primary'}" data-replied="${m.id}">
-          ${m.is_replied ? 'Cofnij odpowiedź' : 'Oznacz: odpowiedział'}
-        </button>
-        <button class="btn ghost" data-toggle="${m.id}">${m.is_read ? 'Nieprzeczytane' : 'Przeczytane'}</button>
-        <span class="spread" style="flex:1"></span>
-        <button class="btn danger" data-del="${m.id}">Usuń</button>
-      </div>`;
-    list.appendChild(row);
-  }
-  list.querySelectorAll('[data-toggle]').forEach((b) => {
-    b.addEventListener('click', async () => {
-      const id = b.dataset.toggle;
-      const m = state.inbox.find((x) => x.id === id);
-      if (!m) return;
-      const { error } = await sb.from('contact_submissions').update({ is_read: !m.is_read }).eq('id', id);
-      if (!error) { m.is_read = !m.is_read; renderInbox(); }
-    });
-  });
-  list.querySelectorAll('[data-replied]').forEach((b) => {
-    b.addEventListener('click', async () => {
-      const id = b.dataset.replied;
-      const m = state.inbox.find((x) => x.id === id);
-      if (!m) return;
-      const next = !m.is_replied;
-      // Marking replied implicitly marks read too — it's clearly seen.
-      const payload = next ? { is_replied: true, is_read: true } : { is_replied: false };
-      const { error } = await sb.from('contact_submissions').update(payload).eq('id', id);
-      if (!error) {
-        m.is_replied = next;
-        if (next) m.is_read = true;
-        renderInbox();
-      }
-    });
-  });
-  list.querySelectorAll('[data-del]').forEach((b) => {
-    b.addEventListener('click', async () => {
-      if (!confirm('Usunąć wiadomość?')) return;
-      const { error } = await sb.from('contact_submissions').delete().eq('id', b.dataset.del);
-      if (!error) { await loadInbox(); renderInbox(); }
-    });
-  });
-}
+// (Inbox UI moved to /mail.html — see Wiadomości & Skrzynka tabs there.)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Storage helpers
