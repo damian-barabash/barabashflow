@@ -2,6 +2,16 @@
    mail.css — overlay on top of admin.css for the Mejle page
    ──────────────────────────────────────────────────────────────────────── */
 
+/* ── Stacking fix ────────────────────────────────────────────────────────
+   admin.css has `body::before` with the dotted grid + explicit `z-index: 0`.
+   That makes ::before a positioned descendant which paints ABOVE static
+   page content (per CSS stacking-order rules), so dots leak over the
+   cards. Push the grid down and lift the shell up so cards properly cover. */
+body::before { z-index: -1 !important; }
+.shell { position: relative; z-index: 1; }
+.modal-root { z-index: 60; }
+.banner { z-index: 80; }
+
 /* ── Topbar overrides for mail.html ────────────────────────────────────── */
 /* admin.html uses <div class="brand"> with a <span class="dot">. We use
    <a class="brand"> with an <img class="brand-logo">. Need to: (a) size the

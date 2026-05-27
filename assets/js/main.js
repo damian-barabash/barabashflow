@@ -2,12 +2,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27f';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27g';
 import {
   LOCALES, getLocale, setLocale, onLocaleChange,
   t, pickField, applyDom,
-} from './i18n.js?v=2026-05-27f';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27f';
+} from './i18n.js?v=2026-05-27g';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27g';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false },
