@@ -598,6 +598,39 @@ body:not(.is-booting) .boot-splash { display: none; }
 }
 .thread-msg-body img { max-width: 100%; height: auto; }
 
+/* Outbound (sent by us) — right-aligned with subtle ink tint, like Gmail's
+   own-reply rendering. Distinguishes "Ja → recipient" from incoming. */
+.thread-msg.is-outbound {
+  padding-left: 14%;
+  border-left: 2px solid var(--ink);
+  padding-inline-start: 16px;
+  background: linear-gradient(90deg, transparent 0%, rgba(15, 15, 15, 0.025) 80%);
+}
+.thread-msg.is-outbound .thread-msg-head { color: var(--ink-2); }
+.thread-msg.is-outbound .thread-msg-from {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.thread-msg.is-outbound .thread-msg-email {
+  font-family: var(--font-body);
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+
+/* Latest-is-outbound marker in the thread list */
+.thread-you-arrow {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-2);
+  margin-right: 6px;
+  letter-spacing: 0.18em;
+}
+
 /* ── Templates manager (modal) ─────────────────────────────────────────── */
 .tmpl-list {
   display: flex;

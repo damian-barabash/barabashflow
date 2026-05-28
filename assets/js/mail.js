@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28a';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28b';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28b';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // Share storageKey with admin.html so signing in once unlocks both pages.
@@ -130,9 +130,16 @@ async function loadTemplates() {
 }
 
 async function loadInbox() {
-  const [submissions, inbound] = await Promise.all([
+  const [submissions, inbound, outbound] = await Promise.all([
     sb.from('contact_submissions').select('*').order('created_at', { ascending: false }).limit(200),
     sb.from('mail_inbound').select('*').order('received_at', { ascending: false }).limit(200),
+    // Only sent replies inside conversation threads — broadcasts (no thread_key) stay out of Skrzynka.
+    sb.from('mail_outbound')
+      .select('*')
+      .not('thread_key', 'is', null)
+      .in('status', ['sent', 'delivered', 'opened', 'clicked'])
+      .order('sent_at', { ascending: false, nullsFirst: false })
+      .limit(200),
   ]);
   const subs = (submissions.data || []).map((s) => ({
     _kind: 'submission',
@@ -155,6 +162,8 @@ async function loadInbox() {
     raw: m,
     from_email: m.from_email,
     from_name: m.from_name,
+    to_email: m.to_email,
+    to_name: null,
     subject: m.subject || '(brak tematu)',
     body_text: m.body_text,
     body_html: m.body_html,
@@ -164,10 +173,27 @@ async function loadInbox() {
     client_id: m.client_id || null,
     received_at: m.received_at,
   }));
-  state.inbox = [...subs, ...ins].sort(
+  const outs = (outbound.data || []).map((m) => ({
+    _kind: 'outbound',
+    id: `out:${m.id}`,
+    raw: m,
+    from_email: 'office@barabashflow.pl',
+    from_name: 'Ja',
+    to_email: m.to_email,
+    to_name: m.to_name,
+    subject: m.subject || '(brak tematu)',
+    body_text: null,
+    body_html: m.body_html,
+    source: 'sent',
+    is_read: true,
+    is_replied: false,
+    client_id: m.client_id || null,
+    received_at: m.sent_at || m.created_at,
+  }));
+  state.inbox = [...subs, ...ins, ...outs].sort(
     (a, b) => new Date(b.received_at) - new Date(a.received_at),
   );
-  // Split unread between the two badges
+  // Split unread between the two badges (outbound never counts as unread).
   paintBadge('#msgs-badge',  state.inbox.filter((m) => m._kind === 'submission' && !m.is_read).length);
   paintBadge('#inbox-badge', state.inbox.filter((m) => m._kind === 'inbound'    && !m.is_read).length);
 }
@@ -838,7 +864,10 @@ class InboxPanel {
   }
   // All messages of this panel kind, after sub-filter.
   filteredMessages() {
-    return state.inbox.filter((m) => m._kind === this.kindFilter).filter((m) => {
+    // For Skrzynka (inbound) — pull both inbound AND outbound so sent replies
+    // show up in threads. For Wiadomości — submission only.
+    const kinds = this.kindFilter === 'inbound' ? ['inbound', 'outbound'] : [this.kindFilter];
+    return state.inbox.filter((m) => kinds.includes(m._kind)).filter((m) => {
       switch (this.subFilter) {
         case 'unread':  return !m.is_read;
         case 'replied': return m.is_replied;
@@ -848,7 +877,7 @@ class InboxPanel {
       }
     });
   }
-  // Group inbound by thread_key (oldest-first inside, newest-first across).
+  // Group inbound+outbound by thread_key (oldest-first inside, newest-first across).
   // For submissions, each message is its own "thread of 1".
   groupedThreads() {
     const msgs = this.filteredMessages();
@@ -858,7 +887,7 @@ class InboxPanel {
         key: m.id, messages: [m], latest: m, anyUnread: !m.is_read, allReplied: m.is_replied,
       }));
     }
-    // Inbound — group by thread_key, fall back to message id if missing.
+    // Inbound+outbound — group by thread_key, fall back to message id if missing.
     const groups = new Map();
     for (const m of msgs) {
       const key = m.raw.thread_key || m.raw.message_id || m.id;
@@ -867,13 +896,22 @@ class InboxPanel {
     }
     const threads = [];
     for (const [key, list] of groups) {
+      // Hide pure-outbound threads (broadcasts that found a stale thread_key but
+      // have no inbound counterpart). Skrzynka = conversations.
+      if (!list.some((m) => m._kind === 'inbound')) continue;
       list.sort((a, b) => new Date(a.received_at) - new Date(b.received_at));
       threads.push({
         key,
         messages: list,
         latest: list[list.length - 1],
-        anyUnread: list.some((m) => !m.is_read),
-        allReplied: list.every((m) => m.is_replied),
+        anyUnread: list.some((m) => m._kind === 'inbound' && !m.is_read),
+        // "Replied" = there's at least one outbound after the last inbound.
+        allReplied: (() => {
+          const lastInboundIdx = list.map((m) => m._kind).lastIndexOf('inbound');
+          const explicitReplied = list.filter((m) => m._kind === 'inbound').every((m) => m.is_replied);
+          const hasOutboundAfter = list.slice(lastInboundIdx + 1).some((m) => m._kind === 'outbound');
+          return explicitReplied || hasOutboundAfter;
+        })(),
       });
     }
     threads.sort((a, b) => new Date(b.latest.received_at) - new Date(a.latest.received_at));
@@ -900,13 +938,19 @@ class InboxPanel {
       if (t.allReplied)                 cls.push('is-replied');
       if (this.selectedKey === t.key)   cls.push('is-selected');
       item.className = cls.join(' ');
-      const sourceTag = t.latest._kind === 'inbound' ? 'inbound'
-        : (t.latest.source === 'mascot-bot' ? 'mascot' : 'form');
-      const subj = this.cleanSubject(t.latest.subject);
+      // In Skrzynka thread list, surface the conversation partner (first inbound),
+      // not "Ja" when the user was last to reply. Falls back to latest for submissions.
+      const firstInbound = this.kindFilter === 'inbound'
+        ? (t.messages.find((m) => m._kind === 'inbound') || t.latest)
+        : t.latest;
+      const sourceTag = firstInbound._kind === 'inbound' ? 'inbound'
+        : (firstInbound.source === 'mascot-bot' ? 'mascot' : 'form');
+      const subj = this.cleanSubject(firstInbound.subject || t.latest.subject);
       const countBadge = t.messages.length > 1
         ? `<span class="thread-count">${t.messages.length}</span>` : '';
+      const youArrow = t.latest._kind === 'outbound' ? '<span class="thread-you-arrow">→</span> ' : '';
       item.innerHTML = `
-        <div class="inbox-from">${escapeHtml(t.latest.from_name || t.latest.from_email || '—')}${countBadge}</div>
+        <div class="inbox-from">${youArrow}${escapeHtml(firstInbound.from_name || firstInbound.from_email || '—')}${countBadge}</div>
         <div class="inbox-subject">${escapeHtml(subj)}</div>
         <div class="inbox-meta">
           <span>${formatDate(t.latest.received_at)}</span>
@@ -920,9 +964,10 @@ class InboxPanel {
   }
   async openThread(t) {
     this.selectedKey = t.key;
-    // Mark all messages in the thread as read.
+    // Mark all messages in the thread as read (outbound is always already read).
     const unreadIds = { sub: [], in: [] };
     for (const m of t.messages) {
+      if (m._kind === 'outbound') continue;
       if (!m.is_read) {
         if (m._kind === 'submission') unreadIds.sub.push(m.raw.id);
         else                          unreadIds.in.push(m.raw.id);
@@ -947,22 +992,30 @@ class InboxPanel {
       return;
     }
     const latest = t.latest;
-    const sourceTag = latest._kind === 'inbound' ? 'inbound'
-      : (latest.source === 'mascot-bot' ? 'mascot' : 'form');
-    const headSubject = this.cleanSubject(latest.subject);
+    // For Skrzynka head, prefer the first inbound message (the actual conversation partner)
+    // over a possibly-outbound latest message. For Wiadomości — same flat behavior as before.
+    const firstInbound = t.messages.find((m) => m._kind === 'inbound') || latest;
+    const partner = this.kindFilter === 'inbound' ? firstInbound : latest;
+    const sourceTag = partner._kind === 'inbound' ? 'inbound'
+      : (partner.source === 'mascot-bot' ? 'mascot' : 'form');
+    const headSubject = this.cleanSubject(partner.subject);
 
-    // Render every message in chronological order, each with its own mini-head + body.
+    // Render every message in chronological order. Outbound = "Ja → recipient"
+    // with a right-aligned accent, inbound = standard from/to.
     const messagesHtml = t.messages.map((m) => {
       const bodyContent = m.body_html
         ? sanitizeHtml(m.body_html)
         : `<pre style="margin:0;font-family:var(--font-body);font-size:14px;white-space:pre-wrap;">${escapeHtml(m.body_text || '(pusta wiadomość)')}</pre>`;
+      const isOut = m._kind === 'outbound';
+      const headLeft = isOut
+        ? `<span class="thread-msg-from">Ja</span>
+           <span class="thread-msg-email">→ ${escapeHtml(m.to_name || m.to_email || '')}</span>`
+        : `<span class="thread-msg-from">${escapeHtml(m.from_name || m.from_email)}</span>
+           <span class="thread-msg-email">&lt;${escapeHtml(m.from_email)}&gt;</span>`;
       return `
-        <article class="thread-msg">
+        <article class="thread-msg${isOut ? ' is-outbound' : ''}">
           <header class="thread-msg-head">
-            <div>
-              <span class="thread-msg-from">${escapeHtml(m.from_name || m.from_email)}</span>
-              <span class="thread-msg-email">&lt;${escapeHtml(m.from_email)}&gt;</span>
-            </div>
+            <div>${headLeft}</div>
             <span class="thread-msg-when">${formatDate(m.received_at, true)}</span>
           </header>
           <div class="thread-msg-body">${bodyContent}</div>
@@ -974,8 +1027,8 @@ class InboxPanel {
       <div class="pane-head">
         <div>
           <div class="pane-subject">${escapeHtml(headSubject)}</div>
-          <div class="pane-from" style="font-size:14px;margin-top:4px;">${escapeHtml(latest.from_name || latest.from_email)}</div>
-          <div class="pane-email">${escapeHtml(latest.from_email)}</div>
+          <div class="pane-from" style="font-size:14px;margin-top:4px;">${escapeHtml(partner.from_name || partner.from_email)}</div>
+          <div class="pane-email">${escapeHtml(partner.from_email)}</div>
         </div>
         <div class="pane-when">
           ${t.messages.length > 1 ? `<span class="thread-count" style="margin-right:8px;">${t.messages.length}</span>` : ''}
@@ -985,14 +1038,14 @@ class InboxPanel {
       <div class="thread-msgs">${messagesHtml}</div>
       <div class="pane-actions">
         <button class="btn primary pane-reply" type="button">Odpowiedz</button>
-        <button class="btn pane-add-crm" type="button" ${latest.client_id ? 'disabled' : ''}>${latest.client_id ? 'Już w CRM' : 'Dodaj do CRM'}</button>
+        <button class="btn pane-add-crm" type="button" ${partner.client_id ? 'disabled' : ''}>${partner.client_id ? 'Już w CRM' : 'Dodaj do CRM'}</button>
         <button class="btn pane-toggle-replied" type="button">${t.allReplied ? 'Cofnij: odpowiedział' : 'Oznacz: odpowiedział'}</button>
         <span class="spread"></span>
         <button class="btn danger pane-delete" type="button">Usuń wątek</button>
       </div>
     `;
     pane.querySelector('.pane-reply').addEventListener('click', () => replyToThread(t));
-    pane.querySelector('.pane-add-crm').addEventListener('click', () => addToCrm(latest));
+    pane.querySelector('.pane-add-crm').addEventListener('click', () => addToCrm(partner));
     pane.querySelector('.pane-toggle-replied').addEventListener('click', () => toggleThreadReplied(t));
     pane.querySelector('.pane-delete').addEventListener('click', () => deleteThread(t));
   }
@@ -1084,10 +1137,15 @@ function replyToThread(thread) {
   // References so Gmail / Outlook keep the conversation grouped.
   switchTab('send');
   const latest = thread.latest;
+  // Recipient = the conversation partner, NOT us. If latest was outbound,
+  // re-target the same recipient we sent to. Otherwise use latest.from_email.
+  const isOutLatest = latest._kind === 'outbound';
+  const recipientEmail = isOutLatest ? latest.to_email : latest.from_email;
+  const recipientName  = isOutLatest ? latest.to_name  : latest.from_name;
   state.selectedRecipients.clear();
-  state.selectedRecipients.set(latest.from_email, {
-    email: latest.from_email,
-    name: latest.from_name,
+  state.selectedRecipients.set(recipientEmail, {
+    email: recipientEmail,
+    name: recipientName,
     client_id: latest.client_id,
   });
   // Build References chain: existing refs + latest message_id, deduped.
@@ -1112,6 +1170,7 @@ async function toggleThreadReplied(thread) {
   const next = !thread.allReplied;
   const ids = { sub: [], in: [] };
   for (const m of thread.messages) {
+    if (m._kind === 'outbound') continue;
     if (m._kind === 'submission') ids.sub.push(m.raw.id);
     else                          ids.in.push(m.raw.id);
     m.is_replied = next;
@@ -1124,13 +1183,15 @@ async function toggleThreadReplied(thread) {
 
 async function deleteThread(thread) {
   if (!confirm(`Usunąć ${thread.messages.length > 1 ? `wątek (${thread.messages.length} wiadomości)` : 'wiadomość'}?`)) return;
-  const ids = { sub: [], in: [] };
+  const ids = { sub: [], in: [], out: [] };
   for (const m of thread.messages) {
-    if (m._kind === 'submission') ids.sub.push(m.raw.id);
-    else                          ids.in.push(m.raw.id);
+    if      (m._kind === 'submission') ids.sub.push(m.raw.id);
+    else if (m._kind === 'outbound')   ids.out.push(m.raw.id);
+    else                               ids.in.push(m.raw.id);
   }
   if (ids.sub.length) await sb.from('contact_submissions').delete().in('id', ids.sub);
   if (ids.in.length)  await sb.from('mail_inbound').delete().in('id', ids.in);
+  if (ids.out.length) await sb.from('mail_outbound').delete().in('id', ids.out);
   if (msgsPanel)  msgsPanel.selectedKey  = null;
   if (inboxPanel) inboxPanel.selectedKey = null;
   await loadInbox();
