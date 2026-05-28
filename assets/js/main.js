@@ -2,12 +2,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28d';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28e';
 import {
   LOCALES, getLocale, setLocale, onLocaleChange,
   t, pickField, applyDom,
-} from './i18n.js?v=2026-05-28d';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28d';
+} from './i18n.js?v=2026-05-28e';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28e';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false },
@@ -231,10 +231,12 @@ function applyAutoFit() {
 
   const fitX = (stageRect.width  / 2) / extentX;
   const fitY = (stageRect.height / 2) / extentY;
-  // Smaller safety margin now that nodes themselves shrink on mobile via
-  // applyGraphScale — too much extra zoom-out makes them illegibly tiny.
   const safety = isMobile ? 0.94 : 1;
-  let fit = Math.max(0.22, Math.min(1, Math.min(fitX, fitY) * safety));
+  // Mobile minimum: stop zooming out past 0.78 so cards stay readable.
+  // The graph may extend beyond the viewport — that's intentional, the user
+  // pans/pinches to reach the edges (better UX than tiny illegible nodes).
+  const minZoom = isMobile ? 0.78 : 0.22;
+  let fit = Math.max(minZoom, Math.min(1, Math.min(fitX, fitY) * safety));
 
   state.viewZoom = fit;
   state.viewPanX = 0;
@@ -262,25 +264,11 @@ function applyViewTransform() {
 function applyGraphScale(n) {
   const root = document.documentElement;
   // 1..4 projects → 1.0 ; 8 → 0.80 ; 12 → 0.65 ; 16+ → 0.55
-  let scale = Math.max(0.55, Math.min(1, 1 - Math.max(0, n - 4) * 0.045));
-  // Portrait phones get a much stronger shrink — admin coords are tuned for
-  // a wide landscape stage and on a narrow portrait viewport they crowd.
-  // Smaller nodes = more relative whitespace between them at the same
-  // normalized positions.
-  const narrow   = window.innerWidth <= 760;
-  const portrait = window.innerHeight > window.innerWidth;
-  let logoFactor = 1;
-  if (narrow && portrait) {
-    const mobileShrink = Math.max(0.45, 1 - Math.max(0, n - 3) * 0.075);
-    scale *= mobileShrink;
-    // Pull the centre logo down further than nodes so it stops eating the
-    // ring's interior space on a phone-sized stage.
-    logoFactor = 0.72;
-  }
+  const scale = Math.max(0.55, Math.min(1, 1 - Math.max(0, n - 4) * 0.045));
   root.style.setProperty('--node-w',       `${Math.round(158 * scale)}px`);
   root.style.setProperty('--node-h',       `${Math.round(144 * scale)}px`);
   root.style.setProperty('--node-thumb-h', `${Math.round(88  * scale)}px`);
-  root.style.setProperty('--logo-d',       `${Math.round(296 * scale * logoFactor)}px`);
+  root.style.setProperty('--logo-d',       `${Math.round(296 * scale)}px`);
 }
 
 function autoLayout(projects) {
@@ -360,12 +348,20 @@ function stageMetrics() {
   // tighter padding → more room → existing baseX/baseY render further from center
   const padX = Math.min(rect.width * 0.04, 64);
   const padY = Math.min(rect.height * 0.06, 56);
+  // On portrait phones the admin-saved positions (designed on a wide stage)
+  // get compressed when mapped to a narrow viewport. Expanding the "world"
+  // here multiplies every node's pixel distance from centre. applyAutoFit
+  // caps min zoom so the graph stays at a readable scale even when it
+  // overflows the viewport — the user can pan/pinch to see the rest.
+  const narrow   = window.innerWidth <= 760;
+  const portrait = rect.height > rect.width;
+  const worldMul = (narrow && portrait) ? 2.0 : 1;
   return {
     rect,
     cx: rect.width / 2,
     cy: rect.height / 2,
-    halfW: rect.width / 2 - padX,
-    halfH: rect.height / 2 - padY,
+    halfW: (rect.width / 2 - padX) * worldMul,
+    halfH: (rect.height / 2 - padY) * worldMul,
   };
 }
 
