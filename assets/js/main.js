@@ -2,12 +2,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28c';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28d';
 import {
   LOCALES, getLocale, setLocale, onLocaleChange,
   t, pickField, applyDom,
-} from './i18n.js?v=2026-05-28c';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28c';
+} from './i18n.js?v=2026-05-28d';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28d';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false },
@@ -263,19 +263,24 @@ function applyGraphScale(n) {
   const root = document.documentElement;
   // 1..4 projects → 1.0 ; 8 → 0.80 ; 12 → 0.65 ; 16+ → 0.55
   let scale = Math.max(0.55, Math.min(1, 1 - Math.max(0, n - 4) * 0.045));
-  // Portrait phones get an extra shrink so admin positions (designed on a
-  // wide stage) don't crowd into each other when remapped to a narrow
-  // viewport. The more projects, the harder we shrink.
+  // Portrait phones get a much stronger shrink — admin coords are tuned for
+  // a wide landscape stage and on a narrow portrait viewport they crowd.
+  // Smaller nodes = more relative whitespace between them at the same
+  // normalized positions.
   const narrow   = window.innerWidth <= 760;
   const portrait = window.innerHeight > window.innerWidth;
+  let logoFactor = 1;
   if (narrow && portrait) {
-    const mobileShrink = Math.max(0.60, 1 - Math.max(0, n - 3) * 0.06);
+    const mobileShrink = Math.max(0.45, 1 - Math.max(0, n - 3) * 0.075);
     scale *= mobileShrink;
+    // Pull the centre logo down further than nodes so it stops eating the
+    // ring's interior space on a phone-sized stage.
+    logoFactor = 0.72;
   }
   root.style.setProperty('--node-w',       `${Math.round(158 * scale)}px`);
   root.style.setProperty('--node-h',       `${Math.round(144 * scale)}px`);
   root.style.setProperty('--node-thumb-h', `${Math.round(88  * scale)}px`);
-  root.style.setProperty('--logo-d',       `${Math.round(296 * scale)}px`);
+  root.style.setProperty('--logo-d',       `${Math.round(296 * scale * logoFactor)}px`);
 }
 
 function autoLayout(projects) {
