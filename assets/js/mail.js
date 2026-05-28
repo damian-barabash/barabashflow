@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27i';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27i';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28a';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28a';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // Share storageKey with admin.html so signing in once unlocks both pages.
@@ -796,10 +796,44 @@ class InboxPanel {
     });
     const refresh = this.root.querySelector('.inbox-refresh-btn');
     if (refresh) refresh.addEventListener('click', async () => {
-      await loadInbox();
-      msgsPanel?.render();
-      inboxPanel?.render();
-      banner('Odświeżono', 'ok');
+      const origLabel = refresh.textContent;
+      refresh.disabled = true;
+      try {
+        // Skrzynka → fire IMAP poll via mail-refresh Edge Function.
+        // Wiadomości (form/mascot) live in contact_submissions — no IMAP needed.
+        if (this.kindFilter === 'inbound') {
+          refresh.textContent = 'Sprawdzam pocztę…';
+          banner('Łączę z IMAP…', null);
+          const { data: { session } } = await sb.auth.getSession();
+          const r = await fetch(`${FUNCTIONS_URL}/mail-refresh`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          });
+          const out = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            banner(`IMAP błąd: ${out.error || r.status}`, 'error');
+            return;
+          }
+          await loadInbox();
+          msgsPanel?.render();
+          inboxPanel?.render();
+          banner(out.ingested ? `Nowe: ${out.ingested}` : 'Brak nowych', 'ok');
+          return;
+        }
+        refresh.textContent = 'Ładuję…';
+        await loadInbox();
+        msgsPanel?.render();
+        inboxPanel?.render();
+        banner('Odświeżono', 'ok');
+      } finally {
+        refresh.disabled = false;
+        refresh.textContent = origLabel;
+      }
     });
   }
   // All messages of this panel kind, after sub-filter.
