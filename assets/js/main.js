@@ -2,12 +2,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-27i';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28a';
 import {
   LOCALES, getLocale, setLocale, onLocaleChange,
   t, pickField, applyDom,
-} from './i18n.js?v=2026-05-27i';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-27i';
+} from './i18n.js?v=2026-05-28a';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28a';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false },
@@ -168,8 +168,14 @@ function renderNodes() {
 
   applyGraphScale(projects.length);
 
+  // On mobile we always recompute a clean ring — user-saved positions are
+  // from desktop drag where the stage is wide; on a 360px portrait screen
+  // those positions clump and overlap. Desktop keeps custom positions intact
+  // because we never persist these overrides (autoLayout only mutates the
+  // in-memory projects array passed to renderNodes).
+  const isMobile = window.innerWidth <= 760;
   const allZero = projects.every((p) => p.position_x === 0 && p.position_y === 0);
-  if (allZero) autoLayout(projects);
+  if (allZero || isMobile) autoLayout(projects);
 
   const frag = document.createDocumentFragment();
   projects.forEach((p, i) => {
@@ -200,19 +206,35 @@ function renderNodes() {
 
 function applyAutoFit() {
   if (state.userViewSet) return;          // respect manual zoom/pan if user touched it
-  let maxAbs = 1;
+
+  const stageRect = state.stage?.getBoundingClientRect();
+  if (!stageRect || !stageRect.width || !stageRect.height) return;
+
+  // Measure actual node bounds so the auto-fit accounts for node size, not
+  // just position. Without this we'd clip the outermost node off-screen.
+  const firstNode = state.nodes[0]?.el;
+  const nodeRect  = firstNode?.getBoundingClientRect();
+  const nodeW = nodeRect?.width  || 158;
+  const nodeH = nodeRect?.height || 144;
+
+  let maxAbsX = 0.001, maxAbsY = 0.001;
   for (const n of state.nodes) {
-    maxAbs = Math.max(maxAbs, Math.abs(n.baseX), Math.abs(n.baseY));
+    maxAbsX = Math.max(maxAbsX, Math.abs(n.baseX));
+    maxAbsY = Math.max(maxAbsY, Math.abs(n.baseY));
   }
-  let fit = 1 / Math.max(1, maxAbs * 1.06);
-  // On narrow viewports nodes are still oversized vs. available space —
-  // pull the camera back further so the graph reads as a whole. The 3D
-  // logo + node thumbs are big in absolute px and don't scale with viewport
-  // width by themselves.
-  const w = window.innerWidth;
-  if (w <= 480)       fit *= 0.62;
-  else if (w <= 760)  fit *= 0.72;
-  else if (w <= 1024) fit *= 0.88;
+
+  const m = stageMetrics();
+  // Pixel extent from center to outermost node center, plus node half-size
+  // (so the node body fits in viewport, not just its center point).
+  const padding = 16;
+  const extentX = maxAbsX * m.halfW + nodeW / 2 + padding;
+  const extentY = maxAbsY * m.halfH + nodeH / 2 + padding;
+
+  const fitX = (stageRect.width  / 2) / extentX;
+  const fitY = (stageRect.height / 2) / extentY;
+  // Never zoom in past 1.0 (would defeat the purpose); clamp tiny zoom too.
+  let fit = Math.max(0.22, Math.min(1, Math.min(fitX, fitY)));
+
   state.viewZoom = fit;
   state.viewPanX = 0;
   state.viewPanY = 0;
@@ -248,9 +270,30 @@ function applyGraphScale(n) {
 
 function autoLayout(projects) {
   const n = projects.length;
-  // The circle widens as N grows so labels keep their distance.
-  const radiusX = Math.min(0.96, 0.86 + Math.max(0, n - 4) * 0.018);
-  const radiusY = Math.min(0.90, 0.78 + Math.max(0, n - 4) * 0.018);
+  const portrait = window.innerHeight > window.innerWidth;
+  const narrow   = window.innerWidth <= 760;
+
+  let radiusX, radiusY;
+  if (narrow && portrait && n >= 2) {
+    // Portrait phones: derive a TRUE pixel-circle radius from node size so
+    // adjacent chord length (2r·sin(π/n)) is large enough to clear the node
+    // diagonal. The ring may overflow the stage in pixels — applyAutoFit
+    // then zooms out to bring everything into view.
+    const m = stageMetrics();
+    const cs = getComputedStyle(document.documentElement);
+    const nodeW = parseFloat(cs.getPropertyValue('--node-w')) || 128;
+    const nodeH = parseFloat(cs.getPropertyValue('--node-h')) || 118;
+    // Nodes are axis-aligned rectangles, not tangent to the ring, so using
+    // the diagonal over-spaces them. The larger side + a small buffer is
+    // enough for visual clearance at any angle.
+    const minChord = Math.max(nodeW, nodeH) + 10;
+    const rPx = minChord / (2 * Math.sin(Math.PI / n));
+    radiusX = rPx / Math.max(1, m.halfW);
+    radiusY = rPx / Math.max(1, m.halfH);
+  } else {
+    radiusX = Math.min(0.96, 0.86 + Math.max(0, n - 4) * 0.018);
+    radiusY = Math.min(0.90, 0.78 + Math.max(0, n - 4) * 0.018);
+  }
   for (let i = 0; i < n; i++) {
     const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
     projects[i].position_x = Math.cos(angle) * radiusX;
@@ -1021,7 +1064,17 @@ function startAnimationLoop() {
 
 function onResize() {
   cancelAnimationFrame(state.resizeRaf);
-  state.resizeRaf = requestAnimationFrame(redrawEdges);
+  state.resizeRaf = requestAnimationFrame(() => {
+    // On phones, re-layout the ring on rotation/viewport change so the
+    // portrait/landscape ellipse stays correct. Desktop respects user
+    // positions and only redraws edges.
+    const crossedMobileBoundary = window.innerWidth <= 760;
+    if (crossedMobileBoundary && state.projects.length && !state.userViewSet) {
+      renderNodes();
+    } else {
+      redrawEdges();
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

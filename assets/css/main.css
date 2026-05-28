@@ -776,7 +776,9 @@ body::after {
   position: relative;
   z-index: 1;
   width: min(720px, 100%);
-  max-height: min(880px, 100%);
+  /* dvh = visible viewport on iOS Safari (excludes URL bar + bottom toolbar
+     when they're showing), so the modal never extends behind browser chrome. */
+  max-height: min(880px, calc(100dvh - 24px));
   background: var(--surface);
   box-shadow: var(--shadow-modal);
   border: 1px solid var(--hair-2);
@@ -1540,10 +1542,19 @@ body:not(.is-loading) .node        { animation: nodeIn    0.65s cubic-bezier(0.1
   .node:hover { border-color: var(--node-bd); box-shadow: var(--node-sh); }
 }
 
-/* Modal — comfortable on phones (full-width, edge-to-edge stacking actions). */
+/* Modal — comfortable on phones (full-width, edge-to-edge stacking actions).
+   Top/bottom padding reserves room for iOS Safari URL bar + bottom toolbar
+   so the close (X) and action buttons aren't hidden behind browser chrome.
+   `dvh` shrinks when chrome is visible; the hard-coded mins cover the worst
+   case (collapsed bars on iPhones where env() returns the notch offset only). */
 @media (max-width: 600px) {
-  .modal-root { padding: 12px; }
-  .modal      { max-height: 92vh; }
+  .modal-root {
+    padding:
+      max(64px, calc(env(safe-area-inset-top, 0px) + 14px))
+      12px
+      max(80px, calc(env(safe-area-inset-bottom, 0px) + 60px));
+  }
+  .modal       { max-height: calc(100dvh - 144px); }
   .modal-close { top: 10px; right: 10px; width: 32px; height: 32px; }
   .modal-body  { padding: 24px 18px 20px; gap: 12px; }
   .modal-title { font-size: clamp(20px, 5.4vmin, 26px); letter-spacing: 0.03em; }
