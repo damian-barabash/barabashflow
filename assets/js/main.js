@@ -2,12 +2,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28b';
 import {
   LOCALES, getLocale, setLocale, onLocaleChange,
   t, pickField, applyDom,
-} from './i18n.js?v=2026-05-28a';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28a';
+} from './i18n.js?v=2026-05-28b';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28b';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false },
@@ -168,14 +168,10 @@ function renderNodes() {
 
   applyGraphScale(projects.length);
 
-  // On mobile we always recompute a clean ring — user-saved positions are
-  // from desktop drag where the stage is wide; on a 360px portrait screen
-  // those positions clump and overlap. Desktop keeps custom positions intact
-  // because we never persist these overrides (autoLayout only mutates the
-  // in-memory projects array passed to renderNodes).
-  const isMobile = window.innerWidth <= 760;
+  // Use admin-saved positions verbatim (mobile too). autoLayout only fires
+  // when nothing has been positioned yet (fresh project set).
   const allZero = projects.every((p) => p.position_x === 0 && p.position_y === 0);
-  if (allZero || isMobile) autoLayout(projects);
+  if (allZero) autoLayout(projects);
 
   const frag = document.createDocumentFragment();
   projects.forEach((p, i) => {
@@ -226,14 +222,19 @@ function applyAutoFit() {
   const m = stageMetrics();
   // Pixel extent from center to outermost node center, plus node half-size
   // (so the node body fits in viewport, not just its center point).
-  const padding = 16;
+  // Larger padding on phones — admin positions are tuned for wide desktop
+  // stages and would otherwise crowd against the viewport edges on portrait.
+  const isMobile = window.innerWidth <= 760;
+  const padding = isMobile ? 32 : 16;
   const extentX = maxAbsX * m.halfW + nodeW / 2 + padding;
   const extentY = maxAbsY * m.halfH + nodeH / 2 + padding;
 
   const fitX = (stageRect.width  / 2) / extentX;
   const fitY = (stageRect.height / 2) / extentY;
-  // Never zoom in past 1.0 (would defeat the purpose); clamp tiny zoom too.
-  let fit = Math.max(0.22, Math.min(1, Math.min(fitX, fitY)));
+  // Extra safety margin on mobile so the ring breathes — admin coords were
+  // arranged on a landscape stage and look tighter when remapped to portrait.
+  const safety = isMobile ? 0.86 : 1;
+  let fit = Math.max(0.22, Math.min(1, Math.min(fitX, fitY) * safety));
 
   state.viewZoom = fit;
   state.viewPanX = 0;
@@ -1065,15 +1066,10 @@ function startAnimationLoop() {
 function onResize() {
   cancelAnimationFrame(state.resizeRaf);
   state.resizeRaf = requestAnimationFrame(() => {
-    // On phones, re-layout the ring on rotation/viewport change so the
-    // portrait/landscape ellipse stays correct. Desktop respects user
-    // positions and only redraws edges.
-    const crossedMobileBoundary = window.innerWidth <= 760;
-    if (crossedMobileBoundary && state.projects.length && !state.userViewSet) {
-      renderNodes();
-    } else {
-      redrawEdges();
-    }
+    redrawEdges();
+    // Recompute auto-fit zoom so the layout adapts to the new viewport
+    // (e.g. phone rotation). Skip if the user has manually zoomed/panned.
+    if (!state.userViewSet) applyAutoFit();
   });
 }
 
