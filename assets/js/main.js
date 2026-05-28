@@ -2,12 +2,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28e';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28f';
 import {
   LOCALES, getLocale, setLocale, onLocaleChange,
   t, pickField, applyDom,
-} from './i18n.js?v=2026-05-28e';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28e';
+} from './i18n.js?v=2026-05-28f';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28f';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false },
@@ -173,12 +173,36 @@ function renderNodes() {
   const allZero = projects.every((p) => p.position_x === 0 && p.position_y === 0);
   if (allZero) autoLayout(projects);
 
+  // On portrait phones each node is pushed radially outward from the BF
+  // centre by a constant — this opens a bigger inner ring around the 3D
+  // logo so projects don't crowd the middle. The push preserves each
+  // node's angle (admin's intended arrangement) but increases its
+  // distance from centre uniformly.
+  const isMobilePortrait =
+    window.innerWidth <= 760 && window.innerHeight > window.innerWidth;
+  const radialPush = isMobilePortrait ? 0.55 : 0;
+
   const frag = document.createDocumentFragment();
   projects.forEach((p, i) => {
     const el = buildNodeEl(p, i);
     frag.appendChild(el);
-    const bx = clampUnit(p.position_x);
-    const by = clampUnit(p.position_y);
+    let bx = Number.isFinite(p.position_x) ? p.position_x : 0;
+    let by = Number.isFinite(p.position_y) ? p.position_y : 0;
+    if (radialPush > 0) {
+      const len = Math.hypot(bx, by);
+      if (len > 0.01) {
+        const factor = (len + radialPush) / len;
+        bx *= factor;
+        by *= factor;
+      } else {
+        // Node sits exactly at centre — push it straight up so it joins
+        // the ring instead of clipping the 3D logo.
+        by = -radialPush;
+      }
+    } else {
+      bx = clampUnit(bx);
+      by = clampUnit(by);
+    }
     state.nodes.push({
       id: p.id,
       el,
@@ -339,7 +363,10 @@ function buildNodeEl(p, index = 0) {
 }
 
 function clampUnit(v) {
-  if (Number.isFinite(v)) return Math.max(-1, Math.min(1, v));
+  // Broad bound (±3) so the mobile radial push doesn't get yanked back to
+  // ±1 by repulsion / smoothNodes. Admin positions are still ±1 on desktop,
+  // so this is a no-op for the desktop layout.
+  if (Number.isFinite(v)) return Math.max(-3, Math.min(3, v));
   return 0;
 }
 
