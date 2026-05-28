@@ -925,10 +925,83 @@ a { color: var(--ink); text-decoration: none; }
 
 /* small responsive */
 @media (max-width: 760px) {
-  .tabs { gap: 0; }
-  .tab-btn { padding: 7px 10px; font-size: 10px; letter-spacing: 0.16em; }
+  /* Topbar — drop secondary text, keep brand mark + tabs + critical icons.
+     Allow horizontal scroll on tabs in case more get added. */
+  .top-inner {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .brand { font-size: 11px; letter-spacing: 0.18em; gap: 8px; }
+  .brand > span:not(.brand-logo) { display: none; }   /* only logo remains */
+  .brand-logo { height: 24px; }
   .brand .sep, .session { display: none; }
-  .work { min-height: auto; }
-  .graph-workspace { min-height: 420px; }
-  .side-panel { min-height: 320px; }
+  .tabs {
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab-btn { padding: 9px 11px; font-size: 10px; letter-spacing: 0.14em; flex-shrink: 0; }
+  .icon-btn { width: 36px; height: 36px; }
+
+  /* Forms — 16px font kills the iOS auto-zoom on focus. Also looser padding
+     for fat-finger tap targets. */
+  input, textarea, select {
+    font-size: 16px;
+    padding: 13px 14px;
+  }
+
+  /* Lang-trio: stack PL/EN/RU vertically — three side-by-side inputs are
+     unusable at ~110px each. */
+  .lang-trio {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .lang-trio .field-input::before {
+    top: 14px;
+    right: 12px;
+    font-size: 10px;
+  }
+  .lang-trio input,
+  .lang-trio textarea { padding-right: 44px; }
+
+  /* row-2 (any two-column layout) → single column on phones. */
+  .row-2 { grid-template-columns: 1fr; gap: 12px; }
+  .photo-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* Settings card padding shrink. */
+  .settings-card {
+    padding: 22px clamp(14px, 4vw, 20px);
+    gap: 22px;
+  }
+  .panel-page {
+    padding: 18px 12px 100px;
+  }
+
+  /* Sections — tighter heads, no aside if cramped. */
+  .section-head { flex-wrap: wrap; gap: 6px; }
+
+  /* Buttons — full width primary action on small screens. */
+  .button-row { flex-direction: column-reverse; align-items: stretch; gap: 8px; }
+  .button-row .spread { display: none; }
+  .button-row .btn { width: 100%; padding: 14px 16px; font-size: 11px; }
+
+  /* Work area — collapsed by the 1100px rule already. Just tighten heights. */
+  .work { min-height: auto; gap: 14px; }
+  .graph-workspace { min-height: 380px; }
+  .side-panel { min-height: auto; padding: 18px 16px; }
+
+  /* Banner — keep above iOS Safari URL bar. */
+  .banner { top: max(60px, env(safe-area-inset-top, 0px) + 14px); }
+}
+
+/* Tiny phones — squeeze further. */
+@media (max-width: 420px) {
+  .top-inner { padding: 8px 10px; gap: 6px; }
+  .icon-btn { width: 34px; height: 34px; }
+  .mejle-link .badge { font-size: 8px; padding: 1px 4px; min-width: 14px; }
+  .tab-btn { padding: 8px 9px; font-size: 9px; letter-spacing: 0.12em; }
 }

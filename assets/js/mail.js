@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28b';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28b';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28g';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28g';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // Share storageKey with admin.html so signing in once unlocks both pages.
@@ -964,6 +964,9 @@ class InboxPanel {
   }
   async openThread(t) {
     this.selectedKey = t.key;
+    // Mobile single-pane: toggle layout to show pane, hide list.
+    const layout = this.root.querySelector('.inbox-layout');
+    if (layout) layout.classList.add('has-selection');
     // Mark all messages in the thread as read (outbound is always already read).
     const unreadIds = { sub: [], in: [] };
     for (const m of t.messages) {
@@ -985,6 +988,10 @@ class InboxPanel {
     if (!pane) return;
     const t = this.groupedThreads().find((x) => x.key === this.selectedKey);
     if (!t) {
+      // Selection lost (item filtered out, deleted, etc.) — drop the
+      // mobile single-pane lock so the list is visible again.
+      const layout = this.root.querySelector('.inbox-layout');
+      if (layout) layout.classList.remove('has-selection');
       const empty = this.kindFilter === 'inbound'
         ? 'Wybierz e-mail, by zobaczyć rozmowę.'
         : 'Wybierz wiadomość, by zobaczyć szczegóły.';
@@ -1024,6 +1031,12 @@ class InboxPanel {
     }).join('');
 
     pane.innerHTML = `
+      <button class="pane-back-btn" type="button" aria-label="Wróć do listy">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M12 4l-5 6 5 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Lista</span>
+      </button>
       <div class="pane-head">
         <div>
           <div class="pane-subject">${escapeHtml(headSubject)}</div>
@@ -1044,6 +1057,12 @@ class InboxPanel {
         <button class="btn danger pane-delete" type="button">Usuń wątek</button>
       </div>
     `;
+    pane.querySelector('.pane-back-btn').addEventListener('click', () => {
+      this.selectedKey = null;
+      const layout = this.root.querySelector('.inbox-layout');
+      if (layout) layout.classList.remove('has-selection');
+      this.render();
+    });
     pane.querySelector('.pane-reply').addEventListener('click', () => replyToThread(t));
     pane.querySelector('.pane-add-crm').addEventListener('click', () => addToCrm(partner));
     pane.querySelector('.pane-toggle-replied').addEventListener('click', () => toggleThreadReplied(t));

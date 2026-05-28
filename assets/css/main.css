@@ -1016,6 +1016,47 @@ body::after {
 }
 
 /* ════════════════════════════════════════════════════════════════
+   Pan hint — mobile-only chip telling the user the graph is draggable.
+   Auto-fades in shortly after load, dismisses on first interaction
+   (pointerdown on .stage) or after a few seconds.
+   ════════════════════════════════════════════════════════════════ */
+.graph-pan-hint {
+  display: none;            /* shown only on touch / narrow viewports */
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translate(-50%, 8px);
+  z-index: 24;
+  padding: 9px 14px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 12px 28px -14px rgba(15,15,15,0.45);
+  transition:
+    opacity   0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.graph-pan-hint svg { width: 14px; height: 14px; }
+.graph-pan-hint.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+@media (hover: none) and (pointer: coarse), (max-width: 760px) {
+  .graph-pan-hint { display: inline-flex; }
+}
+:root[data-theme="dark"] .graph-pan-hint {
+  box-shadow: 0 12px 28px -14px rgba(0,0,0,0.8);
+}
+
+/* ════════════════════════════════════════════════════════════════
    Cookie consent — bottom-right popup + dedicated policy modal.
    ════════════════════════════════════════════════════════════════ */
 .cookie-bot {

@@ -2,12 +2,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28f';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28g';
 import {
   LOCALES, getLocale, setLocale, onLocaleChange,
   t, pickField, applyDom,
-} from './i18n.js?v=2026-05-28f';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28f';
+} from './i18n.js?v=2026-05-28g';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28g';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false },
@@ -64,6 +64,7 @@ async function init() {
   setupViewZoomPan();
   setupMascotBot();
   setupCookieConsent();
+  setupPanHint();
 
   // Trigger cinematic entrance.
   // Two frames so the first paint settles before keyframes start.
@@ -1473,6 +1474,41 @@ function setupMascotBot() {
 // Tab-away prank — when the tab loses focus, swap the title to a playful PL
 // nudge to come back. Restore the original on focus. Rotate every 6s.
 // ═══════════════════════════════════════════════════════════════════════════
+
+function setupPanHint() {
+  const hint = $('#graph-pan-hint');
+  if (!hint) return;
+  // Don't pester the user — once dismissed, stay quiet for the session.
+  const KEY = 'bf:pan-hint-seen';
+  try { if (sessionStorage.getItem(KEY) === '1') return; } catch {}
+
+  // Show only when there's something worth panning to (graph overflows or
+  // we're on a narrow viewport where pan is the natural way to explore).
+  const narrow = window.innerWidth <= 760
+    || window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  if (!narrow) return;
+
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
+    hint.classList.remove('is-visible');
+    try { sessionStorage.setItem(KEY, '1'); } catch {}
+    state.stage?.removeEventListener('pointerdown', dismiss);
+    window.removeEventListener('wheel', dismiss);
+  };
+
+  // Show after the cinematic entrance has settled.
+  setTimeout(() => {
+    if (dismissed) return;
+    hint.classList.add('is-visible');
+  }, 1600);
+  // Auto-hide after a few seconds even if the user didn't touch the stage.
+  setTimeout(dismiss, 6500);
+
+  state.stage?.addEventListener('pointerdown', dismiss, { once: true });
+  window.addEventListener('wheel',       dismiss, { once: true, passive: true });
+}
 
 function setupTabAway() {
   const original = document.title;

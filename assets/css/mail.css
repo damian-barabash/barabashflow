@@ -729,9 +729,64 @@ body:not(.is-booting) .boot-splash { display: none; }
   .inbox-pane { order: 2; }
 }
 @media (max-width: 760px) {
-  .crm-toolbar { grid-template-columns: 1fr; }
-  .crm-actions { justify-content: stretch; }
-  .crm-actions .btn { flex: 1; }
-  .inbox-toolbar { flex-direction: column; align-items: stretch; }
-  .seg-btn { font-size: 9px; padding: 6px 10px; }
+  /* CRM toolbar: stack and stretch CTAs for fat-finger tapping. */
+  .crm-toolbar { grid-template-columns: 1fr; gap: 10px; }
+  .crm-actions { justify-content: stretch; flex-wrap: wrap; }
+  .crm-actions .btn { flex: 1 1 calc(50% - 4px); padding: 13px 12px; }
+  .crm-list { grid-template-columns: 1fr; gap: 10px; }
+  .crm-card { padding: 16px 14px; }
+
+  /* Inbox toolbar: filters scroll horizontally — there are up to 5 chips. */
+  .inbox-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .inbox-filters {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    white-space: nowrap;
+    margin: 0 -2px;
+    padding: 0 2px;
+  }
+  .inbox-filters::-webkit-scrollbar { display: none; }
+  .seg-btn { font-size: 10px; padding: 9px 12px; flex-shrink: 0; }
+  .inbox-refresh-btn { width: 100%; padding: 13px 14px; }
+
+  /* Single-pane inbox: list OR pane, controlled by .has-selection on the
+     layout. The list shows by default; opening a thread swaps to the pane. */
+  .inbox-layout { gap: 0; }
+  .inbox-list { max-height: none; }
+  .inbox-pane { display: none; padding: 18px 14px; min-height: auto; }
+  .inbox-layout.has-selection .inbox-list { display: none; }
+  .inbox-layout.has-selection .inbox-pane { display: block; }
+
+  /* Back button shown only on mobile when a thread is open. */
+  .pane-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--hair-2);
+    padding: 9px 12px;
+    margin-bottom: 14px;
+  }
+  .pane-back-btn svg { width: 14px; height: 14px; }
+  .pane-actions { flex-direction: column; align-items: stretch; }
+  .pane-actions .spread { display: none; }
+  .pane-actions .btn { width: 100%; padding: 13px 14px; font-size: 11px; }
+
+  /* Send (Rozsyłka) — already stacks at 1024. Just bigger inputs + RTE. */
+  .rte { min-height: 220px; padding: 14px; font-size: 16px; }
+  .rte-toolbar button { padding: 9px 12px; font-size: 13px; }
+  .preview-frame { height: 320px; }
+  .recipient-chips { gap: 6px; }
+  .send-progress-bar { height: 6px; }
+}
+
+/* Hide back button on desktop — only meaningful in mobile single-pane mode. */
+@media (min-width: 761px) {
+  .pane-back-btn { display: none !important; }
 }
