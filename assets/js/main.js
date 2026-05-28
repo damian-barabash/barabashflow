@@ -2,12 +2,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28b';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28c';
 import {
   LOCALES, getLocale, setLocale, onLocaleChange,
   t, pickField, applyDom,
-} from './i18n.js?v=2026-05-28b';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28b';
+} from './i18n.js?v=2026-05-28c';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28c';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false },
@@ -231,9 +231,9 @@ function applyAutoFit() {
 
   const fitX = (stageRect.width  / 2) / extentX;
   const fitY = (stageRect.height / 2) / extentY;
-  // Extra safety margin on mobile so the ring breathes — admin coords were
-  // arranged on a landscape stage and look tighter when remapped to portrait.
-  const safety = isMobile ? 0.86 : 1;
+  // Smaller safety margin now that nodes themselves shrink on mobile via
+  // applyGraphScale — too much extra zoom-out makes them illegibly tiny.
+  const safety = isMobile ? 0.94 : 1;
   let fit = Math.max(0.22, Math.min(1, Math.min(fitX, fitY) * safety));
 
   state.viewZoom = fit;
@@ -262,7 +262,16 @@ function applyViewTransform() {
 function applyGraphScale(n) {
   const root = document.documentElement;
   // 1..4 projects → 1.0 ; 8 → 0.80 ; 12 → 0.65 ; 16+ → 0.55
-  const scale = Math.max(0.55, Math.min(1, 1 - Math.max(0, n - 4) * 0.045));
+  let scale = Math.max(0.55, Math.min(1, 1 - Math.max(0, n - 4) * 0.045));
+  // Portrait phones get an extra shrink so admin positions (designed on a
+  // wide stage) don't crowd into each other when remapped to a narrow
+  // viewport. The more projects, the harder we shrink.
+  const narrow   = window.innerWidth <= 760;
+  const portrait = window.innerHeight > window.innerWidth;
+  if (narrow && portrait) {
+    const mobileShrink = Math.max(0.60, 1 - Math.max(0, n - 3) * 0.06);
+    scale *= mobileShrink;
+  }
   root.style.setProperty('--node-w',       `${Math.round(158 * scale)}px`);
   root.style.setProperty('--node-h',       `${Math.round(144 * scale)}px`);
   root.style.setProperty('--node-thumb-h', `${Math.round(88  * scale)}px`);
