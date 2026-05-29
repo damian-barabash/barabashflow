@@ -234,6 +234,17 @@ function applyAutoFit() {
   const stageRect = state.stage?.getBoundingClientRect();
   if (!stageRect || !stageRect.width || !stageRect.height) return;
 
+  // Mobile (≤ 760): always start at 60% zoom. The graph deliberately overflows
+  // the viewport so the user pans/pinches to explore it (the pan-hint chip
+  // nudges this). Desktop keeps the fit-to-viewport logic below.
+  if (window.innerWidth <= 760) {
+    state.viewZoom = 0.6;
+    state.viewPanX = 0;
+    state.viewPanY = 0;
+    applyViewTransform();
+    return;
+  }
+
   // Measure actual node bounds so the auto-fit accounts for node size, not
   // just position. Without this we'd clip the outermost node off-screen.
   const firstNode = state.nodes[0]?.el;

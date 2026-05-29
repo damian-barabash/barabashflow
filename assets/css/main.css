@@ -1022,8 +1022,10 @@ body::after {
    ════════════════════════════════════════════════════════════════ */
 .graph-pan-hint {
   display: none;            /* shown only on touch / narrow viewports */
-  position: absolute;
-  bottom: 14px;
+  position: fixed;
+  /* Lift clear of the iOS Safari bottom toolbar (chrome ≠ safe-area-inset),
+     so the chip is actually visible on phones instead of hiding under it. */
+  bottom: max(78px, calc(env(safe-area-inset-bottom) + 78px));
   left: 50%;
   transform: translate(-50%, 8px);
   z-index: 24;
