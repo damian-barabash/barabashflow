@@ -201,6 +201,9 @@ function renderNodes() {
         by = -radialPush;
       }
     } else {
+      // Desktop (> 760): tighten the spread so projects sit closer to centre.
+      // Mobile landscape (≤ 760) falls through untouched.
+      if (window.innerWidth > 760) [bx, by] = compressRadius(bx, by);
       bx = clampUnit(bx);
       by = clampUnit(by);
     }
@@ -288,12 +291,38 @@ function applyViewTransform() {
 // Pull the camera back as more projects join the graph.
 function applyGraphScale(n) {
   const root = document.documentElement;
-  // 1..4 projects → 1.0 ; 8 → 0.80 ; 12 → 0.65 ; 16+ → 0.55
+  // Desktop (> 760): cards are wider so project titles read fully, and they
+  // taper more gently as projects pile up so they stay legible at N≈9.
+  // Mobile (≤ 760) keeps its existing sizing untouched — it already looks
+  // right and must not change.
+  if (window.innerWidth > 760) {
+    // 1..4 → 1.0 ; 9 → ~0.86 ; floor 0.74
+    const scale = Math.max(0.74, Math.min(1, 1 - Math.max(0, n - 4) * 0.028));
+    root.style.setProperty('--node-w',       `${Math.round(210 * scale)}px`);
+    root.style.setProperty('--node-h',       `${Math.round(154 * scale)}px`);
+    root.style.setProperty('--node-thumb-h', `${Math.round(94  * scale)}px`);
+    root.style.setProperty('--logo-d',       `${Math.round(296 * scale)}px`);
+    return;
+  }
+  // Mobile — unchanged: 1..4 → 1.0 ; 8 → 0.80 ; 12 → 0.65 ; 16+ → 0.55
   const scale = Math.max(0.55, Math.min(1, 1 - Math.max(0, n - 4) * 0.045));
   root.style.setProperty('--node-w',       `${Math.round(158 * scale)}px`);
   root.style.setProperty('--node-h',       `${Math.round(144 * scale)}px`);
   root.style.setProperty('--node-thumb-h', `${Math.round(88  * scale)}px`);
   root.style.setProperty('--logo-d',       `${Math.round(296 * scale)}px`);
+}
+
+// Desktop only: pull far-flung projects toward the centre so the graph reads
+// as a tighter cluster (closer to how it looked before the mobile pass) and
+// auto-fit no longer has to zoom way out to catch a couple of outliers. The
+// inner ring (r ≤ 0.5) is left untouched so those cards keep clear of the 3D
+// logo; only the outer projects are compressed inward.
+function compressRadius(x, y) {
+  const r = Math.hypot(x, y);
+  if (r <= 0.5) return [x, y];
+  const r2 = 0.5 + (r - 0.5) * 0.45;   // 1.62 → ~1.0 ; 1.06 → ~0.75
+  const f = r2 / r;
+  return [x * f, y * f];
 }
 
 function autoLayout(projects) {
