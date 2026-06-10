@@ -1126,13 +1126,41 @@ async function deleteProjectFromEditor() {
 // Storage helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Downscale + re-encode to WebP in the browser before upload, so we never
+// ship multi-MB originals (a 4–5 MB PNG screenshot → ~50–120 KB WebP). Vector
+// SVG and animated GIF are passed through untouched.
+async function optimizeImage(file, maxEdge = 1600, quality = 0.82) {
+  const passthrough = /svg|gif/i.test(file.type) || !/^image\//.test(file.type || '');
+  if (passthrough) return { blob: file, type: file.type || 'application/octet-stream', ext: (file.name.split('.').pop() || 'bin').toLowerCase() };
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close?.();
+    const encode = (type, q) => new Promise((res) => canvas.toBlob(res, type, q));
+    let blob = await encode('image/webp', quality);
+    if (blob && blob.type === 'image/webp') return { blob, type: 'image/webp', ext: 'webp' };
+    // Safari < 17 can't encode WebP via canvas — fall back to JPEG.
+    blob = await encode('image/jpeg', 0.85);
+    if (blob) return { blob, type: 'image/jpeg', ext: 'jpg' };
+  } catch (err) {
+    console.warn('[optimize] falling back to original', err);
+  }
+  return { blob: file, type: file.type || 'application/octet-stream', ext: (file.name.split('.').pop() || 'jpg').toLowerCase() };
+}
+
 async function uploadFile(file, folder) {
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const { blob, type, ext } = await optimizeImage(file);
   const safeExt = /^[a-z0-9]+$/.test(ext) ? ext : 'jpg';
   const path = `${folder}/${crypto.randomUUID()}.${safeExt}`;
-  const { error } = await sb.storage.from(MEDIA_BUCKET).upload(path, file, {
-    cacheControl: '3600',
-    contentType: file.type || undefined,
+  const { error } = await sb.storage.from(MEDIA_BUCKET).upload(path, blob, {
+    cacheControl: '31536000',
+    contentType: type || undefined,
     upsert: false,
   });
   if (error) throw error;

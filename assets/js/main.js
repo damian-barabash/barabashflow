@@ -1182,9 +1182,10 @@ function openProjectModal(project, sourceEl) {
     media.className = `modal-media cols-${visible.length}`;
     for (const ph of visible) {
       const img = document.createElement('img');
-      img.src = mediaUrl(ph.storage_path);
       img.alt = pickField(ph, 'alt') || pickField(project, 'title');
       img.loading = 'lazy';
+      img.decoding = 'async';
+      img.src = mediaUrl(ph.storage_path);
       media.appendChild(img);
     }
   } else {
