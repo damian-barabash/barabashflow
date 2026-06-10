@@ -16,7 +16,7 @@
     href="https://fonts.googleapis.com/css2?family=Saira+Extended:wght@200;300;400;500&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="assets/css/main.css?v=2026-05-29b" />
+  <link rel="stylesheet" href="assets/css/main.css?v=2026-06-10a" />
 
   <script type="importmap">
   {
@@ -78,9 +78,8 @@
       <span class="portrait" id="owner-portrait" data-empty="true" aria-hidden="true"></span>
       <div class="hero-stack">
         <h1 class="hero-title" id="hero-title">Strony internetowe <em>i platformy</em></h1>
+        <p class="hero-sub" id="hero-sub"></p>
         <div class="hero-meta">
-          <span class="hero-sub" id="hero-sub"></span>
-          <span class="meta-sep" aria-hidden="true">—</span>
           <span data-i18n="meta.location">Warszawa → Świat</span>
         </div>
       </div>
@@ -88,6 +87,7 @@
 
     <!-- ── Graph stage ──────────────────────────────────────────── -->
     <main class="stage" id="graph-canvas">
+      <p class="graph-caption" id="graph-caption" aria-hidden="true"></p>
       <div class="stage-inner" id="stage-inner">
         <svg id="graph-edges" aria-hidden="true"></svg>
         <div id="logo-stage" aria-hidden="true">
@@ -101,7 +101,7 @@
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span data-i18n="graph.pan-hint">Przeciągnij · Pinch</span>
+        <span data-i18n="graph.pan-hint">To graf — przeciągnij, by przesunąć</span>
       </div>
     </main>
 
@@ -290,6 +290,6 @@
     </div>
   </aside>
 
-  <script type="module" src="assets/js/main.js?v=2026-05-29b"></script>
+  <script type="module" src="assets/js/main.js?v=2026-06-10a"></script>
 </body>
 </html>

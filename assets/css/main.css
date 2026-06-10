@@ -162,6 +162,7 @@ body::after {
   z-index: 2;
   display: grid;
   grid-template-rows: auto auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
   /* iOS safe-area aware padding (notch / home indicator) */
   padding:
     max(clamp(28px, 3.6vmin, 48px), env(safe-area-inset-top, 0px))
@@ -362,12 +363,13 @@ body::after {
   display: flex;
   flex-direction: column;
   gap: clamp(8px, 1.2vmin, 14px);
+  flex: 1 1 0%;
   min-width: 0;
 }
 
 .hero-title {
   font-family: var(--font-display);
-  font-weight: 200;
+  font-weight: 300;
   font-stretch: expanded;
   font-size: clamp(26px, 4.2vmin, 52px);
   letter-spacing: 0.02em;
@@ -375,10 +377,11 @@ body::after {
   margin: 0;
   color: var(--ink);
   max-width: 22ch;
+  overflow-wrap: break-word;
 }
 .hero-title em {
   font-style: italic;
-  font-weight: 200;
+  font-weight: 300;
   color: var(--muted);
   letter-spacing: 0.01em;
 }
@@ -396,13 +399,15 @@ body::after {
 }
 .hero-sub {
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  font-size: clamp(12.5px, 1.45vmin, 15px);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 1.55;
   color: var(--ink-2);
+  margin: 0;
+  max-width: 58ch;
 }
 .hero-sub:empty { display: none; }
-.hero-sub:empty + .meta-sep { display: none; }
 .meta-sep {
   color: var(--soft);
   font-weight: 400;
@@ -454,6 +459,32 @@ body::after {
   transition: opacity 0.4s ease;
 }
 .zoom-indicator.is-visible { opacity: 1; }
+
+/* Permanent caption over the graph: "projects we've already delivered".
+   Editable in the CMS (site_settings.graph_caption). Sits above the nodes,
+   click-through so it never blocks dragging the graph. */
+.graph-caption {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  margin: 0;
+  max-width: calc(100% - 24px);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  color: var(--soft);
+  pointer-events: none;
+}
+.graph-caption:empty { display: none; }
+@media (max-width: 480px) {
+  .graph-caption { font-size: 9px; letter-spacing: 0.18em; }
+}
 #logo-stage,
 .node,
 #graph-edges {
@@ -1016,46 +1047,48 @@ body::after {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   Pan hint — mobile-only chip telling the user the graph is draggable.
-   Auto-fades in shortly after load, dismisses on first interaction
-   (pointerdown on .stage) or after a few seconds.
+   Pan hint — permanent subtle chip telling the user the graph is
+   draggable. Sits inside the stage, just under the graph caption, on
+   every viewport. Fades in once the cinematic entrance settles.
+   Click-through so it never blocks panning.
    ════════════════════════════════════════════════════════════════ */
 .graph-pan-hint {
-  display: none;            /* shown only on touch / narrow viewports */
-  position: fixed;
-  /* Lift clear of the iOS Safari bottom toolbar (chrome ≠ safe-area-inset),
-     so the chip is actually visible on phones instead of hiding under it. */
-  bottom: max(78px, calc(env(safe-area-inset-bottom) + 78px));
+  display: inline-flex;
+  position: absolute;
+  top: 26px;
   left: 50%;
-  transform: translate(-50%, 8px);
-  z-index: 24;
-  padding: 9px 14px;
-  background: var(--ink);
-  color: var(--bg);
+  transform: translate(-50%, -6px);
+  z-index: 6;
+  padding: 6px 12px;
+  background: var(--surface);
+  color: var(--ink-2);
+  border: 1px solid var(--hair-2);
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.24em;
+  font-size: 9px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   white-space: nowrap;
+  max-width: calc(100% - 24px);
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   opacity: 0;
   pointer-events: none;
-  box-shadow: 0 12px 28px -14px rgba(15,15,15,0.45);
+  box-shadow: 0 12px 28px -16px rgba(15,15,15,0.30);
   transition:
     opacity   0.32s cubic-bezier(0.16, 1, 0.3, 1),
     transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.graph-pan-hint svg { width: 14px; height: 14px; }
+.graph-pan-hint svg { width: 13px; height: 13px; opacity: 0.8; flex-shrink: 0; }
+.graph-pan-hint span { overflow: hidden; text-overflow: ellipsis; }
 .graph-pan-hint.is-visible {
   opacity: 1;
   transform: translate(-50%, 0);
 }
-@media (hover: none) and (pointer: coarse), (max-width: 760px) {
-  .graph-pan-hint { display: inline-flex; }
+@media (max-width: 480px) {
+  .graph-pan-hint { top: 40px; font-size: 8px; letter-spacing: 0.14em; padding: 5px 10px; }
 }
 :root[data-theme="dark"] .graph-pan-hint {
-  box-shadow: 0 12px 28px -14px rgba(0,0,0,0.8);
+  box-shadow: 0 12px 28px -16px rgba(0,0,0,0.7);
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -1537,10 +1570,11 @@ body:not(.is-loading) .node        { animation: nodeIn    0.65s cubic-bezier(0.1
   .icon-btn svg { width: 14px; height: 14px; }
   .nav-group button { padding: 5px 7px; font-size: 10px; letter-spacing: 0.20em; }
 
-  .hero { gap: 14px; padding-top: 0; }
+  .hero { gap: 14px; padding-top: 0; align-items: flex-start; }
   .hero .portrait { width: 56px; height: 56px; }
-  .hero-stack { gap: 6px; min-width: 0; }
-  .hero-title { font-size: clamp(20px, 5.2vmin, 28px); letter-spacing: 0.02em; line-height: 1.0; }
+  .hero-stack { gap: 7px; min-width: 0; }
+  .hero-title { font-size: clamp(20px, 5.2vmin, 28px); letter-spacing: 0.02em; line-height: 1.0; max-width: 100%; }
+  .hero-sub { font-size: 12px; letter-spacing: 0.03em; line-height: 1.45; max-width: 100%; }
   .hero-meta { font-size: 10px; gap: 8px; flex-wrap: wrap; letter-spacing: 0.18em; }
 
   .footer { grid-template-columns: 1fr; justify-items: center; gap: 10px; padding-top: 10px; }
@@ -1563,6 +1597,7 @@ body:not(.is-loading) .node        { animation: nodeIn    0.65s cubic-bezier(0.1
   .brand-name { font-size: 11px; letter-spacing: 0.18em; }
   .hero .portrait { width: 48px; height: 48px; }
   .hero-title { font-size: clamp(18px, 5.8vmin, 24px); }
+  .hero-sub { font-size: 11.5px; line-height: 1.42; }
   .hero-meta { font-size: 9px; gap: 6px; }
   .meta-sep { display: none; }
   .cta { padding: 13px 20px; font-size: 10px; letter-spacing: 0.24em; }

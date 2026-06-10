@@ -6,7 +6,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?
 import {
   LOCALES, getLocale, setLocale, onLocaleChange,
   t, pickField, applyDom,
-} from './i18n.js?v=2026-05-28g';
+} from './i18n.js?v=2026-06-10a';
 import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28g';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -141,6 +141,10 @@ function renderHeader() {
   const ctaLabelEl = $('.cta-label');
   const ctaLabel = pickField(state.settings.cta_label, 'value');
   if (ctaLabel) ctaLabelEl.textContent = ctaLabel;
+
+  // Permanent caption over the graph ("projects we've already delivered").
+  const captionEl = $('#graph-caption');
+  if (captionEl) captionEl.textContent = pickField(state.settings.graph_caption, 'value') || '';
 }
 
 /* Soften the hero by italicising the conjunction (i/and/и) so the line breathes. */
@@ -1518,36 +1522,9 @@ function setupMascotBot() {
 function setupPanHint() {
   const hint = $('#graph-pan-hint');
   if (!hint) return;
-  // Don't pester the user — once dismissed, stay quiet for the session.
-  const KEY = 'bf:pan-hint-seen';
-  try { if (sessionStorage.getItem(KEY) === '1') return; } catch {}
-
-  // Show only when there's something worth panning to (graph overflows or
-  // we're on a narrow viewport where pan is the natural way to explore).
-  const narrow = window.innerWidth <= 760
-    || window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-  if (!narrow) return;
-
-  let dismissed = false;
-  const dismiss = () => {
-    if (dismissed) return;
-    dismissed = true;
-    hint.classList.remove('is-visible');
-    try { sessionStorage.setItem(KEY, '1'); } catch {}
-    state.stage?.removeEventListener('pointerdown', dismiss);
-    window.removeEventListener('wheel', dismiss);
-  };
-
-  // Show after the cinematic entrance has settled.
-  setTimeout(() => {
-    if (dismissed) return;
-    hint.classList.add('is-visible');
-  }, 1600);
-  // Auto-hide after a few seconds even if the user didn't touch the stage.
-  setTimeout(dismiss, 6500);
-
-  state.stage?.addEventListener('pointerdown', dismiss, { once: true });
-  window.addEventListener('wheel',       dismiss, { once: true, passive: true });
+  // Permanent hint — fade it in once the cinematic entrance has settled and
+  // leave it on screen on every viewport.
+  setTimeout(() => hint.classList.add('is-visible'), 1600);
 }
 
 function setupTabAway() {
