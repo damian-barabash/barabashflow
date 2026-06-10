@@ -16,7 +16,7 @@
     href="https://fonts.googleapis.com/css2?family=Saira+Extended:wght@200;300;400;500&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="assets/css/main.css?v=2026-06-10a" />
+  <link rel="stylesheet" href="assets/css/main.css?v=2026-06-10b" />
 
   <script type="importmap">
   {
@@ -87,7 +87,6 @@
 
     <!-- ── Graph stage ──────────────────────────────────────────── -->
     <main class="stage" id="graph-canvas">
-      <p class="graph-caption" id="graph-caption" aria-hidden="true"></p>
       <div class="stage-inner" id="stage-inner">
         <svg id="graph-edges" aria-hidden="true"></svg>
         <div id="logo-stage" aria-hidden="true">
@@ -97,27 +96,32 @@
         <!-- nodes injected by main.js -->
       </div>
       <span class="zoom-indicator" id="zoom-indicator">100%</span>
-      <div class="graph-pan-hint" id="graph-pan-hint" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span data-i18n="graph.pan-hint">To graf — przeciągnij, by przesunąć</span>
-      </div>
     </main>
 
-    <!-- ── Footer (editorial 3-col: index · CTA · location) ───── -->
+    <!-- ── Footer (editorial 3-col: index · [caption · CTA · hint] · location) ─ -->
     <footer class="footer">
       <div class="footer-side footer-left">
         <span class="footer-mono strong">MMXXVI</span>
         <span class="footer-mono muted">/ N° 01</span>
       </div>
 
-      <button type="button" class="cta" id="cta">
-        <span class="cta-label">Zlecić projekt</span>
-        <svg class="cta-arrow" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
+      <div class="footer-cta-wrap">
+        <p class="graph-caption" id="graph-caption" aria-hidden="true"></p>
+
+        <button type="button" class="cta" id="cta">
+          <span class="cta-label">Zlecić projekt</span>
+          <svg class="cta-arrow" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <div class="graph-pan-hint" id="graph-pan-hint" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span data-i18n="graph.pan-hint">To graf — przeciągnij, by przesunąć</span>
+        </div>
+      </div>
 
       <div class="footer-side footer-right">
         <span class="footer-mono muted" data-i18n="meta.location">Warszawa → Świat</span>

@@ -459,32 +459,6 @@ body::after {
   transition: opacity 0.4s ease;
 }
 .zoom-indicator.is-visible { opacity: 1; }
-
-/* Permanent caption over the graph: "projects we've already delivered".
-   Editable in the CMS (site_settings.graph_caption). Sits above the nodes,
-   click-through so it never blocks dragging the graph. */
-.graph-caption {
-  position: absolute;
-  top: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 6;
-  margin: 0;
-  max-width: calc(100% - 24px);
-  text-align: center;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 400;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  line-height: 1.4;
-  color: var(--soft);
-  pointer-events: none;
-}
-.graph-caption:empty { display: none; }
-@media (max-width: 480px) {
-  .graph-caption { font-size: 9px; letter-spacing: 0.18em; }
-}
 #logo-stage,
 .node,
 #graph-edges {
@@ -1047,49 +1021,47 @@ body::after {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   Pan hint — permanent subtle chip telling the user the graph is
-   draggable. Sits inside the stage, just under the graph caption, on
-   every viewport. Fades in once the cinematic entrance settles.
-   Click-through so it never blocks panning.
+   Footer hints — the two permanent labels flank the CTA button:
+   .graph-caption (left, "projects we've already delivered", CMS-editable)
+   and .graph-pan-hint (right, "this is a graph — drag it"). On desktop
+   they sit on either side of the button; on phones they stack with it.
+   Both fade in once the cinematic entrance settles; click-through.
    ════════════════════════════════════════════════════════════════ */
-.graph-pan-hint {
+.footer-cta-wrap {
   display: inline-flex;
-  position: absolute;
-  top: 26px;
-  left: 50%;
-  transform: translate(-50%, -6px);
-  z-index: 6;
-  padding: 6px 12px;
-  background: var(--surface);
-  color: var(--ink-2);
-  border: 1px solid var(--hair-2);
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 1.8vmin, 26px);
+  min-width: 0;
+}
+.graph-caption,
+.graph-pan-hint {
+  margin: 0;
   font-family: var(--font-mono);
   font-size: 9px;
+  font-weight: 400;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  white-space: nowrap;
-  max-width: calc(100% - 24px);
+  line-height: 1.4;
+  color: var(--soft);
+  max-width: 30ch;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
+}
+.graph-caption { text-align: right; }
+.graph-pan-hint {
+  display: inline-flex;
   align-items: center;
   gap: 7px;
-  opacity: 0;
-  pointer-events: none;
-  box-shadow: 0 12px 28px -16px rgba(15,15,15,0.30);
-  transition:
-    opacity   0.32s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
 }
-.graph-pan-hint svg { width: 13px; height: 13px; opacity: 0.8; flex-shrink: 0; }
-.graph-pan-hint span { overflow: hidden; text-overflow: ellipsis; }
-.graph-pan-hint.is-visible {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-@media (max-width: 480px) {
-  .graph-pan-hint { top: 40px; font-size: 8px; letter-spacing: 0.14em; padding: 5px 10px; }
-}
-:root[data-theme="dark"] .graph-pan-hint {
-  box-shadow: 0 12px 28px -16px rgba(0,0,0,0.7);
-}
+.graph-pan-hint svg { width: 13px; height: 13px; opacity: 0.75; flex-shrink: 0; }
+/* Caption fades in as soon as it has text (set by renderHeader);
+   the pan-hint gets .is-visible from JS after the entrance settles. */
+.graph-caption:not(:empty) { opacity: 1; }
+.graph-pan-hint.is-visible { opacity: 1; }
+.graph-caption:empty { display: none; }
 
 /* ════════════════════════════════════════════════════════════════
    Cookie consent — bottom-right popup + dedicated policy modal.
@@ -1581,6 +1553,9 @@ body:not(.is-loading) .node        { animation: nodeIn    0.65s cubic-bezier(0.1
   .footer-left, .footer-right { display: none; }
   .cta { padding: 14px 22px; letter-spacing: 0.28em; font-size: 10px; gap: 10px; }
   .cta-arrow { width: 11px; height: 11px; }
+  /* Stack the hints around the button so they never sit over the graph. */
+  .footer-cta-wrap { flex-direction: column; gap: 9px; max-width: 100%; }
+  .graph-caption, .graph-pan-hint { text-align: center; max-width: 90vw; }
 }
 
 /* Phone portrait (≤480px) — aggressive compression. */
