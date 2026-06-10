@@ -635,6 +635,31 @@ body::after {
   opacity: 0.85;
 }
 
+/* Cover photo lives on a fade-in layer (background-image can't transition on
+   its own). It sits over the neutral tint while the WebP preloads, then
+   gently materialises once main.js sets --thumb-img + .is-loaded. */
+.node-thumb:not([data-empty])::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--thumb-img, none);
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transform: scale(1.04);
+  transition:
+    opacity   0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.node-thumb.is-loaded::after {
+  opacity: 1;
+  transform: scale(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .node-thumb:not([data-empty])::after { transition: opacity 0.2s ease; transform: none; }
+}
+
 .node-body {
   padding: 12px 14px 14px;
   display: flex;
@@ -842,8 +867,14 @@ body::after {
   background: var(--bg-tint);
   border-bottom: 1px solid var(--hair);
   /* no object-fit: image keeps its natural proportions; scroll handles tall ones */
+  opacity: 0;
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
+.modal-media img.is-loaded { opacity: 1; }
 .modal-media img:last-child { border-bottom: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .modal-media img { transition: opacity 0.18s ease; }
+}
 
 .modal-body {
   padding: 32px clamp(26px, 3.4vmin, 40px) clamp(26px, 3vmin, 32px);

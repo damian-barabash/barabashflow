@@ -396,9 +396,17 @@ function buildNodeEl(p, index = 0) {
   const photos = state.photosByProject.get(p.id) || [];
   if (photos[0]?.storage_path) {
     const thumb = $('.node-thumb', el);
-    thumb.style.backgroundImage = `url("${mediaUrl(photos[0].storage_path)}")`;
-    thumb.style.backgroundSize = 'cover';
+    // Drop the hatch placeholder right away (neutral tint shows while loading),
+    // then fade the cover in once it has actually decoded — no abrupt pop.
     thumb.removeAttribute('data-empty');
+    const url = mediaUrl(photos[0].storage_path);
+    const pre = new Image();
+    pre.decoding = 'async';
+    pre.onload = () => {
+      thumb.style.setProperty('--thumb-img', `url("${url}")`);
+      requestAnimationFrame(() => thumb.classList.add('is-loaded'));
+    };
+    pre.src = url;
   }
 
   $('.node-cat', el).textContent = catLabel;
@@ -1185,7 +1193,10 @@ function openProjectModal(project, sourceEl) {
       img.alt = pickField(ph, 'alt') || pickField(project, 'title');
       img.loading = 'lazy';
       img.decoding = 'async';
+      const reveal = () => img.classList.add('is-loaded');
+      img.addEventListener('load', reveal, { once: true });
       img.src = mediaUrl(ph.storage_path);
+      if (img.complete) reveal();   // already cached — load may not fire
       media.appendChild(img);
     }
   } else {
