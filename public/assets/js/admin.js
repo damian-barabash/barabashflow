@@ -463,6 +463,8 @@ function redrawEdges() {
   for (const [id, p] of positions) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('class', 'edge is-center');
+    path.dataset.from = '__c__';
+    path.dataset.to = id;
     path.setAttribute('d', `M ${cx} ${cy} Q ${(cx + p.x) / 2 + 14} ${(cy + p.y) / 2 - 14} ${p.x} ${p.y}`);
     svg.appendChild(path);
   }
@@ -474,6 +476,8 @@ function redrawEdges() {
     if (!a || !b) continue;
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('class', 'edge is-conn');
+    path.dataset.from = c.from_project_id;
+    path.dataset.to = c.to_project_id;
     path.setAttribute('d', `M ${a.x} ${a.y} Q ${(a.x + b.x) / 2} ${(a.y + b.y) / 2 + 22} ${b.x} ${b.y}`);
     svg.appendChild(path);
   }
@@ -491,11 +495,37 @@ function redrawEdges() {
         if (!o) continue;
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('class', 'edge is-pending');
+        path.dataset.from = state.selectedId;
+        path.dataset.to = otherId;
         path.setAttribute('d', `M ${self.x} ${self.y} Q ${(self.x + o.x) / 2} ${(self.y + o.y) / 2 + 22} ${o.x} ${o.y}`);
         svg.appendChild(path);
       }
     }
   }
+}
+
+// Re-path existing edges in place (no innerHTML rebuild, no getBoundingClientRect).
+// Called on every pointermove during a node drag — must stay allocation-light.
+function edgePathD(cls, ax, ay, bx, by) {
+  if (cls.indexOf('is-center') !== -1)
+    return `M ${ax} ${ay} Q ${(ax + bx) / 2 + 14} ${(ay + by) / 2 - 14} ${bx} ${by}`;
+  return `M ${ax} ${ay} Q ${(ax + bx) / 2} ${(ay + by) / 2 + 22} ${bx} ${by}`;
+}
+function adminNodePos(id) {
+  const el = document.querySelector(`.node[data-project-id="${id}"]`);
+  if (!el) return null;
+  return { x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0 };
+}
+function updateEdgePaths(cx, cy) {
+  const svg = $('#graph-edges');
+  if (!svg) return;
+  svg.querySelectorAll('path.edge').forEach((path) => {
+    const from = path.dataset.from;
+    const a = from === '__c__' ? { x: cx, y: cy } : adminNodePos(from);
+    const b = adminNodePos(path.dataset.to);
+    if (!a || !b) return;
+    path.setAttribute('d', edgePathD(path.getAttribute('class') || '', a.x, a.y, b.x, b.y));
+  });
 }
 
 // click vs drag — same threshold as the public page
@@ -507,9 +537,11 @@ function bindAdminNodeDrag(el, projectId) {
   let pid = null;
   let startX = 0, startY = 0;
   let originLeft = 0, originTop = 0;
+  let dragWs = null;   // workspace rect cached at drag-start (avoids per-move reflow)
 
   el.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
+    dragWs = $('#graph-workspace').getBoundingClientRect();
     pid = e.pointerId;
     down = true;
     escalated = false;
@@ -528,7 +560,7 @@ function bindAdminNodeDrag(el, projectId) {
       el.classList.add('is-dragging');
     }
     if (!escalated) return;
-    const ws   = $('#graph-workspace').getBoundingClientRect();
+    const ws   = dragWs || $('#graph-workspace').getBoundingClientRect();
     const zoom = state.zoom || 1;
     // Screen-space delta → workspace-space delta (account for CSS scale).
     const nx = originLeft + dx / zoom;
@@ -547,7 +579,8 @@ function bindAdminNodeDrag(el, projectId) {
       state.draft.position_y = baseY;
       updateCoordsLabel();
     }
-    redrawEdges();
+    // Lightweight: just re-path existing edges (no DOM rebuild, no reflow).
+    updateEdgePaths(ws.width / 2, ws.height / 2);
   });
   const finish = (e) => {
     if (!down) return;

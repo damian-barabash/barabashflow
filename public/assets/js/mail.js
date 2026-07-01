@@ -43,16 +43,16 @@ init().catch((err) => {
   document.body.innerHTML = `<div style="padding:40px;font-family:Menlo,Consolas,monospace;font-size:13px;line-height:1.6;color:#0e0e0e;background:#f6f4ee;min-height:100vh;box-sizing:border-box;">
     <h2 style="font-family:Georgia,serif;font-weight:300;font-size:22px;margin:0 0 14px 0;">Błąd inicjalizacji Mejli</h2>
     <pre style="white-space:pre-wrap;background:#fff;border:1px solid #d6d3c8;padding:14px;color:#d83a3a;margin:0 0 14px 0;">${String(err?.message || err).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</pre>
-    <p style="margin:0;">Otwórz DevTools → Console dla pełnego stack-trace. Wróć do <a href="/admin.html" style="color:#0e0e0e;">/admin.html</a>.</p>
+    <p style="margin:0;">Otwórz DevTools → Console dla pełnego stack-trace. Wróć do <a href="/admin" style="color:#0e0e0e;">/admin</a>.</p>
   </div>`;
 });
 
 async function init() {
-  // ── Auth gate ── must be signed-in admin; otherwise redirect to /admin.html
+  // ── Auth gate ── must be signed-in admin; otherwise redirect to /admin
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
-    const next = encodeURIComponent('/mail.html');
-    window.location.replace(`/admin.html?next=${next}`);
+    const next = encodeURIComponent('/mail');
+    window.location.replace(`/admin?next=${next}`);
     return;
   }
   state.user = session.user;
@@ -60,7 +60,7 @@ async function init() {
   // Watch for sign-out / token refresh
   sb.auth.onAuthStateChange((evt, sess) => {
     if (evt === 'SIGNED_OUT' || !sess) {
-      window.location.replace('/admin.html');
+      window.location.replace('/admin');
       return;
     }
     if (sess?.user) state.user = sess.user;
@@ -99,7 +99,7 @@ function bindShellUI() {
   });
   $('#signout').addEventListener('click', async () => {
     await sb.auth.signOut();
-    window.location.replace('/admin.html');
+    window.location.replace('/admin');
   });
 }
 

@@ -1,0 +1,23 @@
+# BarabashFlow
+
+> Studio Dmytrija Barabasha (Warszawa, Polska). Tworzenie nowoczesnych stron
+> internetowych, platform i aplikacji webowych. Websites & internet platforms.
+> Разработка сайтов, платформ и веб-приложений.
+
+BarabashFlow to jednoosobowe studio web-developmentu prowadzone przez Dmytrija
+Barabasha. Specjalizacja: szybkie, statyczne strony i platformy w technologiach
+Astro, React, Next.js, Supabase i Three.js, wdrażane na GitHub Pages / Cloudflare.
+
+## Usługi
+- Tworzenie stron internetowych i stron-wizytówek
+- Platformy internetowe i aplikacje webowe na zamówienie
+- Panele administracyjne / systemy CMS
+- Sklepy internetowe (e-commerce)
+- Integracje: Supabase, Resend, Cloudflare, R2
+
+## Kontakt
+- Strona: https://barabashflow.pl
+- Formularz kontaktowy na stronie głównej
+
+## Języki
+Polski (domyślny), English, Русский.

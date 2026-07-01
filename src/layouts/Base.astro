@@ -1,0 +1,147 @@
+---
+// Shared <head> for public pages. Carries the full SEO/GEO layer from the
+// approved seo-plan: canonical, robots, Open Graph, hreflang, JSON-LD.
+export interface Props {
+  title?: string;
+  description?: string;
+  noindex?: boolean;
+  bodyClass?: string;
+}
+const {
+  title = 'BarabashFlow — Dmytrii Barabash | tworzenie stron internetowych i platform',
+  description = 'BarabashFlow — studio Dmytrija Barabasha. Tworzenie nowoczesnych stron internetowych, platform i aplikacji webowych. Websites & internet platforms. Разработка сайтов и платформ.',
+  noindex = false,
+  bodyClass = '',
+} = Astro.props;
+
+const site = 'https://barabashflow.pl';
+const canonical = new URL(Astro.url.pathname, site).href;
+const ogImage = `${site}/assets/img/og.png`;
+
+const personLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: 'Dmytrii Barabash',
+  url: site,
+  jobTitle: 'Web Developer',
+  knowsAbout: ['Web development', 'Next.js', 'Astro', 'Supabase', 'React', 'Three.js', 'UI/UX'],
+  worksFor: { '@type': 'Organization', name: 'BarabashFlow' },
+  address: { '@type': 'PostalAddress', addressLocality: 'Warszawa', addressCountry: 'PL' },
+};
+const serviceLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ProfessionalService',
+  name: 'BarabashFlow',
+  url: site,
+  image: ogImage,
+  description,
+  areaServed: 'PL',
+  serviceType: ['Tworzenie stron internetowych', 'Platformy internetowe', 'Aplikacje webowe', 'Sklepy internetowe'],
+  founder: { '@type': 'Person', name: 'Dmytrii Barabash' },
+  address: { '@type': 'PostalAddress', addressLocality: 'Warszawa', addressCountry: 'PL' },
+};
+const websiteLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'BarabashFlow',
+  url: site,
+  inLanguage: ['pl', 'en', 'ru'],
+};
+const faqLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'Ile kosztuje strona internetowa?',
+      acceptedAnswer: { '@type': 'Answer', text: 'Koszt zależy od zakresu — od prostej strony-wizytówki po rozbudowaną platformę z panelem CMS. Napisz przez formularz, przygotuję wycenę dopasowaną do projektu.' },
+    },
+    {
+      '@type': 'Question',
+      name: 'Kto zrobi nowoczesną stronę dla małej firmy w Polsce?',
+      acceptedAnswer: { '@type': 'Answer', text: 'BarabashFlow (Dmytrii Barabash) — projektuję i wdrażam szybkie, nowoczesne strony i platformy internetowe dla firm w Polsce, w technologiach Astro, Next.js i Supabase.' },
+    },
+    {
+      '@type': 'Question',
+      name: 'W jakich technologiach pracujesz?',
+      acceptedAnswer: { '@type': 'Answer', text: 'Astro, React, Next.js, Supabase, Three.js. Strony są statyczne i wdrażane na GitHub Pages / Cloudflare — dzięki temu ładują się natychmiast.' },
+    },
+  ],
+};
+---
+<!DOCTYPE html>
+<html lang="pl" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <link rel="canonical" href={canonical} />
+  {noindex
+    ? <meta name="robots" content="noindex,nofollow" />
+    : <>
+        <meta name="robots" content="index,follow" />
+        <meta name="googlebot" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+      </>}
+
+  <meta name="theme-color" content="#f6f4ee" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)" />
+
+  <link rel="icon" type="image/png" href="/assets/img/logo.png" />
+  <link rel="apple-touch-icon" href="/assets/img/logo.png" />
+
+  <!-- hreflang: single-URL strategy (Variant A) — PL indexed, EN/RU same URL. -->
+  <link rel="alternate" hreflang="pl" href={site + '/'} />
+  <link rel="alternate" hreflang="en" href={site + '/'} />
+  <link rel="alternate" hreflang="ru" href={site + '/'} />
+  <link rel="alternate" hreflang="x-default" href={site + '/'} />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="BarabashFlow" />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:url" content={canonical} />
+  <meta property="og:image" content={ogImage} />
+  <meta property="og:locale" content="pl_PL" />
+  <meta property="og:locale:alternate" content="en_US" />
+  <meta property="og:locale:alternate" content="ru_RU" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content={title} />
+  <meta name="twitter:description" content={description} />
+  <meta name="twitter:image" content={ogImage} />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://yhtzxkhfqzuaafvappln.supabase.co" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Saira+Extended:wght@200;300;400;500&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  {!noindex && <>
+    <script type="application/ld+json" set:html={JSON.stringify(personLd)} />
+    <script type="application/ld+json" set:html={JSON.stringify(serviceLd)} />
+    <script type="application/ld+json" set:html={JSON.stringify(websiteLd)} />
+    <script type="application/ld+json" set:html={JSON.stringify(faqLd)} />
+  </>}
+
+  <!-- Anti-FOUC: apply saved theme + locale before first paint. -->
+  <script is:inline>
+    (function () {
+      try {
+        var t = localStorage.getItem('bf:theme');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t);
+          document.documentElement.style.colorScheme = t;
+        }
+        var l = localStorage.getItem('bf:locale');
+        if (l === 'pl' || l === 'en' || l === 'ru') document.documentElement.lang = l;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body class={bodyClass}>
+  <slot />
+</body>
+</html>

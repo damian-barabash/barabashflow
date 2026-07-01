@@ -477,11 +477,12 @@ body::after {
   transform: translate(var(--par-x), var(--par-y));
 }
 .stage > .node:not(.is-dragging) {
-  /* compose: position translate + parallax + magnetic + entrance lift + entrance scale */
+  /* compose: position translate + parallax + magnetic + float bob + entrance lift + entrance scale.
+     --bob-x/--bob-y are driven by a cheap compositor-only rAF (no layout). */
   transform:
     translate(
-      calc(-50% + var(--mag-x) + var(--par-x)),
-      calc(-50% + var(--mag-y) + var(--par-y) + var(--enter-y))
+      calc(-50% + var(--mag-x) + var(--par-x) + var(--bob-x, 0px)),
+      calc(-50% + var(--mag-y) + var(--par-y) + var(--enter-y) + var(--bob-y, 0px))
     )
     scale(var(--enter-scale));
 }
@@ -1522,10 +1523,12 @@ body:not(.is-loading) .node        { animation: nodeIn    0.65s cubic-bezier(0.1
   to   { opacity: 1; --enter-scale: 1;    --enter-y: 0px;  }
 }
 
-/* Magnetic + parallax layer */
+/* Magnetic + parallax + float-bob layer */
 .node {
   --mag-x: 0px;
   --mag-y: 0px;
+  --bob-x: 0px;
+  --bob-y: 0px;
 }
 
 /* ════════════════════════════════════════════════════════════════

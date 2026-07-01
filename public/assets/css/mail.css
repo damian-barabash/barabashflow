@@ -1,0 +1,792 @@
+/* ────────────────────────────────────────────────────────────────────────
+   mail.css — overlay on top of admin.css for the Mejle page
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* ── Stacking fix ────────────────────────────────────────────────────────
+   admin.css has `body::before` with the dotted grid + explicit `z-index: 0`.
+   That makes ::before a positioned descendant which paints ABOVE static
+   page content (per CSS stacking-order rules), so dots leak over the
+   cards. Push the grid down and lift the shell up so cards properly cover. */
+body::before { z-index: -1 !important; }
+.shell { position: relative; z-index: 1; }
+.modal-root { z-index: 60; }
+.banner { z-index: 80; }
+
+/* ── Topbar overrides for mail.html ────────────────────────────────────── */
+/* admin.html uses <div class="brand"> with a <span class="dot">. We use
+   <a class="brand"> with an <img class="brand-logo">. Need to: (a) size the
+   image, (b) kill anchor underline, (c) center-align the IMG/text row. */
+a.brand {
+  text-decoration: none;
+  color: inherit;
+  align-items: center;
+  cursor: pointer;
+}
+a.brand:hover { opacity: 0.78; }
+.brand-logo {
+  height: 28px;
+  width: auto;
+  display: inline-block;
+  vertical-align: middle;
+}
+:root[data-theme="dark"] .brand-logo {
+  filter: invert(0.94) hue-rotate(180deg);
+}
+
+/* ── Banner — admin.css uses .is-shown, our mail.js uses .is-visible.
+   Mirror the rule so toasts actually appear. ──────────────────────────── */
+.banner.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Section cards — admin.css's `.section` is bg-less (it relies on a
+   parent `.settings-card`/`.side-panel` for the surface). On Mejle, sections
+   sit directly on the dotted page bg, so wrap each one in a card. Sections
+   inside the modal keep their flat look (modal already provides the card). */
+.send-side > .section,
+.send-main > .section,
+.panel-page > .section {
+  background: var(--surface);
+  border: 1px solid var(--hair-2);
+  padding: 16px 20px;
+}
+.send-side > .section + .section,
+.send-main > .section + .section { margin-top: 14px; }
+
+/* Toolbars that wrap controls (CRM search row, inbox filter row, etc.) */
+.crm-toolbar,
+.inbox-toolbar {
+  background: var(--surface);
+  border: 1px solid var(--hair-2);
+  padding: 14px 16px;
+}
+
+/* ── Opaque buttons on Mejle page — admin.css has `.btn { background: transparent }`
+   which lets the dotted page bg show through. On a busy backdrop it reads
+   noisy, so override here for the Mejle page only. ─────────────────────── */
+.btn { background: var(--surface); }
+.btn:hover { background: var(--bg-tint); }
+.btn.primary { background: var(--ink); color: var(--bg); }
+.btn.primary:hover { background: var(--ink); opacity: 0.92; }
+.btn.danger { background: var(--surface); }
+.btn.danger:hover { background: var(--bg-tint); }
+.btn.ghost { background: var(--bg-tint); }
+
+/* ── Bare .eyebrow + .spread + .placeholder-glyph (admin.css scopes them
+   under .side-panel / .button-row). Used standalone in modals + panes. ── */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-2, var(--muted));
+  margin-bottom: 4px;
+}
+.spread { flex: 1; }
+.placeholder-glyph {
+  font-family: var(--font-display);
+  font-weight: 200;
+  font-size: 48px;
+  color: var(--soft, var(--muted));
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+/* ── Boot splash (shown while we check auth) ───────────────────────────── */
+body.is-booting { background: var(--surface); }
+.boot-splash {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px;
+  z-index: 100;
+  background: var(--surface);
+  color: var(--ink);
+}
+body:not(.is-booting) .boot-splash { display: none; }
+.boot-spinner {
+  width: 20px; height: 20px;
+  border: 1.4px solid var(--hair);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: bf-spin 0.9s linear infinite;
+}
+.boot-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+@keyframes bf-spin { to { transform: rotate(360deg); } }
+
+/* ── Top: back-to-panel button gets a label on wide screens ───────────── */
+.back-to-panel { gap: 8px; padding: 0 10px; width: auto; min-width: 32px; }
+.back-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+@media (max-width: 760px) {
+  .back-label { display: none; }
+  .back-to-panel { padding: 0; width: 32px; }
+}
+
+/* ── Shared: segmented buttons (used in send + inbox tabs) ─────────────── */
+.seg-buttons { display: flex; gap: 0; }
+.seg-btn,
+.recipient-modes .seg-btn,
+.seg-buttons .seg-btn {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  padding: 7px 12px;
+  background: var(--surface);
+  color: var(--ink-2);
+  border: 1px solid var(--hair-2);
+  border-right: 0;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.seg-btn:last-child { border-right: 1px solid var(--hair-2); }
+.seg-btn:hover { color: var(--ink); background: var(--bg-tint); }
+.seg-btn.is-active {
+  background: var(--ink);
+  color: var(--surface);
+  border-color: var(--ink);
+}
+
+/* ── CRM tab ──────────────────────────────────────────────────────────── */
+.crm-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr auto;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+.crm-search input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--hair-2);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+.crm-search input:focus { outline: none; border-color: var(--ink); }
+.crm-tagfilter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.crm-actions { display: flex; gap: 8px; }
+
+.crm-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.crm-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--hair-2);
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color 120ms, transform 120ms;
+}
+.crm-card:hover { border-color: var(--ink); }
+.crm-card-name {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 18px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.crm-card-email {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  word-break: break-all;
+}
+.crm-card-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3, #8a8a83);
+  display: flex; gap: 10px; flex-wrap: wrap;
+}
+.crm-card-tags {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 4px;
+}
+.crm-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border: 1px solid var(--hair);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.crm-tag .dot {
+  width: 6px; height: 6px;
+  background: var(--tag-color, var(--ink));
+}
+.crm-tag.is-filter { cursor: pointer; }
+.crm-tag.is-filter.is-on { background: var(--ink); color: var(--surface); }
+.crm-tag.is-filter.is-on .dot { background: var(--surface); }
+
+/* ── Rozsyłka tab ─────────────────────────────────────────────────────── */
+.send-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.send-side, .send-main { display: flex; flex-direction: column; gap: 18px; }
+
+.recipient-modes { display: flex; margin-bottom: 10px; }
+.recipient-mode-pane { display: flex; flex-direction: column; gap: 8px; }
+.recipient-mode-pane[hidden] { display: none; }
+.recipient-mode-pane input[type="search"],
+.recipient-mode-pane textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--hair-2);
+  color: var(--ink);
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  resize: vertical;
+}
+.recipient-mode-pane input[type="search"]:focus,
+.recipient-mode-pane textarea:focus { outline: none; border-color: var(--ink); }
+
+.crm-picklist {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--hair-2);
+  background: var(--surface);
+}
+.pick-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--hair);
+  cursor: pointer;
+  font-size: 12px;
+}
+.pick-row:last-child { border-bottom: 0; }
+.pick-row:hover { background: var(--surface-2); }
+.pick-row.is-picked { background: var(--ink); color: var(--surface); }
+.pick-row .pick-email { font-family: var(--font-mono); font-size: 10px; color: var(--ink-2); }
+.pick-row.is-picked .pick-email { color: rgba(245,244,240,0.7); }
+
+.tag-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.recipient-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  min-height: 32px;
+  padding: 8px;
+  border: 1px dashed var(--hair-2);
+  background: var(--surface);
+}
+.recip-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 4px 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--hair-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.recip-chip button {
+  background: transparent;
+  border: 0;
+  color: var(--ink-2);
+  cursor: pointer;
+  padding: 0 6px;
+  line-height: 1;
+}
+.recip-chip button:hover { color: var(--ink); }
+
+/* Form inputs across Mejle — always solid white so the dotted page bg
+   doesn't bleed through. (admin.css inputs are bg-less by default.) */
+#send-template,
+#send-throttle,
+#send-subject,
+#crm-search,
+#send-crm-search {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--hair-2);
+  color: var(--ink);
+}
+#send-template { padding: 8px 10px; }
+#send-subject  { padding: 10px 12px; font-size: 14px; }
+
+.rte-toolbar {
+  display: flex; gap: 0;
+  border: 1px solid var(--hair-2);
+  border-bottom: 0;
+  background: var(--bg-tint);
+}
+.rte-toolbar button {
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--hair);
+  padding: 8px 12px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+.rte-toolbar button:hover { background: var(--surface); }
+.rte {
+  min-height: 260px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  outline: none;
+}
+.rte:focus { border-color: var(--ink); }
+.rte p { margin: 0 0 0.8em 0; }
+.rte a { color: var(--accent, #7a3ad8); }
+
+.preview-frame {
+  width: 100%;
+  min-height: 460px;
+  border: 1px solid var(--hair);
+  background: #eeebe1;     /* matches branded template outer bg */
+}
+
+.send-progress {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--hair-2);
+  background: var(--surface);
+}
+.send-progress[hidden] { display: none; }
+.send-progress-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+.send-progress-bar {
+  height: 6px;
+  background: var(--surface);
+  border: 1px solid var(--hair);
+}
+#send-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--ink);
+  transition: width 200ms;
+}
+.send-progress-detail {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-2);
+  max-height: 160px;
+  overflow-y: auto;
+}
+.send-progress-detail .ok  { color: var(--ok, #2f7d3a); }
+.send-progress-detail .err { color: var(--danger, #d83a3a); }
+
+/* ── Skrzynka tab ─────────────────────────────────────────────────────── */
+.inbox-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.inbox-filters { display: flex; flex-wrap: wrap; gap: 0; }
+
+.inbox-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.inbox-list {
+  display: flex; flex-direction: column; gap: 0;
+  border: 1px solid var(--hair-2);
+  background: var(--surface);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.inbox-item {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--hair-2);
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 4px;
+  transition: background 120ms;
+  position: relative;
+}
+.inbox-item:last-child { border-bottom: 0; }
+.inbox-item:hover { background: var(--bg-tint); }
+.inbox-item.is-selected { background: var(--bg-tint); border-left: 3px solid var(--ink); padding-left: 11px; }
+.inbox-item.is-unread { background: rgba(15,15,15,0.06); }
+.inbox-item.is-unread .inbox-from { font-weight: 500; }
+.inbox-item.is-replied { opacity: 0.62; }
+.inbox-item.is-replied::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--ok, #2f7d3a);
+}
+
+.inbox-from {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--ink);
+}
+.inbox-subject {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inbox-meta {
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3, #8a8a83);
+}
+.inbox-source {
+  padding: 1px 6px;
+  border: 1px solid var(--hair);
+}
+.inbox-source.is-mascot { color: #7a3ad8; }
+.inbox-source.is-form   { color: var(--ink-2); }
+.inbox-source.is-inbound { color: #2f7d3a; }
+
+.inbox-pane {
+  background: var(--surface);
+  border: 1px solid var(--hair-2);
+  padding: 24px;
+  min-height: 50vh;
+}
+.inbox-pane .pane-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--hair);
+}
+.pane-from {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 20px;
+  color: var(--ink);
+}
+.pane-email {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+.pane-subject {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 16px;
+  color: var(--ink);
+  margin-top: 6px;
+}
+.pane-when {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3, #8a8a83);
+  text-align: right;
+  white-space: nowrap;
+}
+.pane-body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+.pane-body img { max-width: 100%; height: auto; }
+.pane-actions {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hair);
+}
+
+/* ── Threading (Skrzynka rows + pane) ─────────────────────────────────── */
+.thread-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  background: var(--ink);
+  color: var(--surface);
+  vertical-align: middle;
+  border-radius: 2px;
+}
+.inbox-item.is-selected .thread-count { background: var(--surface); color: var(--ink); }
+
+.thread-msgs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.thread-msg {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--hair);
+}
+.thread-msg:last-child { border-bottom: 0; }
+.thread-msg:first-child { padding-top: 0; }
+.thread-msg-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.thread-msg-from {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--ink);
+}
+.thread-msg-email {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-2);
+  margin-left: 6px;
+}
+.thread-msg-when {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3, #8a8a83);
+  white-space: nowrap;
+}
+.thread-msg-body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.thread-msg-body img { max-width: 100%; height: auto; }
+
+/* Outbound (sent by us) — right-aligned with subtle ink tint, like Gmail's
+   own-reply rendering. Distinguishes "Ja → recipient" from incoming. */
+.thread-msg.is-outbound {
+  padding-left: 14%;
+  border-left: 2px solid var(--ink);
+  padding-inline-start: 16px;
+  background: linear-gradient(90deg, transparent 0%, rgba(15, 15, 15, 0.025) 80%);
+}
+.thread-msg.is-outbound .thread-msg-head { color: var(--ink-2); }
+.thread-msg.is-outbound .thread-msg-from {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.thread-msg.is-outbound .thread-msg-email {
+  font-family: var(--font-body);
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+
+/* Latest-is-outbound marker in the thread list */
+.thread-you-arrow {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-2);
+  margin-right: 6px;
+  letter-spacing: 0.18em;
+}
+
+/* ── Templates manager (modal) ─────────────────────────────────────────── */
+.tmpl-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hair-2);
+  background: var(--surface);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.tmpl-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--hair);
+}
+.tmpl-row:last-child { border-bottom: 0; }
+.tmpl-row-main { min-width: 0; flex: 1; }
+.tmpl-row-name {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink);
+}
+.tmpl-row-meta {
+  display: flex; gap: 8px;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3, #8a8a83);
+}
+.tmpl-kind {
+  padding: 1px 6px;
+  border: 1px solid var(--hair-2);
+}
+.tmpl-row-subject {
+  margin-top: 4px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tmpl-row-actions {
+  display: flex; gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Mono code chips inside template manager hint */
+.coords code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--bg-tint);
+  padding: 1px 5px;
+  border: 1px solid var(--hair);
+}
+
+/* ── Modal-root (CRM client form, etc.) ───────────────────────────────── */
+.modal-root[hidden] { display: none; }
+.modal-root {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 60;
+}
+.modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.42);
+  cursor: pointer;
+}
+.modal-window {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  width: min(640px, 92vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px 28px 22px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.18);
+}
+
+.btn.small {
+  font-size: 9px;
+  padding: 5px 10px;
+  letter-spacing: 0.20em;
+}
+
+/* ── Wide-screen breakpoints ──────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .send-layout, .inbox-layout {
+    grid-template-columns: 1fr;
+  }
+  .send-side { order: 2; }
+  .send-main { order: 1; }
+  .inbox-pane { order: 2; }
+}
+@media (max-width: 760px) {
+  /* CRM toolbar: stack and stretch CTAs for fat-finger tapping. */
+  .crm-toolbar { grid-template-columns: 1fr; gap: 10px; }
+  .crm-actions { justify-content: stretch; flex-wrap: wrap; }
+  .crm-actions .btn { flex: 1 1 calc(50% - 4px); padding: 13px 12px; }
+  .crm-list { grid-template-columns: 1fr; gap: 10px; }
+  .crm-card { padding: 16px 14px; }
+
+  /* Inbox toolbar: filters scroll horizontally — there are up to 5 chips. */
+  .inbox-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .inbox-filters {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    white-space: nowrap;
+    margin: 0 -2px;
+    padding: 0 2px;
+  }
+  .inbox-filters::-webkit-scrollbar { display: none; }
+  .seg-btn { font-size: 10px; padding: 9px 12px; flex-shrink: 0; }
+  .inbox-refresh-btn { width: 100%; padding: 13px 14px; }
+
+  /* Single-pane inbox: list OR pane, controlled by .has-selection on the
+     layout. The list shows by default; opening a thread swaps to the pane. */
+  .inbox-layout { gap: 0; }
+  .inbox-list { max-height: none; }
+  .inbox-pane { display: none; padding: 18px 14px; min-height: auto; }
+  .inbox-layout.has-selection .inbox-list { display: none; }
+  .inbox-layout.has-selection .inbox-pane { display: block; }
+
+  /* Back button shown only on mobile when a thread is open. */
+  .pane-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--hair-2);
+    padding: 9px 12px;
+    margin-bottom: 14px;
+  }
+  .pane-back-btn svg { width: 14px; height: 14px; }
+  .pane-actions { flex-direction: column; align-items: stretch; }
+  .pane-actions .spread { display: none; }
+  .pane-actions .btn { width: 100%; padding: 13px 14px; font-size: 11px; }
+
+  /* Send (Rozsyłka) — already stacks at 1024. Just bigger inputs + RTE. */
+  .rte { min-height: 220px; padding: 14px; font-size: 16px; }
+  .rte-toolbar button { padding: 9px 12px; font-size: 13px; }
+  .preview-frame { height: 320px; }
+  .recipient-chips { gap: 6px; }
+  .send-progress-bar { height: 6px; }
+}
+
+/* Hide back button on desktop — only meaningful in mobile single-pane mode. */
+@media (min-width: 761px) {
+  .pane-back-btn { display: none !important; }
+}
