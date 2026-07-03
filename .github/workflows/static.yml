@@ -58,3 +58,9 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # Pages' status-polling API is flaky ("Deployment failed, try again
+          # later" while the deployment actually lands) — tolerate more
+          # transient errors and give it more time before declaring failure.
+          error_count: 15
+          timeout: 900000
