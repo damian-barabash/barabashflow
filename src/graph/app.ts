@@ -22,6 +22,7 @@ import {
   LOCALES, getLocale, setLocale, onLocaleChange, t, pickField, applyDom,
 } from '../lib/i18n';
 import { getTheme, toggleTheme, onThemeChange } from '../lib/theme';
+import { setupTopbarMorph } from '../lib/shell';
 
 type Row = Record<string, any>;
 interface GraphNode {
@@ -74,6 +75,7 @@ export async function mountApp() {
 
   setupLangSwitcher();
   setupThemeToggle();
+  setupTopbarMorph();
   setupCta();
   setupModalDismiss();
   setupTabAway();
@@ -88,8 +90,11 @@ export async function mountApp() {
   try { start3DLogo(); }
   catch (err) { console.warn('[bf] 3D logo disabled', err); showLogoFallback(); }
 
+  setupReveal();
+
   await loadData();
   renderHeader();
+  renderStats();
   renderNodes();
   bindNodeInteractions();
   setupViewZoomPan();
@@ -132,9 +137,9 @@ function refreshMetrics() {
   const rect = stage.getBoundingClientRect();
   const padX = Math.min(rect.width * 0.04, 64);
   const padY = Math.min(rect.height * 0.06, 56);
-  const narrow = window.innerWidth <= 760;
-  const portrait = rect.height > rect.width;
-  const worldMul = (narrow && portrait) ? 2.0 : 1;
+  // The graph lives inside a card on a scrollable page now (no more
+  // full-screen mobile world multiplier) — auto-fit handles small screens.
+  const worldMul = 1;
   const cs = getComputedStyle(document.documentElement);
   const nodeW = parseFloat(cs.getPropertyValue('--node-w')) || 158;
   const nodeH = parseFloat(cs.getPropertyValue('--node-h')) || 144;
@@ -183,12 +188,40 @@ function renderHeader() {
     }
   }
 
-  const ctaLabelEl = $('.cta-label');
   const ctaLabel = pickField(state.settings.cta_label, 'value');
-  if (ctaLabel && ctaLabelEl) ctaLabelEl.textContent = ctaLabel;
+  if (ctaLabel) {
+    document.querySelectorAll<HTMLElement>('.cta-label').forEach((el) => { el.textContent = ctaLabel; });
+  }
 
   const captionEl = $('#graph-caption');
   if (captionEl) captionEl.textContent = pickField(state.settings.graph_caption, 'value') || '';
+}
+
+// Live numbers in the hero stat strip.
+function renderStats() {
+  const el = $('#stat-projects');
+  if (el) el.textContent = String(state.projects.length || 0);
+}
+
+// Reveal-on-scroll for the info sections below the fold.
+function setupReveal() {
+  const targets = document.querySelectorAll<HTMLElement>('[data-reveal]');
+  if (!targets.length) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    targets.forEach((el) => el.classList.add('is-inview'));
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-inview');
+        io.unobserve(entry.target);
+      }
+    }
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+  // .will-reveal only gets added when JS runs — without JS the sections
+  // simply stay visible (crawlers, reader modes).
+  targets.forEach((el) => { el.classList.add('will-reveal'); io.observe(el); });
 }
 
 function styleHeroTitle(text: string): string {
@@ -217,27 +250,14 @@ function renderNodes() {
   const allZero = projects.every((p) => p.position_x === 0 && p.position_y === 0);
   if (allZero) autoLayout(projects);
 
-  const isMobilePortrait = window.innerWidth <= 760 && window.innerHeight > window.innerWidth;
-  const radialPush = isMobilePortrait ? 0.55 : 0;
-
   const frag = document.createDocumentFragment();
   projects.forEach((p, i) => {
     const el = buildNodeEl(p, i);
     frag.appendChild(el);
     let bx = Number.isFinite(p.position_x) ? p.position_x : 0;
     let by = Number.isFinite(p.position_y) ? p.position_y : 0;
-    if (radialPush > 0) {
-      const len = Math.hypot(bx, by);
-      if (len > 0.01) {
-        const factor = (len + radialPush) / len;
-        bx *= factor; by *= factor;
-      } else {
-        by = -radialPush;
-      }
-    } else {
-      if (window.innerWidth > 760) [bx, by] = compressRadius(bx, by);
-      bx = clampUnit(bx); by = clampUnit(by);
-    }
+    [bx, by] = compressRadius(bx, by);
+    bx = clampUnit(bx); by = clampUnit(by);
     state.nodes.push({ id: p.id, el, baseX: bx, baseY: by, targetX: bx, targetY: by, dragging: false });
   });
   state.stageInner!.appendChild(frag);
@@ -355,12 +375,6 @@ function applyAutoFit() {
   if (state.userViewSet) return;
   const m = metrics();
   if (!m.width || !m.height) return;
-
-  if (window.innerWidth <= 760) {
-    state.viewZoom = 0.6; state.viewPanX = 0; state.viewPanY = 0;
-    applyViewTransform();
-    return;
-  }
 
   let maxAbsX = 0.001, maxAbsY = 0.001;
   for (const n of state.nodes) {
@@ -646,7 +660,11 @@ function setupViewZoomPan() {
   const inner = state.stageInner;
   if (!stage || !inner) return;
 
+  // The page scrolls now, so plain wheel passes through; zoom needs
+  // Ctrl/Cmd+wheel (this also catches trackpad pinch, which browsers report
+  // as ctrlKey wheel) or the +/− buttons below.
   stage.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
     inner.classList.add('is-interacting');
     state.userViewSet = true;
@@ -656,6 +674,19 @@ function setupViewZoomPan() {
     clearTimeout(state.zoomReleaseTimer);
     state.zoomReleaseTimer = setTimeout(() => inner.classList.remove('is-interacting'), 200);
   }, { passive: false });
+
+  const zoomBy = (factor: number) => {
+    state.userViewSet = true;
+    state.viewZoom = Math.max(0.25, Math.min(3.0, state.viewZoom * factor));
+    applyViewTransform();
+  };
+  $('#zoom-in')?.addEventListener('click', () => zoomBy(1.25));
+  $('#zoom-out')?.addEventListener('click', () => zoomBy(0.8));
+  $('#zoom-reset')?.addEventListener('click', () => {
+    state.userViewSet = false;
+    state.viewPanX = 0; state.viewPanY = 0;
+    applyAutoFit();
+  });
 
   let panning = false, panSX = 0, panSY = 0, oPanX = 0, oPanY = 0, panPid: number | null = null;
   stage.addEventListener('pointerdown', (e) => {
@@ -996,7 +1027,9 @@ function closeModal() {
 
 // ─── CTA + contact form ──────────────────────────────────────────────────────
 function setupCta() {
-  $('#cta')?.addEventListener('click', openContactModal);
+  document.querySelectorAll<HTMLElement>('[data-open-contact]').forEach((el) => {
+    el.addEventListener('click', openContactModal);
+  });
   $('#contact-link')?.addEventListener('click', openContactModal);
   const form = $<HTMLFormElement>('#contact-form');
   form?.addEventListener('submit', async (e) => {

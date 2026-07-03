@@ -1,0 +1,106 @@
+---
+import Base from '../../layouts/Base.astro';
+import '../../styles/main.css';
+import { mediaUrl } from '../../lib/supabase';
+import { fetchPostList, formatDatePl } from '../../lib/blog';
+
+const posts = await fetchPostList();
+const title = 'Blog — BarabashFlow | strony internetowe, platformy, SEO';
+const description =
+  'Blog studia BarabashFlow: praktycznie o stronach internetowych, platformach, sklepach online i SEO dla firm. Ceny, technologie, porady — bez żargonu.';
+
+const blogLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Blog',
+  name: 'Blog BarabashFlow',
+  url: 'https://barabashflow.pl/blog/',
+  description,
+  inLanguage: 'pl',
+  publisher: { '@type': 'Organization', name: 'BarabashFlow', url: 'https://barabashflow.pl' },
+  author: { '@type': 'Person', name: 'Dmytrii Barabash', url: 'https://barabashflow.pl' },
+};
+---
+<Base title={title} description={description}>
+  <script type="application/ld+json" set:html={JSON.stringify(blogLd)} />
+
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="BarabashFlow">
+        <img class="brand-logo" src="/assets/img/logo.png" alt="" draggable="false" />
+        <span class="brand-name">Barabashflow</span>
+      </a>
+      <nav class="nav" aria-label="Site navigation">
+        <a class="chip" href="/" data-i18n="nav.home">Strona główna</a>
+        <span class="chip chip-lime">Blog</span>
+        <div class="nav-group lang pill" aria-label="Language switcher"></div>
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme" title="Theme">
+          <svg viewBox="0 0 20 20" fill="none" id="theme-icon" aria-hidden="true">
+            <path d="M14.5 11.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </nav>
+    </header>
+
+    <section class="hero blog-hero">
+      <div class="hero-chips">
+        <span class="chip kicker">Blog</span>
+        <span class="chip" data-i18n="blog.chip">Strony · Platformy · SEO</span>
+      </div>
+      <h1 class="hero-title">Blog</h1>
+      <p class="hero-sub" data-i18n="blog.sub">
+        Praktycznie o stronach internetowych, platformach i widoczności w Google —
+        ceny, technologie i porady dla firm, bez żargonu.
+      </p>
+    </section>
+
+    <section class="blog-list-section">
+      {posts.length === 0 && (
+        <div class="blog-empty">
+          <p data-i18n="blog.empty">Pierwsze wpisy są w drodze — zajrzyj tu wkrótce.</p>
+        </div>
+      )}
+      <div class="blog-grid">
+        {posts.map((p) => (
+          <a class="blog-card" href={`/blog/${p.slug}/`}>
+            {p.cover_path
+              ? <img class="blog-card-cover" src={mediaUrl(p.cover_path)} alt={p.cover_alt || p.title_pl} loading="lazy" decoding="async" />
+              : <div class="blog-card-cover is-empty" aria-hidden="true"></div>}
+            <div class="blog-card-body">
+              <span class="blog-card-date">{formatDatePl(p.published_at)}</span>
+              <h2
+                class="blog-card-title"
+                data-lm-pl={p.title_pl}
+                data-lm-en={p.title_en || p.title_pl}
+                data-lm-ru={p.title_ru || p.title_pl}
+              >{p.title_pl}</h2>
+              {p.excerpt_pl && (
+                <p
+                  class="blog-card-excerpt"
+                  data-lm-pl={p.excerpt_pl}
+                  data-lm-en={p.excerpt_en || p.excerpt_pl}
+                  data-lm-ru={p.excerpt_ru || p.excerpt_pl}
+                >{p.excerpt_pl}</p>
+              )}
+              {p.tags?.length > 0 && (
+                <div class="blog-card-tags">
+                  {p.tags.slice(0, 4).map((t: string) => <span class="chip chip-xs">{t}</span>)}
+                </div>
+              )}
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span class="footer-item strong">Barabashflow · MMXXVI</span>
+      <a class="footer-item" href="/blog/rss.xml">RSS</a>
+      <a class="footer-item" href="mailto:office@barabashflow.pl">office@barabashflow.pl</a>
+    </footer>
+  </div>
+
+  <script>
+    import { mountShell } from '../../lib/shell';
+    mountShell();
+  </script>
+</Base>

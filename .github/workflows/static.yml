@@ -4,6 +4,13 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
+  # Blog worker on the Mac Studio fires this after publishing new posts so the
+  # static pages regenerate. The daily cron is a best-effort fallback (GH
+  # schedules are unreliable) that picks up posts even without the dispatch.
+  repository_dispatch:
+    types: [blog-publish]
+  schedule:
+    - cron: "20 5 * * *"
 
 permissions:
   contents: read

@@ -790,3 +790,167 @@ body:not(.is-booting) .boot-splash { display: none; }
 @media (min-width: 761px) {
   .pane-back-btn { display: none !important; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   "Superpower" skin (2026-07-02 redesign) — rounded pill layer for
+   the Mejle page. Complements the same layer in admin.css.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Section cards on the page field */
+.send-side > .section,
+.send-main > .section,
+.panel-page > .section {
+  border: 0;
+  border-radius: var(--r-lg, 22px);
+  box-shadow: var(--card-sh);
+  padding: 18px 20px;
+}
+.crm-toolbar,
+.inbox-toolbar {
+  border: 0;
+  border-radius: var(--r-lg, 22px);
+  box-shadow: var(--card-sh);
+}
+
+/* Segmented buttons → pill group */
+.seg-btn,
+.recipient-modes .seg-btn,
+.seg-buttons .seg-btn {
+  border: 0;
+  background: var(--surface-2);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  padding: 9px 14px;
+}
+.seg-btn:first-child { border-radius: 999px 0 0 999px; padding-left: 16px; }
+.seg-btn:last-child  { border-radius: 0 999px 999px 0; padding-right: 16px; border-right: 0; }
+.seg-btn:only-child  { border-radius: 999px; }
+.seg-btn.is-active { background: var(--ink); color: var(--surface); }
+
+/* CRM cards + tags */
+.crm-card {
+  border: 1px solid transparent;
+  border-radius: var(--r-lg, 22px);
+  box-shadow: var(--card-sh);
+}
+.crm-card:hover { border-color: var(--hair-2); }
+.crm-card-name { font-weight: 600; letter-spacing: -0.01em; }
+.crm-tag { border-radius: 999px; padding: 3px 10px; }
+.crm-tag .dot { border-radius: 50%; }
+.recip-chip { border-radius: 999px; border: 0; background: var(--surface-2); padding: 5px 6px 5px 12px; }
+.recipient-chips { border-radius: var(--r-md, 14px); }
+.crm-picklist { border: 0; border-radius: var(--r-md, 14px); box-shadow: var(--card-sh); overflow: hidden; }
+
+/* Inbox */
+.inbox-list {
+  border: 0;
+  border-radius: var(--r-lg, 22px);
+  box-shadow: var(--card-sh);
+  overflow: hidden;
+}
+.inbox-item.is-unread { background: var(--surface-2); }
+.inbox-pane {
+  border: 0;
+  border-radius: var(--r-lg, 22px);
+  box-shadow: var(--card-sh);
+}
+.inbox-from { font-weight: 600; letter-spacing: -0.01em; }
+.pane-from { font-weight: 600; letter-spacing: -0.015em; }
+.pane-subject { font-weight: 500; }
+.inbox-source { border-radius: 999px; padding: 2px 8px; }
+.thread-count { border-radius: 999px; }
+
+/* Rich text editor + preview */
+.rte-toolbar {
+  border: 0;
+  background: var(--surface-2);
+  border-radius: var(--r-md, 14px) var(--r-md, 14px) 0 0;
+  overflow: hidden;
+}
+.rte-toolbar button { border-right: 1px solid var(--hair); }
+.rte {
+  border: 0;
+  background: var(--surface-2);
+  border-radius: 0 0 var(--r-md, 14px) var(--r-md, 14px);
+}
+.rte:focus { background: var(--surface); }
+.preview-frame { border: 0; border-radius: var(--r-md, 14px); box-shadow: var(--card-sh); }
+.send-progress { border: 0; border-radius: var(--r-md, 14px); box-shadow: var(--card-sh); }
+.send-progress-bar { border: 0; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+#send-progress-fill { border-radius: 999px; }
+
+/* Inputs solid + rounded */
+#send-template,
+#send-throttle,
+#send-subject,
+#crm-search,
+#send-crm-search,
+.recipient-mode-pane input[type="search"],
+.recipient-mode-pane textarea,
+.crm-search input {
+  border: 1px solid transparent;
+  border-radius: var(--r-md, 14px);
+  background: var(--surface-2);
+}
+#send-template:focus,
+#send-throttle:focus,
+#send-subject:focus,
+#crm-search:focus,
+#send-crm-search:focus,
+.recipient-mode-pane input[type="search"]:focus,
+.recipient-mode-pane textarea:focus,
+.crm-search input:focus { border-color: var(--hair-2); background: var(--surface); }
+
+/* Templates manager + modal */
+.tmpl-list { border: 0; border-radius: var(--r-md, 14px); box-shadow: var(--card-sh); overflow: hidden; }
+.tmpl-kind { border-radius: 999px; }
+.tmpl-row-name { font-weight: 600; }
+.modal-window {
+  border: 0;
+  border-radius: var(--r-xl, 28px);
+  box-shadow: 0 60px 140px -36px rgba(24, 24, 18, 0.32), 0 16px 36px -14px rgba(24, 24, 18, 0.16);
+}
+.coords code { border-radius: 7px; border: 0; background: var(--surface-2); }
+
+/* Buttons on the field (mail.css set flat backgrounds earlier) */
+.btn { background: var(--surface-2); }
+.btn:hover { background: var(--bg-tint); }
+.btn.primary { background: var(--ink); color: var(--bg); }
+.btn.danger { background: var(--surface-2); }
+.btn.ghost { background: var(--surface-2); }
+.pane-back-btn { border: 0; border-radius: 999px; background: var(--surface-2); }
+
+/* Eyebrow → quiet caps in the body face */
+.eyebrow { font-family: var(--font-body); font-weight: 600; letter-spacing: 0.08em; }
+
+/* ── Glass boost (2026-07-02, iteration 3) — Mejle page ──────────── */
+.send-side > .section,
+.send-main > .section,
+.panel-page > .section,
+.crm-toolbar,
+.inbox-toolbar,
+.crm-card,
+.inbox-list,
+.inbox-pane,
+.tmpl-list,
+.crm-picklist,
+.send-progress,
+.modal-window {
+  background: var(--glass, rgba(255, 255, 255, 0.44));
+  border: 1px solid var(--glass-bd, rgba(255, 255, 255, 0.78));
+  -webkit-backdrop-filter: blur(26px) saturate(140%);
+  backdrop-filter: blur(26px) saturate(140%);
+}
+.crm-card:hover { border-color: var(--hair-2); }
+.inbox-item.is-unread { background: rgba(255, 255, 255, 0.35); }
+:root[data-theme="dark"] .inbox-item.is-unread { background: rgba(244, 244, 236, 0.05); }
+.seg-btn { -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); background: var(--glass, rgba(255,255,255,0.44)); }
+.seg-btn.is-active { background: var(--ink); }
+.rte, .rte-toolbar { background: var(--glass-strong, rgba(255,255,255,0.62)); }
+.rte:focus { background: var(--surface); }
+
+/* Preview frame matches the new e-mail template field color */
+.preview-frame { background: #e9e8e4; }

@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Saira+Extended:wght@200;300;400;500&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="/assets/css/admin.css?v=2026-05-28g" />
+  <link rel="stylesheet" href="/assets/css/admin.css?v=2026-07-03a" />
   <style>
     /* Mejle button — wider than icon-btn to fit label, hides label on mobile */
     .mejle-link { gap: 8px; padding: 0 12px; width: auto; min-width: 32px; position: relative; }
@@ -52,7 +52,7 @@
       filter: invert(0.94) hue-rotate(180deg);
     }
   </style>
-  <script type="module" src="/assets/js/theme.js?v=2026-05-28g"></script>
+  <script type="module" src="/assets/js/theme.js?v=2026-07-03a"></script>
 </head>
 <body>
 
@@ -94,6 +94,10 @@
           </button>
           <button class="tab-btn" data-tab="settings">
             <span>Strona</span>
+          </button>
+          <button class="tab-btn" data-tab="blog">
+            <span>Blog</span>
+            <span class="count" id="blog-count"></span>
           </button>
         </nav>
 
@@ -291,10 +295,66 @@
       </div>
     </section>
 
+    <!-- ── BLOG (AI autopilot + posts) ──────────────────────── -->
+    <section class="panel-page" data-panel="blog">
+      <div class="settings-card">
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">Autopilot bloga</span>
+            <span class="section-aside">agent na Mac Studio · publikacja codziennie rano</span>
+          </div>
+          <div class="row-2">
+            <div class="field">
+              <label class="field-label">Publikowanie</label>
+              <select id="blog-enabled">
+                <option value="true">Włączone</option>
+                <option value="false">Wstrzymane</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">Wpisów dziennie</label>
+              <select id="blog-count-sel">
+                <option value="1|1">1</option>
+                <option value="1|2">1–2</option>
+                <option value="2|2">2</option>
+                <option value="2|3">2–3</option>
+                <option value="3|3">3</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Własne tematy / słowa kluczowe (po jednym w linii — agent bierze je w pierwszej kolejności)</label>
+            <textarea id="blog-seeds" rows="3" placeholder="np. strona internetowa dla warsztatu samochodowego&#10;ile kosztuje sklep internetowy 2026"></textarea>
+          </div>
+          <div class="button-row">
+            <span class="coords">Nowe wpisy pojawiają się na stronie po najbliższej przebudowie (agent sam ją uruchamia po publikacji).</span>
+            <span class="spread"></span>
+            <button class="btn primary" id="blog-save-config">Zapisz ustawienia</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">Research słów kluczowych</span>
+            <span class="section-aside" id="blog-kw-aside">dziś</span>
+          </div>
+          <div id="blog-keywords" class="blog-kw-list"><span class="coords">Brak danych — agent loguje research przy każdym uruchomieniu.</span></div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">Wpisy</span>
+            <span class="section-aside" id="blog-posts-aside"></span>
+          </div>
+          <div id="blog-posts" class="blog-admin-list"></div>
+        </div>
+      </div>
+    </section>
+
   </div>
 
   <div class="banner" id="banner"></div>
 
-  <script type="module" src="/assets/js/admin.js?v=2026-06-10c"></script>
+  <script type="module" src="/assets/js/admin.js?v=2026-07-03a"></script>
 </body>
 </html>

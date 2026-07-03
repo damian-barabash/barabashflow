@@ -1,0 +1,163 @@
+---
+import Base from '../../layouts/Base.astro';
+import '../../styles/main.css';
+import { mediaUrl } from '../../lib/supabase';
+import { fetchAllPosts, formatDatePl, renderMarkdown, type BlogPost } from '../../lib/blog';
+
+export async function getStaticPaths() {
+  const posts = await fetchAllPosts();
+  return posts.map((post) => ({ params: { slug: post.slug }, props: { post } }));
+}
+
+const { post } = Astro.props as { post: BlogPost };
+const site = 'https://barabashflow.pl';
+const url = `${site}/blog/${post.slug}/`;
+const coverUrl = post.cover_path ? mediaUrl(post.cover_path) : `${site}/assets/img/og.png`;
+const bodyHtml = renderMarkdown(post.body_pl);
+const title = `${post.title_pl} — Blog BarabashFlow`;
+const description = post.excerpt_pl || post.title_pl;
+const faq = Array.isArray(post.faq) ? post.faq.filter((f) => f?.q && f?.a) : [];
+
+const postLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: post.title_pl,
+  description,
+  image: coverUrl,
+  url,
+  datePublished: post.published_at,
+  dateModified: post.published_at,
+  inLanguage: 'pl',
+  keywords: (post.keywords || []).join(', '),
+  author: { '@type': 'Person', name: 'Dmytrii Barabash', url: site },
+  publisher: { '@type': 'Organization', name: 'BarabashFlow', url: site },
+  mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+};
+const crumbsLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'BarabashFlow', item: site + '/' },
+    { '@type': 'ListItem', position: 2, name: 'Blog', item: site + '/blog/' },
+    { '@type': 'ListItem', position: 3, name: post.title_pl, item: url },
+  ],
+};
+const faqLd = faq.length
+  ? {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faq.map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    }
+  : null;
+---
+<Base title={title} description={description}>
+  <script type="application/ld+json" set:html={JSON.stringify(postLd)} />
+  <script type="application/ld+json" set:html={JSON.stringify(crumbsLd)} />
+  {faqLd && <script type="application/ld+json" set:html={JSON.stringify(faqLd)} />}
+
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="BarabashFlow">
+        <img class="brand-logo" src="/assets/img/logo.png" alt="" draggable="false" />
+        <span class="brand-name">Barabashflow</span>
+      </a>
+      <nav class="nav" aria-label="Site navigation">
+        <a class="chip" href="/" data-i18n="nav.home">Strona główna</a>
+        <a class="chip" href="/blog/">Blog</a>
+        <div class="nav-group lang pill" aria-label="Language switcher"></div>
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme" title="Theme">
+          <svg viewBox="0 0 20 20" fill="none" id="theme-icon" aria-hidden="true">
+            <path d="M14.5 11.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </nav>
+    </header>
+
+    <article class="post">
+      <nav class="post-crumbs" aria-label="Breadcrumb">
+        <a href="/">BarabashFlow</a><span>/</span><a href="/blog/">Blog</a>
+      </nav>
+
+      <header class="post-head">
+        <div class="hero-chips">
+          <span class="chip">{formatDatePl(post.published_at)}</span>
+          {(post.tags || []).slice(0, 4).map((t) => <span class="chip chip-xs">{t}</span>)}
+        </div>
+        <h1
+          class="post-title"
+          data-lm-pl={post.title_pl}
+          data-lm-en={post.title_en || post.title_pl}
+          data-lm-ru={post.title_ru || post.title_pl}
+        >{post.title_pl}</h1>
+        {post.excerpt_pl && (
+          <p
+            class="post-lead"
+            data-lm-pl={post.excerpt_pl}
+            data-lm-en={post.excerpt_en || post.excerpt_pl}
+            data-lm-ru={post.excerpt_ru || post.excerpt_pl}
+          >{post.excerpt_pl}</p>
+        )}
+      </header>
+
+      {post.cover_path && (
+        <figure class="post-cover-wrap">
+          <img class="post-cover" src={coverUrl} alt={post.cover_alt || post.title_pl} loading="eager" decoding="async" />
+          {post.cover_credit && (
+            <figcaption class="post-credit">
+              {post.cover_source_url
+                ? <a href={post.cover_source_url} rel="noopener nofollow" target="_blank">{post.cover_credit}</a>
+                : post.cover_credit}
+            </figcaption>
+          )}
+        </figure>
+      )}
+
+      <div class="post-body" data-locale="pl" set:html={bodyHtml} />
+      {post.body_en && <div class="post-body" data-locale="en" hidden set:html={renderMarkdown(post.body_en)} />}
+      {post.body_ru && <div class="post-body" data-locale="ru" hidden set:html={renderMarkdown(post.body_ru)} />}
+
+      {faq.length > 0 && (
+        <section class="post-faq">
+          <h2 class="section-title" data-i18n="sec.faq.title">Częste pytania</h2>
+          <div class="faq-list">
+            {faq.map((f) => (
+              <details class="faq-item">
+                <summary><span>{f.q}</span><span class="faq-plus" aria-hidden="true"></span></summary>
+                <p>{f.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <aside class="author-box">
+        <img class="author-logo" src="/assets/img/logo.png" alt="" aria-hidden="true" />
+        <div class="author-text">
+          <strong>Dmytrii Barabash — BarabashFlow</strong>
+          <p data-i18n="blog.author">Projektuję i wdrażam strony internetowe, platformy i aplikacje webowe dla firm. Warszawa → cały świat.</p>
+        </div>
+        <a class="cta cta-lime" href="/#works">
+          <span class="cta-label">Zlecić projekt</span>
+          <svg class="cta-arrow" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+      </aside>
+    </article>
+
+    <footer class="footer">
+      <span class="footer-item strong">Barabashflow · MMXXVI</span>
+      <a class="footer-item" href="/blog/" data-i18n="blog.all">← Wszystkie wpisy</a>
+      <a class="footer-item" href="mailto:office@barabashflow.pl">office@barabashflow.pl</a>
+    </footer>
+  </div>
+
+  <script>
+    import { mountShell } from '../../lib/shell';
+    mountShell();
+  </script>
+</Base>

@@ -5,67 +5,84 @@
 
 :root,
 :root[data-theme="light"] {
-  --bg:        #f6f4ee;
-  --bg-tint:   #efece4;
-  --surface:   #ffffff;
-  --surface-2: #fbfaf6;
-  --hair:      rgba(15, 15, 15, 0.08);
-  --hair-2:    rgba(15, 15, 15, 0.16);
-  --ink:       #0e0e0e;
-  --ink-2:     #2a2a28;
-  --muted:     #6b6b66;
-  --soft:      #9c9c95;
+  --bg:        #e9e8e4;
+  --bg-tint:   #e1e0db;
+  --surface:   #fcfcfa;
+  --surface-2: #f2f1ed;
+  --hair:      rgba(24, 24, 18, 0.07);
+  --hair-2:    rgba(24, 24, 18, 0.13);
+  --ink:       #161614;
+  --ink-2:     #3b3b36;
+  --muted:     #7d7d75;
+  --soft:      #a5a59c;
 
-  --grid-dot:  rgba(15, 15, 15, 0.10);
+  --lime:      #e0fe52;
+  --lime-ink:  #1c1e08;
 
-  --node-bg:   #ffffff;
-  --node-bd:   rgba(15, 15, 15, 0.18);
-  --node-sh:   0 1px 0 rgba(15, 15, 15, 0.05),
-               0 14px 32px -16px rgba(15, 15, 15, 0.22);
-  --node-sh-h: 0 1px 0 rgba(15, 15, 15, 0.05),
-               0 26px 60px -18px rgba(15, 15, 15, 0.32);
-  --node-sh-sel: 0 0 0 2px var(--ink), 0 22px 50px -18px rgba(15, 15, 15, 0.30);
+  --grid-dot:  rgba(24, 24, 18, 0.11);
 
-  --edge:      rgba(15, 15, 15, 0.30);
-  --edge-soft: rgba(15, 15, 15, 0.18);
+  --node-bg:   #fcfcfa;
+  --node-bd:   rgba(24, 24, 18, 0.08);
+  --node-sh:   0 1px 2px rgba(24, 24, 18, 0.04),
+               0 14px 34px -16px rgba(24, 24, 18, 0.16);
+  --node-sh-h: 0 2px 4px rgba(24, 24, 18, 0.05),
+               0 26px 56px -18px rgba(24, 24, 18, 0.26);
+  --node-sh-sel: 0 0 0 2px var(--ink), 0 22px 50px -18px rgba(24, 24, 18, 0.28);
 
-  --ok:        #166534;
-  --danger:    #b91c1c;
+  --edge:      rgba(24, 24, 18, 0.26);
+  --edge-soft: rgba(24, 24, 18, 0.14);
+
+  --card-sh:   0 1px 2px rgba(24, 24, 18, 0.04),
+               0 12px 34px -18px rgba(24, 24, 18, 0.12);
+
+  --ok:        #3d8b2f;
+  --danger:    #c23434;
 }
 
 :root[data-theme="dark"] {
-  --bg:        #0d0d0d;
-  --bg-tint:   #131313;
-  --surface:   #151515;
-  --surface-2: #1a1a1a;
-  --hair:      rgba(245, 244, 240, 0.08);
-  --hair-2:    rgba(245, 244, 240, 0.16);
-  --ink:       #f5f4f0;
-  --ink-2:     #d6d4cd;
-  --muted:     #8d8b84;
-  --soft:      #5b5955;
+  --bg:        #131311;
+  --bg-tint:   #1a1a18;
+  --surface:   #1e1e1c;
+  --surface-2: #262624;
+  --hair:      rgba(244, 244, 236, 0.08);
+  --hair-2:    rgba(244, 244, 236, 0.15);
+  --ink:       #f1f0ea;
+  --ink-2:     #cfcec6;
+  --muted:     #8f8f86;
+  --soft:      #62625b;
 
-  --grid-dot:  rgba(245, 244, 240, 0.08);
+  --lime:      #d9f24b;
+  --lime-ink:  #191b06;
 
-  --node-bg:   #171717;
-  --node-bd:   rgba(245, 244, 240, 0.16);
-  --node-sh:   0 1px 0 rgba(245, 244, 240, 0.04),
-               0 18px 36px -22px rgba(0, 0, 0, 0.9);
-  --node-sh-h: 0 1px 0 rgba(245, 244, 240, 0.06),
-               0 26px 60px -22px rgba(0, 0, 0, 1);
+  --grid-dot:  rgba(244, 244, 236, 0.09);
+
+  --node-bg:   #22221f;
+  --node-bd:   rgba(244, 244, 236, 0.10);
+  --node-sh:   0 1px 0 rgba(244, 244, 236, 0.03),
+               0 20px 44px -20px rgba(0, 0, 0, 0.85);
+  --node-sh-h: 0 1px 0 rgba(244, 244, 236, 0.05),
+               0 28px 60px -20px rgba(0, 0, 0, 1);
   --node-sh-sel: 0 0 0 2px var(--ink), 0 22px 50px -18px rgba(0, 0, 0, 0.7);
 
-  --edge:      rgba(245, 244, 240, 0.30);
-  --edge-soft: rgba(245, 244, 240, 0.18);
+  --edge:      rgba(244, 244, 236, 0.30);
+  --edge-soft: rgba(244, 244, 236, 0.14);
 
-  --ok:        #5eea9a;
-  --danger:    #ff7676;
+  --card-sh:   0 1px 0 rgba(244, 244, 236, 0.03),
+               0 18px 44px -22px rgba(0, 0, 0, 0.8);
+
+  --ok:        #7ddb68;
+  --danger:    #ff8484;
 }
 
 :root {
-  --font-display: 'Saira Extended', 'Inter', system-ui, sans-serif;
-  --font-body:    'Inter', system-ui, sans-serif;
+  --font-display: 'Golos Text', 'Helvetica Neue', Arial, system-ui, sans-serif;
+  --font-body:    'Golos Text', 'Helvetica Neue', Arial, system-ui, sans-serif;
   --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  --r-xl:  28px;
+  --r-lg:  22px;
+  --r-md:  14px;
+  --r-pill: 999px;
 }
 
 * { box-sizing: border-box; }
@@ -1004,4 +1021,300 @@ a { color: var(--ink); text-decoration: none; }
   .icon-btn { width: 34px; height: 34px; }
   .mejle-link .badge { font-size: 8px; padding: 1px 4px; min-width: 14px; }
   .tab-btn { padding: 8px 9px; font-size: 9px; letter-spacing: 0.12em; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   "Superpower" skin (2026-07-02 redesign) — soft gray field, white
+   pill cards, rounded everything, lime accents. This layer re-rounds
+   and re-shades the cockpit; layout rules above stay untouched.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Page field: soft daylight wash instead of the full-page dot grid.
+   (The dot grid stays only inside .graph-workspace — it's a map.) */
+body::before {
+  background-image: none;
+  background: radial-gradient(120% 60% at 50% -10%, rgba(255, 255, 255, 0.55), transparent 60%);
+}
+:root[data-theme="dark"] body::before {
+  background: radial-gradient(120% 60% at 50% -10%, rgba(255, 255, 255, 0.05), transparent 60%);
+}
+
+/* Inputs — soft rounded fills, no hard borders. */
+input, textarea, select {
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--hair-2);
+  background: var(--surface);
+}
+.auth-card input { background: var(--surface-2); }
+
+/* Cards */
+.auth-card,
+.settings-card,
+.side-panel {
+  border: 0;
+  border-radius: var(--r-xl);
+  box-shadow: var(--card-sh);
+}
+.graph-workspace {
+  border: 0;
+  border-radius: var(--r-xl);
+  box-shadow: var(--card-sh);
+}
+.message {
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  box-shadow: var(--card-sh);
+}
+.message.unread { border-color: var(--ink); }
+
+/* Top bar — translucent, blurred, pill controls. */
+.top {
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  backdrop-filter: blur(16px) saturate(120%);
+  border-bottom: 0;
+}
+.brand { align-items: center; font-stretch: normal; letter-spacing: -0.02em; text-transform: none; font-weight: 600; font-size: 16px; }
+.brand .sep { letter-spacing: 0.02em; }
+.tab-btn {
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: var(--card-sh);
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding: 9px 16px;
+}
+.tab-btn.is-active { background: var(--ink); color: var(--bg); box-shadow: var(--card-sh); }
+.tab-btn .badge { border-radius: var(--r-pill); }
+.icon-btn {
+  border: 0;
+  border-radius: 50%;
+  box-shadow: var(--card-sh);
+}
+
+/* Graph workspace internals */
+#graph-center { border-radius: 50%; font-stretch: normal; font-weight: 600; letter-spacing: -0.02em; }
+.node { border-radius: var(--r-md); }
+.node.is-pending { border-radius: var(--r-md); }
+.node-thumb { border-bottom: 0; }
+.node-cat::before { border-radius: 50%; }
+.node-title { font-stretch: normal; font-weight: 600; text-transform: none; letter-spacing: -0.01em; font-size: 14px; }
+.node-visibility { border-radius: var(--r-pill); }
+.fab-add { border-radius: 50%; }
+.zoom-indicator {
+  border: 0;
+  border-radius: var(--r-pill);
+  box-shadow: var(--card-sh);
+  padding: 6px 12px;
+}
+.graph-help {
+  background: var(--surface);
+  border-radius: var(--r-pill);
+  box-shadow: var(--card-sh);
+  padding: 7px 14px;
+  bottom: 14px;
+}
+
+/* Form atoms */
+.photo-slot { border-radius: var(--r-md); }
+.photo-slot .remove { border-radius: 50%; }
+.portrait-slot { border-radius: 50%; }
+.conn-chip { border-radius: var(--r-pill); }
+.conn-chip .chip-dot { border-radius: 50%; }
+.color-swatch { border-radius: 10px; }
+.placeholder-glyph { border-radius: 50%; }
+
+/* Buttons — pills. */
+.btn {
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  padding: 12px 20px;
+  box-shadow: none;
+}
+.btn:hover { background: var(--bg-tint); }
+.btn.primary { background: var(--ink); color: var(--bg); }
+.btn.danger { background: var(--surface-2); color: var(--danger); }
+.btn.ghost { background: var(--surface-2); }
+
+/* Banner toast — pill. */
+.banner {
+  border: 0;
+  border-radius: var(--r-pill);
+  box-shadow: var(--card-sh), 0 24px 40px -16px rgba(24,24,18,0.28);
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  font-size: 12.5px;
+}
+
+/* Auth screen typography */
+.auth-card h1 {
+  font-stretch: normal;
+  text-transform: none;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  font-size: 20px;
+}
+
+/* Section labels — quieter caps, body face. */
+.section-title, .section-aside, .field-label {
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.side-panel .eyebrow { font-family: var(--font-body); font-weight: 600; letter-spacing: 0.06em; }
+.side-panel h3 { font-stretch: normal; text-transform: none; letter-spacing: -0.02em; font-weight: 600; font-size: 17px; }
+.side-panel.is-empty .pitch { font-stretch: normal; text-transform: none; letter-spacing: -0.01em; font-weight: 600; font-size: 16px; }
+.message-name { font-stretch: normal; text-transform: none; letter-spacing: -0.01em; font-weight: 600; }
+.message-source { border-radius: var(--r-pill); border: 0; background: var(--surface-2); }
+
+/* ── Glass boost (2026-07-02, iteration 3) ─────────────────────────
+   Real frosted glass: colored ambient blobs in the field + translucent
+   blurred cards, matching the public page. */
+:root,
+:root[data-theme="light"] {
+  --glass:        rgba(255, 255, 255, 0.44);
+  --glass-strong: rgba(255, 255, 255, 0.62);
+  --glass-bd:     rgba(255, 255, 255, 0.78);
+}
+:root[data-theme="dark"] {
+  --glass:        rgba(38, 38, 36, 0.46);
+  --glass-strong: rgba(38, 38, 36, 0.68);
+  --glass-bd:     rgba(244, 244, 236, 0.12);
+}
+
+body::before {
+  background:
+    radial-gradient(44% 34% at 86% 2%,  rgba(240, 162, 74, 0.30), transparent 70%),
+    radial-gradient(42% 36% at 2% 34%,  rgba(127, 180, 76, 0.26), transparent 70%),
+    radial-gradient(40% 34% at 96% 78%, rgba(226, 68, 127, 0.18), transparent 70%),
+    radial-gradient(120% 60% at 50% -10%, rgba(255, 255, 255, 0.5), transparent 60%);
+}
+:root[data-theme="dark"] body::before {
+  background:
+    radial-gradient(44% 34% at 86% 2%,  rgba(240, 162, 74, 0.12), transparent 70%),
+    radial-gradient(42% 36% at 2% 34%,  rgba(127, 180, 76, 0.11), transparent 70%),
+    radial-gradient(40% 34% at 96% 78%, rgba(226, 68, 127, 0.08), transparent 70%),
+    radial-gradient(120% 60% at 50% -10%, rgba(255, 255, 255, 0.04), transparent 60%);
+}
+
+.auth-card,
+.settings-card,
+.side-panel,
+.graph-workspace,
+.message {
+  background: var(--glass);
+  border: 1px solid var(--glass-bd);
+  -webkit-backdrop-filter: blur(26px) saturate(140%);
+  backdrop-filter: blur(26px) saturate(140%);
+  box-shadow: var(--card-sh), inset 0 1px 0 var(--glass-bd);
+}
+.graph-workspace {
+  background-image: radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0);
+  background-size: 28px 28px;
+  background-color: var(--glass);
+}
+.message.unread { border-color: var(--ink); }
+
+.tab-btn,
+.icon-btn {
+  background: var(--glass);
+  border: 1px solid var(--glass-bd);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
+}
+.tab-btn.is-active { background: var(--ink); border-color: var(--ink); }
+
+.node {
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.node-body { background: transparent; }
+.node.is-pending { background: var(--glass); }
+
+.top {
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(130%);
+  backdrop-filter: blur(24px) saturate(130%);
+}
+.banner {
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid var(--glass-bd);
+}
+
+/* Blob layer visibility: bg must live on <html>, body transparent, blobs
+   behind content (same fix as the public page). */
+html { background: var(--bg); }
+body { background: transparent; }
+body::before { z-index: -1; }
+.shell, .auth-wrap { position: relative; z-index: 1; }
+
+/* ── Blog admin tab (2026-07-03) ─────────────────────────────────── */
+.blog-admin-list { display: grid; gap: 10px; }
+.blog-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--glass);
+  border: 1px solid var(--glass-bd);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+}
+.blog-row.is-draft { opacity: 0.55; }
+.blog-row-thumb {
+  width: 76px; height: 48px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--surface-2) center/cover no-repeat;
+}
+.blog-row-main { flex: 1 1 auto; min-width: 0; }
+.blog-row-title {
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.blog-row-meta {
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.blog-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.btn.small { font-size: 11px; padding: 8px 12px; }
+.blog-kw-list { display: grid; gap: 14px; }
+.blog-kw-day { display: grid; gap: 8px; }
+.blog-kw-date {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.blog-kw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.blog-kw-chips .conn-chip { cursor: default; font-size: 11px; padding: 6px 11px; }
+@media (max-width: 760px) {
+  .blog-row { flex-wrap: wrap; }
+  .blog-row-actions { width: 100%; }
+  .blog-row-actions .btn { flex: 1; }
 }

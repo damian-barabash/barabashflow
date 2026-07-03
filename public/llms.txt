@@ -21,3 +21,8 @@ Astro, React, Next.js, Supabase i Three.js, wdrażane na GitHub Pages / Cloudfla
 
 ## Języki
 Polski (domyślny), English, Русский.
+
+## Blog
+- https://barabashflow.pl/blog/ — praktyczne artykuły o stronach internetowych,
+  platformach, sklepach online i SEO dla firm (nowe wpisy codziennie, RSS:
+  https://barabashflow.pl/blog/rss.xml).

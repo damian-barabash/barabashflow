@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-05-28g';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-05-28g';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-07-03a';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-03a';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // Share storageKey with admin.html so signing in once unlocks both pages.
@@ -708,29 +708,33 @@ function doRefreshPreview() {
 }
 
 function wrapBrandedLocal(subject, bodyHtml) {
+  // "Superpower" brand wrapper — must stay in sync with wrapBranded() in the
+  // send-mail Edge Function (v6, 2026-07-02).
   const LOGO = `${location.origin}/assets/img/logo.png`;
   const SITE = `${location.origin}`;
+  const SANS = `'Helvetica Neue',Helvetica,Arial,-apple-system,'Segoe UI',Roboto,sans-serif`;
   // Sample-substitute {{name}}/{{email}} so preview reads naturally.
   const replaced = String(bodyHtml)
     .replace(/\{\{name\}\}/g, 'Imię')
     .replace(/\{\{email\}\}/g, 'test@example.com');
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(subject)}</title></head>
-<body style="margin:0;padding:0;background:#eeebe1;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#0e0e0e;">
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eeebe1;">
-<tr><td align="center" style="padding:32px 16px;">
-<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#f6f4ee;border:1px solid #d6d3c8;">
-<tr><td style="padding:28px 36px 16px;border-bottom:1px solid #d6d3c8;">
+<body style="margin:0;padding:0;background:#e9e8e4;font-family:${SANS};color:#161614;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e9e8e4;">
+<tr><td align="center" style="padding:36px 16px;">
+<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#fcfcfa;border:1px solid #ffffff;border-radius:24px;">
+<tr><td style="padding:26px 36px 18px;">
 <table width="100%"><tr>
-<td style="vertical-align:middle;"><img src="${LOGO}" width="28" height="34" alt="BF" style="display:inline-block;vertical-align:middle;margin-right:10px;"><span style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;font-weight:500;letter-spacing:0.04em;color:#0e0e0e;">BarabashFlow</span></td>
-<td align="right" style="font-family:Menlo,Consolas,monospace;font-size:10px;letter-spacing:0.18em;color:#7a7a73;text-transform:uppercase;">Studio · MMXXVI</td>
+<td style="vertical-align:middle;"><img src="${LOGO}" width="26" height="32" alt="BF" style="display:inline-block;vertical-align:middle;margin-right:10px;"><span style="font-family:${SANS};font-size:17px;font-weight:700;letter-spacing:-0.02em;color:#161614;vertical-align:middle;">Barabashflow</span></td>
+<td align="right" style="vertical-align:middle;"><span style="display:inline-block;background:#f2f1ed;border-radius:999px;padding:6px 14px;font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:0.04em;color:#7d7d75;">MMXXVI</span></td>
 </tr></table>
 </td></tr>
-<tr><td style="padding:32px 36px 12px;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:15px;line-height:1.6;color:#0e0e0e;">${replaced}</td></tr>
-<tr><td align="center" style="padding:24px 36px 36px;font-family:Menlo,Consolas,monospace;font-size:10px;letter-spacing:0.16em;color:#7a7a73;text-transform:uppercase;border-top:1px solid #d6d3c8;line-height:1.9;">
-<span style="white-space:nowrap;">office@barabashflow.pl</span>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="${SITE}" style="color:#7a7a73;text-decoration:none;white-space:nowrap;">barabashflow.pl&nbsp;↗</a>
+<tr><td style="padding:14px 36px 10px;font-family:${SANS};font-size:15px;line-height:1.65;color:#161614;">${replaced}</td></tr>
+<tr><td align="center" style="padding:26px 36px 32px;">
+<a href="${SITE}" style="display:inline-block;background:#e0fe52;border-radius:999px;padding:11px 22px;font-family:${SANS};font-size:13px;font-weight:700;letter-spacing:-0.01em;color:#1c1e08;text-decoration:none;">barabashflow.pl&nbsp;&#8599;</a>
+<div style="margin-top:14px;font-family:${SANS};font-size:12px;color:#7d7d75;">office@barabashflow.pl</div>
 </td></tr>
 </table>
-<div style="margin-top:18px;font-family:Menlo,Consolas,monospace;font-size:9px;letter-spacing:0.18em;color:#9a9a93;text-transform:uppercase;">Dmytrii Barabash · Warszawa · PL</div>
+<div style="margin-top:16px;font-family:${SANS};font-size:11px;letter-spacing:0.03em;color:#a5a59c;">Dmytrii Barabash&nbsp;&nbsp;&middot;&nbsp;&nbsp;Warszawa&nbsp;&nbsp;&middot;&nbsp;&nbsp;PL</div>
 </td></tr>
 </table>
 </body></html>`;
