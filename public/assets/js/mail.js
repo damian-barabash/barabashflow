@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-07-03b';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-03b';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-07-03c';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-03c';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // Share storageKey with admin.html so signing in once unlocks both pages.

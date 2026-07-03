@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-07-03b';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-03b';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-07-03c';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-03c';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'bf-admin-auth' },
@@ -188,6 +188,17 @@ function bindShellUI() {
   });
 
   $('#save-settings').addEventListener('click', saveSettings);
+  $('#translate-settings')?.addEventListener('click', async () => {
+    if (!confirm('Przetłumaczyć WSZYSTKIE pola z polskiego i nadpisać EN/RU?')) return;
+    banner('Tłumaczenie PL → EN/RU…', null);
+    try {
+      const n = await autoTranslateSettings(true);
+      banner(`Przetłumaczono ${n} pól — sprawdź i kliknij Zapisz`, 'ok');
+    } catch (err) {
+      console.error(err);
+      banner(err.message || 'Błąd tłumaczenia', 'error');
+    }
+  });
   bindBlogUI();
   $('#new-project').addEventListener('click', createNewProject);
 
@@ -280,6 +291,16 @@ function paintOwnerPhoto(url) {
 async function saveSettings() {
   banner('Zapisywanie…', null);
   try {
+    // Polish-first workflow: any trio with PL text and empty EN/RU gets
+    // machine-translated (local Barabash AI) before the upsert.
+    try {
+      banner('Tłumaczenie PL → EN/RU…', null);
+      await autoTranslateSettings(false);
+      banner('Zapisywanie…', null);
+    } catch (trErr) {
+      console.warn('auto-translate failed', trErr);
+      banner('Tłumaczenie niedostępne — zapisuję bez niego', null);
+    }
     const keys = new Set();
     $$('input[data-setting], textarea[data-setting]').forEach((el) => keys.add(el.dataset.setting));
 
@@ -1037,6 +1058,29 @@ async function saveProjectFromEditor() {
   if (!d) return;
   banner('Zapisywanie…', null);
 
+  // Polish-first: translate missing EN/RU project fields before saving.
+  try {
+    const items = [];
+    for (const base of ['title', 'category', 'description']) {
+      const pl = d[`${base}_pl`]?.trim();
+      if (!pl) continue;
+      if (!d[`${base}_en`]?.trim() || !d[`${base}_ru`]?.trim()) items.push({ key: base, text: pl });
+    }
+    if (items.length) {
+      banner('Tłumaczenie PL → EN/RU…', null);
+      const tr = await translateItems(items, 'karta projektu w portfolio (tytuł, kategoria, opis)');
+      for (const it of items) {
+        const t = tr[it.key];
+        if (!t) continue;
+        if (t.en && !d[`${it.key}_en`]?.trim()) { d[`${it.key}_en`] = t.en; const el = $(`#ed-${it.key === 'description' ? 'desc' : it.key}-en`); if (el) el.value = t.en; }
+        if (t.ru && !d[`${it.key}_ru`]?.trim()) { d[`${it.key}_ru`] = t.ru; const el = $(`#ed-${it.key === 'description' ? 'desc' : it.key}-ru`); if (el) el.value = t.ru; }
+      }
+      banner('Zapisywanie…', null);
+    }
+  } catch (trErr) {
+    console.warn('auto-translate failed', trErr);
+  }
+
   const payload = {
     slug: d.slug?.trim(),
     title_pl: d.title_pl?.trim(),
@@ -1446,6 +1490,57 @@ function renderStats() {
   refsEl.innerHTML = refs.length
     ? refs.map(([r, n]) => `<div class="stats-row"><span class="path">${escapeHtml(r)}</span><span class="num">${n}</span></div>`).join('')
     : '<div class="empty-state">Jeszcze brak danych.</div>';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Auto-translate PL -> EN/RU (Edge Function `translate` -> Barabash AI).
+// Admin types Polish only; empty EN/RU fields fill themselves on save.
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function translateItems(items, context) {
+  if (!items.length) return {};
+  const { data: { session } } = await sb.auth.getSession();
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/translate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ items, context }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || data.error) throw new Error(data.error || `translate HTTP ${resp.status}`);
+  return data.translations || {};
+}
+
+// Fill empty EN/RU inputs of data-setting lang-trios from PL via AI.
+// overwrite=true refills them even when non-empty (button flow).
+async function autoTranslateSettings(overwrite = false) {
+  const keys = new Set();
+  $$('input[data-setting], textarea[data-setting]').forEach((el) => keys.add(el.dataset.setting));
+  const items = [];
+  for (const key of keys) {
+    const get = (l) => document.querySelector(`[data-setting="${key}"][data-lang="${l}"]`);
+    const pl = get('pl'), en = get('en'), ru = get('ru');
+    if (!pl || !pl.value.trim()) continue;
+    if (overwrite || !en?.value.trim() || !ru?.value.trim()) {
+      items.push({ key, text: pl.value.trim() });
+    }
+  }
+  if (!items.length) return 0;
+  const tr = await translateItems(items, 'UI strony głównej portfolio (hero, CTA, teksty bota-maskotki)');
+  let filled = 0;
+  for (const it of items) {
+    const t = tr[it.key];
+    if (!t) continue;
+    const en = document.querySelector(`[data-setting="${it.key}"][data-lang="en"]`);
+    const ru = document.querySelector(`[data-setting="${it.key}"][data-lang="ru"]`);
+    if (en && t.en && (overwrite || !en.value.trim())) { en.value = t.en; filled++; }
+    if (ru && t.ru && (overwrite || !ru.value.trim())) { ru.value = t.ru; filled++; }
+  }
+  return filled;
 }
 
 function banner(text, kind) {
