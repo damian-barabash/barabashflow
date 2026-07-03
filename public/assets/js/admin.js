@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-07-03a';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-03a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-07-03b';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-03b';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'bf-admin-auth' },
@@ -110,10 +110,11 @@ async function onSignedIn(user) {
 }
 
 async function refreshAll() {
-  await Promise.all([loadSettings(), loadProjects(), loadMailCounts(), loadBlog()]);
+  await Promise.all([loadSettings(), loadProjects(), loadMailCounts(), loadBlog(), loadStats()]);
   renderSettings();
   renderGraph();
   renderBlog();
+  renderStats();
 
   // If we were redirected here from /mail.html (auth gate), now that the
   // user is signed in, send them back. Validate it's a same-origin relative
@@ -1378,6 +1379,73 @@ function bindBlogUI() {
     if (t.dataset.blogToggle) toggleBlogPost(t.dataset.blogToggle);
     else if (t.dataset.blogDelete) deleteBlogPost(t.dataset.blogDelete);
   });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Statystyki — first-party page views (no cookies). Aggregated client-side
+// from the last 30 days (capped; fine at this traffic scale).
+// ═══════════════════════════════════════════════════════════════════════════
+
+state.pageViews = [];
+
+async function loadStats() {
+  const since = new Date(Date.now() - 30 * 864e5).toISOString();
+  const { data, error } = await sb
+    .from('page_views')
+    .select('path,referrer,is_session,is_mobile,created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(20000);
+  if (error) { console.error(error); return; }
+  state.pageViews = data || [];
+}
+
+function renderStats() {
+  const cardsEl = $('#stats-cards');
+  if (!cardsEl) return;
+  const now = Date.now();
+  const bucket = (days) => {
+    const from = now - days * 864e5;
+    const rows = state.pageViews.filter((v) => new Date(v.created_at).getTime() >= from);
+    return { views: rows.length, visits: rows.filter((v) => v.is_session).length };
+  };
+  const today = (() => {
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const rows = state.pageViews.filter((v) => new Date(v.created_at) >= midnight);
+    return { views: rows.length, visits: rows.filter((v) => v.is_session).length };
+  })();
+  const d7 = bucket(7), d30 = bucket(30);
+  const card = (label, b) => `
+    <div class="stat-card">
+      <span class="stat-big">${b.visits}</span>
+      <span class="stat-sub">${label} · wizyty</span>
+      <span class="stat-sub">${b.views} odsłon</span>
+    </div>`;
+  cardsEl.innerHTML = card('Dziś', today) + card('7 dni', d7) + card('30 dni', d30);
+
+  const agg = (keyFn) => {
+    const m = new Map();
+    for (const v of state.pageViews) {
+      const k = keyFn(v);
+      if (!k) continue;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+  };
+  const pagesEl = $('#stats-pages');
+  const pages = agg((v) => v.path || '/');
+  pagesEl.innerHTML = pages.length
+    ? pages.map(([p, n]) => `<div class="stats-row"><span class="path">${escapeHtml(p)}</span><span class="num">${n}</span></div>`).join('')
+    : '<div class="empty-state">Jeszcze brak danych — licznik ruszy po wdrożeniu strony.</div>';
+  const refsEl = $('#stats-refs');
+  const refs = agg((v) => {
+    if (!v.referrer) return '(bezpośrednio / brak)';
+    try { return new URL(v.referrer).hostname; } catch { return v.referrer.slice(0, 40); }
+  });
+  refsEl.innerHTML = refs.length
+    ? refs.map(([r, n]) => `<div class="stats-row"><span class="path">${escapeHtml(r)}</span><span class="num">${n}</span></div>`).join('')
+    : '<div class="empty-state">Jeszcze brak danych.</div>';
 }
 
 function banner(text, kind) {

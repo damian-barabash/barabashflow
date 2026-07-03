@@ -22,7 +22,7 @@ import {
   LOCALES, getLocale, setLocale, onLocaleChange, t, pickField, applyDom,
 } from '../lib/i18n';
 import { getTheme, toggleTheme, onThemeChange } from '../lib/theme';
-import { setupTopbarMorph } from '../lib/shell';
+import { setupTopbarMorph, setupSmoothScroll, trackPageView } from '../lib/shell';
 
 type Row = Record<string, any>;
 interface GraphNode {
@@ -76,6 +76,8 @@ export async function mountApp() {
   setupLangSwitcher();
   setupThemeToggle();
   setupTopbarMorph();
+  setupSmoothScroll();
+  trackPageView();
   setupCta();
   setupModalDismiss();
   setupTabAway();

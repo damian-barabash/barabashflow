@@ -13,7 +13,7 @@
     href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="/assets/css/admin.css?v=2026-07-03a" />
+  <link rel="stylesheet" href="/assets/css/admin.css?v=2026-07-03b" />
   <style>
     /* Mejle button — wider than icon-btn to fit label, hides label on mobile */
     .mejle-link { gap: 8px; padding: 0 12px; width: auto; min-width: 32px; position: relative; }
@@ -52,7 +52,7 @@
       filter: invert(0.94) hue-rotate(180deg);
     }
   </style>
-  <script type="module" src="/assets/js/theme.js?v=2026-07-03a"></script>
+  <script type="module" src="/assets/js/theme.js?v=2026-07-03b"></script>
 </head>
 <body>
 
@@ -98,6 +98,9 @@
           <button class="tab-btn" data-tab="blog">
             <span>Blog</span>
             <span class="count" id="blog-count"></span>
+          </button>
+          <button class="tab-btn" data-tab="stats">
+            <span>Statystyki</span>
           </button>
         </nav>
 
@@ -351,10 +354,31 @@
       </div>
     </section>
 
+    <!-- ── STATYSTYKI (first-party analytics) ───────────────── -->
+    <section class="panel-page" data-panel="stats">
+      <div class="settings-card">
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">Ruch na stronie</span>
+            <span class="section-aside" id="stats-aside">bez cookies · liczone po stronie bazy</span>
+          </div>
+          <div class="stats-cards" id="stats-cards"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><span class="section-title">Najczęściej odwiedzane (30 dni)</span></div>
+          <div class="stats-table" id="stats-pages"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><span class="section-title">Źródła ruchu (30 dni)</span></div>
+          <div class="stats-table" id="stats-refs"></div>
+        </div>
+      </div>
+    </section>
+
   </div>
 
   <div class="banner" id="banner"></div>
 
-  <script type="module" src="/assets/js/admin.js?v=2026-07-03a"></script>
+  <script type="module" src="/assets/js/admin.js?v=2026-07-03b"></script>
 </body>
 </html>

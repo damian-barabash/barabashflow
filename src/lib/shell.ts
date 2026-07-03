@@ -3,6 +3,7 @@
 // engine stays home-page-only.
 import { getTheme, toggleTheme, onThemeChange } from './theme';
 import { LOCALES, getLocale, setLocale, onLocaleChange, applyDom, type Locale } from './i18n';
+import { restInsert } from './supabase';
 
 export function mountShell() {
   applyDom();
@@ -10,6 +11,86 @@ export function mountShell() {
   bindLangSwitcher();
   applyBlogLocale();
   setupTopbarMorph();
+  setupSmoothScroll();
+  trackPageView();
+}
+
+// First-party, cookie-less analytics: one anonymous row per page view.
+// is_session marks the first view in this browser session ("a visit").
+// No cookies, no fingerprinting, no external scripts — consistent with the
+// site's cookie policy. Bots running WebDriver are skipped.
+export function trackPageView() {
+  try {
+    if ((navigator as any).webdriver) return;
+    const path = (location.pathname.replace(/\/+$/, '') || '/').slice(0, 200);
+    let isSession = false;
+    try {
+      if (!sessionStorage.getItem('bf:sess')) {
+        sessionStorage.setItem('bf:sess', '1');
+        isSession = true;
+      }
+    } catch {}
+    const ref = document.referrer && !document.referrer.includes(location.host)
+      ? document.referrer.slice(0, 300)
+      : null;
+    void restInsert('page_views', {
+      path,
+      referrer: ref,
+      locale: document.documentElement.lang || 'pl',
+      is_session: isSession,
+      is_mobile: window.matchMedia('(max-width: 760px)').matches,
+    });
+  } catch {}
+}
+
+// Inertial wheel scrolling — mouse-wheel steps get eased into a smooth glide
+// (Lenis-style, but ~30 lines). Native behavior is kept for touch devices,
+// reduced-motion users, inner scrollers (modal, editors) and Ctrl/Cmd+wheel
+// (browser zoom + graph zoom).
+export function setupSmoothScroll() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+
+  let target = window.scrollY;
+  let current = window.scrollY;
+  let raf = 0;
+
+  const maxScroll = () =>
+    Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+
+  const loop = () => {
+    current += (target - current) * 0.16;
+    if (Math.abs(target - current) < 0.6) {
+      current = target;
+      window.scrollTo(0, current);
+      raf = 0;
+      return;
+    }
+    window.scrollTo(0, current);
+    raf = requestAnimationFrame(loop);
+  };
+
+  window.addEventListener(
+    'wheel',
+    (e) => {
+      if (e.ctrlKey || e.metaKey) return; // zoom gestures stay native
+      const t = e.target as HTMLElement;
+      if (t.closest?.('.modal-scroll, textarea, select, [contenteditable]')) return;
+      e.preventDefault();
+      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * window.innerHeight : e.deltaY;
+      if (!raf) { target = current = window.scrollY; }
+      target = Math.max(0, Math.min(maxScroll(), target + dy));
+      if (!raf) raf = requestAnimationFrame(loop);
+    },
+    { passive: false },
+  );
+
+  // Keyboard / scrollbar / anchor jumps: resync so the next wheel starts fresh.
+  window.addEventListener(
+    'scroll',
+    () => { if (!raf) { target = current = window.scrollY; } },
+    { passive: true },
+  );
 }
 
 // Topbar morph: squared matte bar glued to the top → floating rounded pill

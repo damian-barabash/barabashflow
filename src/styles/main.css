@@ -27,7 +27,7 @@
   --glass-strong: rgba(255, 255, 255, 0.55);
   --glass-bd:     rgba(255, 255, 255, 0.78);
 
-  --node-bg:   rgba(255, 255, 255, 0.62);
+  --node-bg:   rgba(255, 255, 255, 0.86);
   --node-bd:   rgba(255, 255, 255, 0.8);
   --node-sh:   0 1px 2px rgba(24, 24, 18, 0.04),
                0 14px 34px -16px rgba(24, 24, 18, 0.16),
@@ -75,7 +75,7 @@
   --glass-strong: rgba(38, 38, 36, 0.66);
   --glass-bd:     rgba(244, 244, 236, 0.12);
 
-  --node-bg:   rgba(38, 38, 36, 0.66);
+  --node-bg:   rgba(38, 38, 36, 0.86);
   --node-bd:   rgba(244, 244, 236, 0.13);
   --node-sh:   0 20px 44px -20px rgba(0, 0, 0, 0.85),
                inset 0 1px 0 rgba(244, 244, 236, 0.09);
@@ -168,8 +168,8 @@ body::before {
   gap: 8px;
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border-radius: var(--r-pill);
   box-shadow: var(--card-sh);
 }
@@ -181,8 +181,8 @@ body::before {
   border-radius: var(--r-pill);
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   box-shadow: var(--card-sh);
   font-size: 12.5px;
   font-weight: 500;
@@ -280,8 +280,8 @@ section.graph-section { margin-top: clamp(56px, 9vh, 104px); }
   padding-block: 15px;
   padding-inline: calc(50vw - 50%);
   background: color-mix(in srgb, var(--bg) 74%, transparent);
-  -webkit-backdrop-filter: blur(24px) saturate(130%);
-  backdrop-filter: blur(24px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
   border: 1px solid transparent;
   border-bottom-color: var(--hair);
   border-radius: 0;
@@ -394,8 +394,8 @@ body.is-scrolled .topbar {
   border-radius: 50%;
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   box-shadow: var(--card-sh);
   display: inline-flex;
   align-items: center;
@@ -516,8 +516,8 @@ body.is-scrolled .topbar {
   border-radius: var(--r-pill);
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   box-shadow: var(--card-sh);
   font-weight: 500;
   font-size: 14.5px;
@@ -535,8 +535,8 @@ body.is-scrolled .topbar {
   border-radius: var(--r-pill);
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   box-shadow: var(--card-sh);
   display: flex;
   align-items: center;
@@ -565,8 +565,8 @@ body.is-scrolled .topbar {
 .stat {
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border-radius: var(--r-lg);
   box-shadow: var(--card-sh);
   padding: clamp(18px, 2vw, 26px) clamp(18px, 2vw, 28px);
@@ -636,8 +636,8 @@ body.is-scrolled .topbar {
   position: relative;
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border-radius: var(--r-xl);
   box-shadow: var(--card-sh);
   overflow: hidden;
@@ -685,8 +685,8 @@ body.is-scrolled .topbar {
   border-radius: var(--r-pill);
   background: var(--glass-strong);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(22px);
-  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   box-shadow: var(--card-sh);
   opacity: 0;
   pointer-events: none;
@@ -707,8 +707,8 @@ body.is-scrolled .topbar {
   border-radius: 50%;
   background: var(--glass-strong);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(22px);
-  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   box-shadow: var(--card-sh);
   color: var(--ink-2);
   font-size: 19px;
@@ -735,8 +735,8 @@ body.is-scrolled .topbar {
   border-radius: var(--r-pill);
   background: var(--glass-strong);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(22px);
-  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   box-shadow: var(--card-sh);
   font-size: 12px;
   font-weight: 500;
@@ -869,8 +869,6 @@ body.is-scrolled .topbar {
   transform: translate(-50%, -50%);
   background: var(--node-bg);
   border: 1px solid var(--node-bd);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
   border-radius: var(--r-md);
   cursor: pointer;
   display: flex;
@@ -994,8 +992,8 @@ body.is-scrolled .topbar {
 .svc-card {
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border-radius: var(--r-lg);
   box-shadow: var(--card-sh);
   padding: clamp(22px, 2.2vw, 30px) clamp(20px, 2vw, 28px);
@@ -1115,8 +1113,8 @@ body.is-scrolled .topbar {
 .faq-item {
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border-radius: var(--r-lg);
   box-shadow: var(--card-sh);
   overflow: hidden;
@@ -1172,8 +1170,8 @@ body.is-scrolled .topbar {
 .contact-card {
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border-radius: clamp(28px, 3.4vw, 44px);
   box-shadow: var(--card-sh);
   padding: clamp(44px, 7vw, 96px) clamp(24px, 5vw, 72px);
@@ -1262,8 +1260,8 @@ a.footer-item:hover { color: var(--ink); }
   max-height: min(880px, calc(100dvh - 24px));
   background: var(--glass-strong);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(34px) saturate(140%);
-  backdrop-filter: blur(34px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-modal);
   display: flex;
@@ -2023,8 +2021,8 @@ body:not(.is-loading) .node         { animation: nodeIn    0.65s cubic-bezier(0.
   flex-direction: column;
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border-radius: var(--r-lg);
   box-shadow: var(--card-sh);
   overflow: hidden;
@@ -2196,8 +2194,8 @@ body:not(.is-loading) .node         { animation: nodeIn    0.65s cubic-bezier(0.
   margin-top: clamp(28px, 4vh, 44px);
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border-radius: var(--r-lg);
   box-shadow: var(--card-sh);
   padding: 22px 24px;
