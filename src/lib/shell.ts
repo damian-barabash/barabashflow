@@ -62,11 +62,11 @@ export function setupSmoothScroll() {
     current += (target - current) * 0.16;
     if (Math.abs(target - current) < 0.6) {
       current = target;
-      window.scrollTo(0, current);
+      window.scrollTo({ top: current, behavior: 'instant' as ScrollBehavior });
       raf = 0;
       return;
     }
-    window.scrollTo(0, current);
+    window.scrollTo({ top: current, behavior: 'instant' as ScrollBehavior });
     raf = requestAnimationFrame(loop);
   };
 

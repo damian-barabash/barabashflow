@@ -23,7 +23,7 @@
   --lime-ink:  #1c1e08;
 
   /* frosted glass */
-  --glass:        rgba(255, 255, 255, 0.34);
+  --glass:        rgba(255, 255, 255, 0.46);
   --glass-strong: rgba(255, 255, 255, 0.55);
   --glass-bd:     rgba(255, 255, 255, 0.78);
 
@@ -71,7 +71,7 @@
   --lime-ink:  #191b06;
 
   /* frosted glass */
-  --glass:        rgba(38, 38, 36, 0.44);
+  --glass:        rgba(38, 38, 36, 0.54);
   --glass-strong: rgba(38, 38, 36, 0.66);
   --glass-bd:     rgba(244, 244, 236, 0.12);
 
@@ -168,8 +168,6 @@ body::before {
   gap: 8px;
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   border-radius: var(--r-pill);
   box-shadow: var(--card-sh);
 }
@@ -181,8 +179,6 @@ body::before {
   border-radius: var(--r-pill);
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   box-shadow: var(--card-sh);
   font-size: 12.5px;
   font-weight: 500;
@@ -280,8 +276,6 @@ section.graph-section { margin-top: clamp(56px, 9vh, 104px); }
   padding-block: 15px;
   padding-inline: calc(50vw - 50%);
   background: color-mix(in srgb, var(--bg) 74%, transparent);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
   border: 1px solid transparent;
   border-bottom-color: var(--hair);
   border-radius: 0;
@@ -394,8 +388,6 @@ body.is-scrolled .topbar {
   border-radius: 50%;
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   box-shadow: var(--card-sh);
   display: inline-flex;
   align-items: center;
@@ -516,8 +508,6 @@ body.is-scrolled .topbar {
   border-radius: var(--r-pill);
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   box-shadow: var(--card-sh);
   font-weight: 500;
   font-size: 14.5px;
@@ -535,8 +525,6 @@ body.is-scrolled .topbar {
   border-radius: var(--r-pill);
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   box-shadow: var(--card-sh);
   display: flex;
   align-items: center;
@@ -565,8 +553,6 @@ body.is-scrolled .topbar {
 .stat {
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   border-radius: var(--r-lg);
   box-shadow: var(--card-sh);
   padding: clamp(18px, 2vw, 26px) clamp(18px, 2vw, 28px);
@@ -636,8 +622,6 @@ body.is-scrolled .topbar {
   position: relative;
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   border-radius: var(--r-xl);
   box-shadow: var(--card-sh);
   overflow: hidden;
@@ -685,8 +669,6 @@ body.is-scrolled .topbar {
   border-radius: var(--r-pill);
   background: var(--glass-strong);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
   box-shadow: var(--card-sh);
   opacity: 0;
   pointer-events: none;
@@ -707,8 +689,6 @@ body.is-scrolled .topbar {
   border-radius: 50%;
   background: var(--glass-strong);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
   box-shadow: var(--card-sh);
   color: var(--ink-2);
   font-size: 19px;
@@ -735,8 +715,6 @@ body.is-scrolled .topbar {
   border-radius: var(--r-pill);
   background: var(--glass-strong);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
   box-shadow: var(--card-sh);
   font-size: 12px;
   font-weight: 500;
@@ -992,8 +970,6 @@ body.is-scrolled .topbar {
 .svc-card {
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   border-radius: var(--r-lg);
   box-shadow: var(--card-sh);
   padding: clamp(22px, 2.2vw, 30px) clamp(20px, 2vw, 28px);
@@ -1113,8 +1089,6 @@ body.is-scrolled .topbar {
 .faq-item {
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   border-radius: var(--r-lg);
   box-shadow: var(--card-sh);
   overflow: hidden;
@@ -1170,8 +1144,6 @@ body.is-scrolled .topbar {
 .contact-card {
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   border-radius: clamp(28px, 3.4vw, 44px);
   box-shadow: var(--card-sh);
   padding: clamp(44px, 7vw, 96px) clamp(24px, 5vw, 72px);
@@ -1245,8 +1217,6 @@ a.footer-item:hover { color: var(--ink); }
   position: absolute;
   inset: 0;
   background: rgba(24, 24, 18, 0.30);
-  backdrop-filter: blur(12px) saturate(115%);
-  -webkit-backdrop-filter: blur(12px) saturate(115%);
   opacity: 0;
   transition: opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1260,8 +1230,6 @@ a.footer-item:hover { color: var(--ink); }
   max-height: min(880px, calc(100dvh - 24px));
   background: var(--glass-strong);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-modal);
   display: flex;
@@ -2021,8 +1989,6 @@ body:not(.is-loading) .node         { animation: nodeIn    0.65s cubic-bezier(0.
   flex-direction: column;
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   border-radius: var(--r-lg);
   box-shadow: var(--card-sh);
   overflow: hidden;
@@ -2194,8 +2160,6 @@ body:not(.is-loading) .node         { animation: nodeIn    0.65s cubic-bezier(0.
   margin-top: clamp(28px, 4vh, 44px);
   background: var(--glass);
   border: 1px solid var(--glass-bd);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   border-radius: var(--r-lg);
   box-shadow: var(--card-sh);
   padding: 22px 24px;
@@ -2218,4 +2182,40 @@ body:not(.is-loading) .node         { animation: nodeIn    0.65s cubic-bezier(0.
   .blog-hero .hero-title { font-size: clamp(38px, 12vw, 54px); }
   .author-box { padding: 18px; }
   .author-box .cta { width: 100%; justify-content: center; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   GPU budget (2026-07-03): real backdrop-blur ONLY where content
+   actually moves behind the surface. Big cards sit over the fixed,
+   already-soft ambient gradient — plain translucency reads the same
+   and costs nothing per frame.
+   ════════════════════════════════════════════════════════════════ */
+.topbar {
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.modal {
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+.modal-backdrop {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.tool-btn,
+.zoom-indicator,
+.graph-pan-hint {
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.cookie-card,
+.mascot-card {
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+/* Skip layout/paint of below-the-fold sections until they approach. */
+.services, .process, .faq, .contact-band, .blog-list-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 640px;
 }

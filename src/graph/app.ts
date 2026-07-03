@@ -750,7 +750,10 @@ function setupViewZoomPan() {
 function startBob() {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   let raf = 0;
+  let skip = false;
   const loop = (time: number) => {
+    skip = !skip;
+    if (skip) { raf = document.hidden ? 0 : requestAnimationFrame(loop); return; }
     for (const n of state.nodes) {
       if (n.dragging) continue;
       const phase = parseFloat(n.el.dataset.phase || '0');
