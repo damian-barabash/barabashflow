@@ -697,6 +697,33 @@ body.is-scrolled .topbar {
   background-size: 26px 26px;
 }
 
+/* Fullscreen graph (⛶ toggle) — CSS overlay above the topbar (z 20) but
+   below the project modal (z 30), so nodes stay clickable in fullscreen. */
+.graph-card.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  border-radius: 0;
+  border: 0;
+  background-color: var(--bg);
+}
+.graph-card.is-fullscreen .stage {
+  height: 100dvh;
+}
+.graph-card.is-fullscreen .graph-tools {
+  right: max(18px, env(safe-area-inset-right, 0px));
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
+}
+.tool-btn[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg);
+}
+html.graph-fs-lock,
+html.graph-fs-lock body { overflow: hidden; }
+/* Floating bots would poke above the fullscreen card — park them. */
+html.graph-fs-lock .mascot-bot,
+html.graph-fs-lock .cookie-bot { display: none !important; }
+
 .stage {
   position: relative;
   z-index: 1;

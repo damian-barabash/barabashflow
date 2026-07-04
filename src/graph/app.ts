@@ -685,10 +685,29 @@ function setupViewZoomPan() {
   };
   $('#zoom-in')?.addEventListener('click', () => zoomBy(1.25));
   $('#zoom-out')?.addEventListener('click', () => zoomBy(0.8));
-  $('#zoom-reset')?.addEventListener('click', () => {
+
+  // ⛶ — fullscreen toggle for the whole graph card. CSS overlay instead of
+  // the Fullscreen API (unavailable for non-video elements on iOS Safari).
+  // Entering/leaving resets the view and re-fits to the new bounds.
+  const card = document.querySelector<HTMLElement>('.graph-card');
+  const setFullscreen = (on: boolean) => {
+    if (!card) return;
+    card.classList.toggle('is-fullscreen', on);
+    document.documentElement.classList.toggle('graph-fs-lock', on);
+    $('#zoom-reset')?.setAttribute('aria-pressed', String(on));
     state.userViewSet = false;
-    state.viewPanX = 0; state.viewPanY = 0;
-    applyAutoFit();
+    state.viewPanX = 0;
+    state.viewPanY = 0;
+    requestAnimationFrame(() => {
+      refreshMetrics();
+      layoutNodePositions();
+      drawEdges();
+      applyAutoFit();
+    });
+  };
+  $('#zoom-reset')?.addEventListener('click', () => setFullscreen(!card?.classList.contains('is-fullscreen')));
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && card?.classList.contains('is-fullscreen')) setFullscreen(false);
   });
 
   let panning = false, panSX = 0, panSY = 0, oPanX = 0, oPanY = 0, panPid: number | null = null;
