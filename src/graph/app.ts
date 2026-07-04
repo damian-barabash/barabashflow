@@ -22,7 +22,7 @@ import {
   LOCALES, getLocale, setLocale, onLocaleChange, t, pickField, applyDom,
 } from '../lib/i18n';
 import { getTheme, toggleTheme, onThemeChange } from '../lib/theme';
-import { setupTopbarMorph, setupSmoothScroll, trackPageView } from '../lib/shell';
+import { setupTopbarMorph, setupBurger, setupSmoothScroll, trackPageView } from '../lib/shell';
 
 type Row = Record<string, any>;
 interface GraphNode {
@@ -76,6 +76,7 @@ export async function mountApp() {
   setupLangSwitcher();
   setupThemeToggle();
   setupTopbarMorph();
+  setupBurger();
   setupSmoothScroll();
   trackPageView();
   setupCta();
@@ -692,7 +693,9 @@ function setupViewZoomPan() {
 
   let panning = false, panSX = 0, panSY = 0, oPanX = 0, oPanY = 0, panPid: number | null = null;
   stage.addEventListener('pointerdown', (e) => {
-    if ((e.target as HTMLElement).closest('.node')) return;
+    // Overlay controls (zoom buttons etc.) must receive their own clicks —
+    // capturing the pointer here would retarget the click to the stage.
+    if ((e.target as HTMLElement).closest('.node, .graph-tools, .zoom-indicator')) return;
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     panning = true; panPid = e.pointerId;
     panSX = e.clientX; panSY = e.clientY;

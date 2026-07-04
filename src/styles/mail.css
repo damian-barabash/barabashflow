@@ -842,7 +842,7 @@ body:not(.is-booting) .boot-splash { display: none; }
 .crm-tag .dot { border-radius: 50%; }
 .recip-chip { border-radius: 999px; border: 0; background: var(--surface-2); padding: 5px 6px 5px 12px; }
 .recipient-chips { border-radius: var(--r-md, 14px); }
-.crm-picklist { border: 0; border-radius: var(--r-md, 14px); box-shadow: var(--card-sh); overflow: hidden; }
+.crm-picklist { border: 0; border-radius: var(--r-md, 14px); box-shadow: var(--card-sh); overflow-y: auto; }
 
 /* Inbox */
 .inbox-list {
@@ -954,3 +954,27 @@ body:not(.is-booting) .boot-splash { display: none; }
 
 /* Preview frame matches the new e-mail template field color */
 .preview-frame { background: #e9e8e4; }
+
+/* ════════════════════════════════════════════════════════════════
+   Mobile polish (2026-07-04) — phone-friendly modal, wrapping RTE
+   toolbar. The burger topbar lives in admin.css (shared).
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 760px) {
+  .rte-toolbar { flex-wrap: wrap; }
+  .send-layout { gap: 14px; }
+  .inbox-item { padding: 14px 14px; }
+}
+@media (max-width: 600px) {
+  .modal-root {
+    padding:
+      max(16px, env(safe-area-inset-top, 0px))
+      10px
+      max(16px, env(safe-area-inset-bottom, 0px));
+  }
+  .modal-window {
+    width: 100%;
+    max-height: calc(100dvh - 64px);
+    padding: 20px 16px 18px;
+    border-radius: 22px;
+  }
+}

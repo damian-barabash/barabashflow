@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-07-03c';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-03c';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-07-04a';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-04a';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // Share storageKey with admin.html so signing in once unlocks both pages.
@@ -93,7 +93,33 @@ async function init() {
   refreshPreview();
 }
 
+// Phone/tablet burger — collapses .top-collapsible into a dropdown.
+// Breakpoint and panel layout live in admin.css; this is a class toggle.
+function bindBurger() {
+  const btn = $('#nav-burger');
+  const top = $('.top');
+  if (!btn || !top) return;
+  const close = () => {
+    top.classList.remove('menu-open');
+    btn.setAttribute('aria-expanded', 'false');
+  };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = top.classList.toggle('menu-open');
+    btn.setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('click', (e) => {
+    if (!top.classList.contains('menu-open')) return;
+    if (!e.target.closest('.top-collapsible') && !e.target.closest('#nav-burger')) close();
+  });
+  $('.top-collapsible')?.addEventListener('click', (e) => {
+    if (e.target.closest('.tab-btn, a')) close();
+  });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+}
+
 function bindShellUI() {
+  bindBurger();
   $$('.tab-btn').forEach((b) => {
     b.addEventListener('click', () => switchTab(b.dataset.tab));
   });

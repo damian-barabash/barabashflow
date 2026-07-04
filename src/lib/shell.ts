@@ -11,8 +11,35 @@ export function mountShell() {
   bindLangSwitcher();
   applyBlogLocale();
   setupTopbarMorph();
+  setupBurger();
   setupSmoothScroll();
   trackPageView();
+}
+
+// Phone/tablet burger: collapses .nav into a dropdown under the topbar.
+// Pure class toggle (.topbar.menu-open) — layout and breakpoint live in CSS.
+export function setupBurger() {
+  const btn = document.getElementById('nav-burger');
+  const topbar = document.querySelector<HTMLElement>('.topbar');
+  if (!btn || !topbar) return;
+  const close = () => {
+    topbar.classList.remove('menu-open');
+    btn.setAttribute('aria-expanded', 'false');
+  };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = topbar.classList.toggle('menu-open');
+    btn.setAttribute('aria-expanded', String(open));
+  });
+  // Tap outside, pick a menu item, or Escape — all close the menu.
+  document.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    if (topbar.classList.contains('menu-open') && !t.closest('.nav') && !t.closest('#nav-burger')) close();
+  });
+  topbar.querySelector('.nav')?.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).closest('a, button')) close();
+  });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 }
 
 // First-party, cookie-less analytics: one anonymous row per page view.

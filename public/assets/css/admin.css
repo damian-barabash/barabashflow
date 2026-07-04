@@ -246,6 +246,26 @@ a { color: var(--ink); text-decoration: none; }
 
 .top-spacer { flex: 1; }
 
+/* Collapsible middle of the topbar (tabs + spacer + page link + session).
+   On desktop it's an inline flex row identical to the old layout; on
+   phones/tablets the burger turns it into a dropdown (rules at file end). */
+.top-collapsible {
+  display: flex;
+  align-items: center;
+  gap: clamp(18px, 3vw, 36px);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.icon-btn.nav-burger { display: none; }
+.nav-burger svg path {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+}
+.top.menu-open .nav-burger .burger-l1 { transform: translateY(3.4px) rotate(45deg); }
+.top.menu-open .nav-burger .burger-l2 { opacity: 0; }
+.top.menu-open .nav-burger .burger-l3 { transform: translateY(-3.4px) rotate(-45deg); }
+
 .icon-btn {
   width: 40px; height: 40px;
   border-radius: 0;
@@ -942,8 +962,8 @@ a { color: var(--ink); text-decoration: none; }
 
 /* small responsive */
 @media (max-width: 760px) {
-  /* Topbar — drop secondary text, keep brand mark + tabs + critical icons.
-     Allow horizontal scroll on tabs in case more get added. */
+  /* Topbar — brand mark + theme + signout + burger. Tabs and the rest
+     live in the burger dropdown (rules at file end). */
   .top-inner {
     padding: 10px 12px;
     gap: 10px;
@@ -951,17 +971,7 @@ a { color: var(--ink); text-decoration: none; }
   .brand { font-size: 11px; letter-spacing: 0.18em; gap: 8px; }
   .brand > span:not(.brand-logo) { display: none; }   /* only logo remains */
   .brand-logo { height: 24px; }
-  .brand .sep, .session { display: none; }
-  .tabs {
-    gap: 2px;
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab-btn { padding: 9px 11px; font-size: 10px; letter-spacing: 0.14em; flex-shrink: 0; }
+  .brand .sep { display: none; }
   .icon-btn { width: 36px; height: 36px; }
 
   /* Forms — 16px font kills the iOS auto-zoom on focus. Also looser padding
@@ -1366,4 +1376,86 @@ body::before { z-index: -1; }
 .stats-row .num  { font-family: var(--font-mono); font-size: 12px; color: var(--muted); flex-shrink: 0; }
 @media (max-width: 760px) {
   .stats-cards { grid-template-columns: 1fr; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Burger topbar (2026-07-04) — phones & tablets ≤1024px.
+   .top-collapsible (tabs + page link + session) becomes a glass
+   dropdown under the bar; brand + theme + signout + burger stay.
+   Shared by /admin and /mail (mail.css loads on top of this file).
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .top-inner { position: relative; }
+  .icon-btn.nav-burger { display: inline-flex; }
+  .top-collapsible { display: none; }
+  .top.menu-open .top-collapsible {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 10px;
+    right: 10px;
+    z-index: 40;
+    padding: 14px;
+    /* Solid surface — no backdrop-filter here: a nested one inside the
+       blurred .top renders in the ancestor's backdrop pass and composited
+       graph layers paint over it (Chromium), which made the menu see-through. */
+    background: var(--surface);
+    border: 1px solid var(--glass-bd, rgba(255, 255, 255, 0.78));
+    border-radius: var(--r-lg, 22px);
+    box-shadow: 0 60px 140px -36px rgba(24, 24, 18, 0.32),
+                0 16px 36px -14px rgba(24, 24, 18, 0.16);
+    animation: topMenuIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .top.menu-open .tabs {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    overflow: visible;
+  }
+  .top.menu-open .tab-btn {
+    justify-content: center;
+    width: 100%;
+    padding: 13px 16px;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    flex-shrink: 1;
+  }
+  .top.menu-open .top-spacer { display: none; }
+  .top.menu-open .mejle-link,
+  .top.menu-open .back-to-panel {
+    width: 100%;
+    height: auto;
+    justify-content: center;
+    padding: 13px 16px;
+    border-radius: var(--r-pill, 999px);
+  }
+  .top.menu-open .mejle-link .mejle-label,
+  .top.menu-open .back-to-panel .back-label { display: inline; font-size: 12px; }
+  .top.menu-open .mejle-link .badge { position: static; margin-left: 8px; }
+  .top.menu-open .session {
+    display: block;
+    text-align: center;
+    margin: 4px 0 0;
+    order: 10;
+  }
+}
+@keyframes topMenuIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .top.menu-open .top-collapsible { animation: none; }
+}
+
+/* ── Mobile polish (2026-07-04) ────────────────────────────────── */
+/* Sticky topbar clears the iPhone notch (viewport-fit=cover). */
+.top { padding-top: env(safe-area-inset-top, 0px); }
+
+/* Single-column Projekty: the editor scrolls with the page instead of
+   trapping its own inner scrollbar. */
+@media (max-width: 1100px) {
+  .side-panel { max-height: none; overflow: visible; }
 }
