@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-07-04a';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-04a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-07-05a';
+import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-05a';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'bf-admin-auth' },
@@ -1331,6 +1331,27 @@ function blogConfig() {
 function renderBlog() {
   const countEl = $('#blog-count');
   if (countEl) countEl.textContent = state.blogPosts.length ? String(state.blogPosts.length) : '';
+
+  // Last agent run — the worker reports every run (also failed ones) into
+  // site_settings.blog_agent_status via the blog-ingest Edge Function.
+  const statusEl = $('#blog-agent-status');
+  if (statusEl) {
+    const st = state.settings.blog_agent_status?.value_meta;
+    if (!st || !st.ts) {
+      statusEl.textContent = 'Agent jeszcze nie raportował przebiegu.';
+      statusEl.classList.remove('is-err');
+    } else {
+      const when = new Date(st.ts).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      if (st.ok) {
+        const what = st.note ? st.note : `wpisy: ${(st.published || []).length}/${st.planned ?? '?'}`;
+        statusEl.textContent = `Ostatni przebieg: ${when} — OK · ${what}`;
+        statusEl.classList.remove('is-err');
+      } else {
+        statusEl.textContent = `⚠ Ostatni przebieg: ${when} — BŁĄD: ${(st.errors || []).join(' · ') || 'nieznany'} (alert poszedł na office@)`;
+        statusEl.classList.add('is-err');
+      }
+    }
+  }
 
   // Config controls
   const cfg = blogConfig();

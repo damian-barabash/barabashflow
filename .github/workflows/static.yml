@@ -7,10 +7,13 @@ on:
   # Blog worker on the Mac Studio fires this after publishing new posts so the
   # static pages regenerate. The daily cron is a best-effort fallback (GH
   # schedules are unreliable) that picks up posts even without the dispatch.
+  # It must run AFTER both agent windows (08:40 + 13:40 Warsaw = 06:40 + 11:40
+  # UTC in summer) — the old 05:20 UTC slot built the site before the agent
+  # published and the day's posts never appeared (2026-07-05 incident).
   repository_dispatch:
     types: [blog-publish]
   schedule:
-    - cron: "20 5 * * *"
+    - cron: "30 12 * * *"
 
 permissions:
   contents: read
