@@ -206,7 +206,14 @@ async function research(seedExtra: string[]): Promise<string[]> {
 // ── Openverse cover (CC / commercial-use licensed) ───────────────────────────
 // Falls back through progressively broader queries — LLM-generated queries are
 // sometimes too specific and return zero results.
-async function findCover(query: string) {
+//
+// usedCovers holds cover_source_url of recent posts + every pick made this
+// run (also failed downloads). Both 2026-07-05 posts fell back to the same
+// generic query and got the IDENTICAL first result — never reuse a photo,
+// and never re-pick one whose download already 502'd.
+const coverKey = (x: any) => String(x.foreign_landing_url || x.url);
+
+async function findCover(query: string, usedCovers: Set<string>) {
   const attempts = [
     query,
     query.split(/\s+/).slice(0, 2).join(' '),
@@ -223,8 +230,9 @@ async function findCover(query: string) {
       const results = (data?.results ?? []).filter((x: any) =>
         x.url && (x.width ?? 0) >= 900 && /jpe?g|png|webp/i.test(x.filetype || x.url),
       );
-      const pick = results[0];
-      if (!pick) { log(`openverse: 0 usable results for "${q}"`); continue; }
+      const pick = results.find((x: any) => !usedCovers.has(coverKey(x)));
+      if (!pick) { log(`openverse: 0 fresh results for "${q}"`); continue; }
+      usedCovers.add(coverKey(pick));
       log(`openverse: cover found for "${q}" (${pick.width}px, ${pick.license})`);
       return {
         cover_image_url: pick.url,
@@ -285,6 +293,7 @@ async function main() {
 
   const suggestions = await research(config.seed_keywords ?? []);
   const usedSlugs = new Set(recentPosts.map((p: any) => p.slug));
+  const usedCovers = new Set<string>(recentPosts.map((p: any) => String(p.cover_source_url || '')).filter(Boolean));
   const recentTitles = recentPosts.slice(0, 40).map((p: any) => p.title_pl);
   const recentPicked = recentKw.filter((k: any) => k.picked).map((k: any) => k.keyword);
 
@@ -347,7 +356,7 @@ async function main() {
       }
 
       // 4) Cover from Openverse
-      const cover = await findCover(t.image_query_en || 'modern website design laptop');
+      const cover = await findCover(t.image_query_en || 'modern website design laptop', usedCovers);
 
       // 5) Publish
       const res = await edge('ingest_post', {
@@ -376,7 +385,7 @@ async function main() {
       // image, fetch error), retry with progressively generic queries.
       if (!res.cover_path) {
         for (const q of ['modern website laptop', 'laptop office desk', 'computer work desk']) {
-          const c2 = await findCover(q);
+          const c2 = await findCover(q, usedCovers);
           if (!c2) continue;
           try {
             const fix = await edge('set_cover', {
