@@ -1,6 +1,6 @@
 // Blog data helpers — used at BUILD TIME by the /blog pages (SSG: every post
 // becomes a real static HTML page, which is the whole SEO point).
-import { restGet } from './supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase';
 import { marked } from 'marked';
 
 export interface BlogPost {
@@ -27,14 +27,26 @@ export interface BlogPost {
 const LIST_FIELDS =
   'slug,title_pl,title_en,title_ru,excerpt_pl,excerpt_en,excerpt_ru,cover_path,cover_alt,tags,published_at';
 
+// Strict fetch: THROWS on any failure so the whole build goes red. The public
+// graph uses the forgiving restGet (page still renders without data), but for
+// the blog "forgiving" means silently deploying a site with missing posts —
+// a failed build gets retried/noticed, a quietly empty blog does not.
+async function restGetStrict<T>(path: string): Promise<T[]> {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+  });
+  if (!r.ok) throw new Error(`[blog build] Supabase fetch failed: HTTP ${r.status} for ${path}`);
+  return (await r.json()) as T[];
+}
+
 export async function fetchPostList(): Promise<BlogPost[]> {
-  return restGet<BlogPost>(
+  return restGetStrict<BlogPost>(
     `blog_posts?select=${LIST_FIELDS}&status=eq.published&order=published_at.desc&limit=200`,
   );
 }
 
 export async function fetchAllPosts(): Promise<BlogPost[]> {
-  return restGet<BlogPost>(
+  return restGetStrict<BlogPost>(
     'blog_posts?select=*&status=eq.published&order=published_at.desc&limit=500',
   );
 }

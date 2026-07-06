@@ -10,9 +10,15 @@
 //      (two separate calls — one combined EN+RU response used to overflow
 //      num_predict and truncate the JSON)
 //   5. finds a CC-licensed cover on Openverse (commercial-use licenses only)
-//   6. publishes via blog-ingest (image is downloaded + stored server-side)
+//      and downloads it LOCALLY — the Edge Function's Fly.io egress 502s on
+//      many Flickr shards while the Mac fetches them fine (2026-07-06: a post
+//      shipped with no cover after 4 consecutive edge-side 502s)
+//   6. publishes via blog-ingest (cover travels as base64 in the payload)
 //   7. logs the day's keyword research to seo_keywords
-//   8. triggers a GitHub Pages rebuild (repository_dispatch) if a PAT is set
+//   8. triggers a GitHub Pages rebuild (repository_dispatch) if a PAT is set,
+//      then VERIFIES the new posts actually serve 200 on the live site —
+//      GH Pages deployments can report success while the CDN keeps serving
+//      the previous build (2026-07-06 incident); one re-dispatch, then alert
 //   9. reports run status to the admin panel (site_settings.blog_agent_status);
 //      a failed run also emails office@ via the Edge Function
 //
@@ -98,7 +104,59 @@ function parseJsonLoose(text: string): any {
   return undefined;
 }
 
-async function llmJson(system: string, user: string, temperature = 0.5, maxTokens = 8192): Promise<any> {
+// JSON schemas passed as Ollama's `format` — constrains generation to valid,
+// correctly-shaped JSON. Plain format:'json' still let the model emit
+// unparseable output occasionally (2026-07-06: done_reason=stop, invalid JSON).
+const TOPICS_SCHEMA = {
+  type: 'object',
+  required: ['topics'],
+  properties: {
+    topics: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['primary_keyword', 'category', 'slug', 'image_query_en'],
+        properties: {
+          primary_keyword: { type: 'string' },
+          category: { type: 'string' },
+          supporting_keywords: { type: 'array', items: { type: 'string' } },
+          slug: { type: 'string' },
+          title_hint: { type: 'string' },
+          angle: { type: 'string' },
+          image_query_en: { type: 'string' },
+        },
+      },
+    },
+  },
+};
+
+const ARTICLE_SCHEMA = {
+  type: 'object',
+  required: ['title_pl', 'excerpt_pl', 'body_pl', 'faq', 'tags', 'keywords'],
+  properties: {
+    title_pl: { type: 'string' },
+    excerpt_pl: { type: 'string' },
+    body_pl: { type: 'string' },
+    faq: {
+      type: 'array',
+      items: { type: 'object', required: ['q', 'a'], properties: { q: { type: 'string' }, a: { type: 'string' } } },
+    },
+    tags: { type: 'array', items: { type: 'string' } },
+    keywords: { type: 'array', items: { type: 'string' } },
+  },
+};
+
+const TRANSLATION_SCHEMA = {
+  type: 'object',
+  required: ['title', 'excerpt', 'body'],
+  properties: {
+    title: { type: 'string' },
+    excerpt: { type: 'string' },
+    body: { type: 'string' },
+  },
+};
+
+async function llmJson(system: string, user: string, temperature = 0.5, maxTokens = 8192, schema?: object): Promise<any> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     // The dominant failure mode is JSON truncated by the output budget
     // (done_reason "length") — retries escalate num_predict instead of
@@ -112,7 +170,7 @@ async function llmJson(system: string, user: string, temperature = 0.5, maxToken
         signal: AbortSignal.timeout(20 * 60 * 1000),
         body: JSON.stringify({
           model: CONFIG.model,
-          format: 'json',
+          format: schema ?? 'json',
           stream: true,
           think: false,
           keep_alive: '30m',
@@ -151,6 +209,7 @@ async function llmJson(system: string, user: string, temperature = 0.5, maxToken
       }
       const parsed = parseJsonLoose(text);
       if (parsed === undefined) {
+        log(`unparseable output head: ${JSON.stringify(text.slice(0, 220))}`);
         throw new Error(`unparseable JSON (done_reason=${doneReason || '?'}, ${evalCount} tok out, ${text.length} chars)`);
       }
       if (doneReason === 'length') log(`warning: output hit num_predict=${numPredict} but JSON still parsed`);
@@ -210,8 +269,35 @@ async function research(seedExtra: string[]): Promise<string[]> {
 // usedCovers holds cover_source_url of recent posts + every pick made this
 // run (also failed downloads). Both 2026-07-05 posts fell back to the same
 // generic query and got the IDENTICAL first result — never reuse a photo,
-// and never re-pick one whose download already 502'd.
+// and never re-pick one whose download already failed.
+//
+// The image is downloaded HERE, on the Mac — the Edge Function's Fly.io
+// egress 502s on many Flickr shards that respond 200 locally. A candidate
+// only wins after its bytes are actually in hand, so a published post can no
+// longer end up cover-less because of a remote fetch flake.
 const coverKey = (x: any) => String(x.foreign_landing_url || x.url);
+const MAX_COVER_BYTES = 6 * 1024 * 1024;
+
+// Flickr's CDN answers 502 to fetch()-style clients whose User-Agent contains
+// "Bot" (curl with the same UA gets 200 — it keys on the whole fingerprint).
+// That was the source of ALL the cover 502s, worker- and edge-side alike. Use
+// a browser UA for image downloads only; API calls keep the honest bot UA.
+const IMG_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+
+async function downloadImage(url: string): Promise<{ b64: string; contentType: string; kb: number }> {
+  const r = await fetch(url, {
+    headers: { 'User-Agent': IMG_UA },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(25000),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const contentType = (r.headers.get('content-type') || '').split(';')[0].trim();
+  if (!/^image\/(jpeg|png|webp|avif|gif)$/.test(contentType)) throw new Error(`not an image: ${contentType}`);
+  const buf = await r.arrayBuffer();
+  if (buf.byteLength > MAX_COVER_BYTES) throw new Error(`too big: ${buf.byteLength}`);
+  if (buf.byteLength < 1024) throw new Error(`suspiciously small: ${buf.byteLength}`);
+  return { b64: Buffer.from(buf).toString('base64'), contentType, kb: Math.round(buf.byteLength / 1024) };
+}
 
 async function findCover(query: string, usedCovers: Set<string>) {
   const attempts = [
@@ -230,15 +316,24 @@ async function findCover(query: string, usedCovers: Set<string>) {
       const results = (data?.results ?? []).filter((x: any) =>
         x.url && (x.width ?? 0) >= 900 && /jpe?g|png|webp/i.test(x.filetype || x.url),
       );
-      const pick = results.find((x: any) => !usedCovers.has(coverKey(x)));
-      if (!pick) { log(`openverse: 0 fresh results for "${q}"`); continue; }
-      usedCovers.add(coverKey(pick));
-      log(`openverse: cover found for "${q}" (${pick.width}px, ${pick.license})`);
-      return {
-        cover_image_url: pick.url,
-        cover_credit: `Foto: ${pick.creator || 'autor nieznany'} · ${String(pick.license || 'cc').toUpperCase()} · Openverse`,
-        cover_source_url: pick.foreign_landing_url || pick.url,
-      };
+      // Walk the fresh candidates and take the first whose bytes download.
+      for (const pick of results) {
+        if (usedCovers.has(coverKey(pick))) continue;
+        usedCovers.add(coverKey(pick));
+        try {
+          const img = await downloadImage(String(pick.url));
+          log(`openverse: cover for "${q}" (${pick.width}px, ${pick.license}, ${img.kb} KB downloaded locally)`);
+          return {
+            cover_b64: img.b64,
+            cover_content_type: img.contentType,
+            cover_credit: `Foto: ${pick.creator || 'autor nieznany'} · ${String(pick.license || 'cc').toUpperCase()} · Openverse`,
+            cover_source_url: pick.foreign_landing_url || pick.url,
+          };
+        } catch (err) {
+          log(`cover download failed for "${q}" (${pick.url}):`, String(err));
+        }
+      }
+      log(`openverse: no downloadable fresh results for "${q}"`);
     } catch (err) {
       log(`openverse failed for "${q}":`, String(err));
     }
@@ -265,9 +360,56 @@ async function translateInto(art: any, lang: { code: 'en' | 'ru'; name: string }
     `Przetłumacz ten wpis blogowy na ${lang.name} (markdown zachowaj, linki zostaw bez zmian). Zwróć JSON {"title":"...","excerpt":"...","body":"..."}.\n\nTYTUŁ: ${art.title_pl}\nEXCERPT: ${art.excerpt_pl}\nTREŚĆ:\n${art.body_pl}`,
     0.3,
     8192,
+    TRANSLATION_SCHEMA,
   );
   if (!out?.title || !out?.body) throw new Error(`empty ${lang.code} translation`);
   return out;
+}
+
+async function githubDispatch(): Promise<boolean> {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${CONFIG.github.repo}/dispatches`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${CONFIG.github.pat}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': UA,
+      },
+      body: JSON.stringify({ event_type: 'blog-publish' }),
+    });
+    log(`github dispatch: ${r.status}`);
+    return r.status < 300;
+  } catch (err) {
+    log('github dispatch failed:', String(err));
+    return false;
+  }
+}
+
+// Poll the live site until every slug serves 200 (or the deadline passes).
+// Returns the slugs that are still missing. The cache-buster query matters:
+// GH Pages sits behind Fastly with max-age=600, and a stale cached 404 would
+// make a freshly deployed page look missing for another 10 minutes.
+async function verifyLive(slugs: string[], timeoutMs: number): Promise<string[]> {
+  const deadline = Date.now() + timeoutMs;
+  let missing = [...slugs];
+  while (missing.length && Date.now() < deadline) {
+    await Bun.sleep(30_000);
+    const still: string[] = [];
+    for (const slug of missing) {
+      try {
+        const r = await fetch(`https://barabashflow.pl/blog/${slug}/?live=${Date.now()}`, {
+          headers: { 'User-Agent': UA },
+          redirect: 'follow',
+          signal: AbortSignal.timeout(15000),
+        });
+        if (r.status !== 200) still.push(slug);
+      } catch {
+        still.push(slug);
+      }
+    }
+    missing = still;
+  }
+  return missing;
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -315,6 +457,7 @@ async function main() {
     `{"topics":[{"primary_keyword":"...","category":"nazwa kategorii z listy","supporting_keywords":["..."],"slug":"kebab-case-po-polsku-bez-znakow","title_hint":"...","angle":"jedna linia o ujęciu tematu","image_query_en":"2-4 English words for a stock photo"}]}`,
     0.4,
     2048,
+    TOPICS_SCHEMA,
   );
   const topics = (topicsResp?.topics ?? []).slice(0, n);
   if (!topics.length) throw new Error('no topics from LLM');
@@ -339,6 +482,7 @@ async function main() {
         `Napisz wpis blogowy pod frazę kluczową: "${t.primary_keyword}".\nFrazy wspierające: ${(t.supporting_keywords || []).join(', ')}.\nUjęcie: ${t.angle || '-'}.\n\nWymagania SEO:\n- title_pl: maks. 62 znaki, fraza kluczowa blisko początku, bez clickbaitu\n- excerpt_pl: 140-158 znaków, zachęca do kliknięcia, zawiera frazę (to meta description)\n- body_pl: markdown, MINIMUM 800 słów (docelowo 800-1100). BEZ nagłówka H1 (strona doda tytuł sama). Struktura: krótki lead (2-3 zdania z frazą kluczową), potem 4-6 sekcji H2 sformułowanych jak pytania które ludzie wpisują w Google, listy punktowane, konkretne przedziały cen w PLN gdy temat o kosztach, przykłady. Frazy wspierające wplataj NATURALNIE i gramatycznie — odmieniaj je przez przypadki, nigdy nie wklejaj surowej frazy łamiącej składnię zdania. Dodaj DOKŁADNIE dwa linki wewnętrzne w treści: [strony internetowe — BarabashFlow](https://barabashflow.pl/) oraz [blog BarabashFlow](https://barabashflow.pl/blog/). Zakończ krótkim akapitem-CTA zapraszającym do kontaktu przez formularz na barabashflow.pl.\n- faq: 3 pytania i zwięzłe odpowiedzi (2-3 zdania), sformułowane jak realne zapytania\n- tags: 3-5 krótkich tagów po polsku\n- keywords: 5-10 fraz (primary + supporting + odmiany)\n\nZwróć JSON: {"title_pl":"...","excerpt_pl":"...","body_pl":"...","faq":[{"q":"...","a":"..."}],"tags":["..."],"keywords":["..."]}`,
         0.6,
         8192,
+        ARTICLE_SCHEMA,
       );
       if (!art?.title_pl || !art?.body_pl) { log('article missing fields — skipping topic'); errors.push(`${t.primary_keyword}: article missing fields`); continue; }
 
@@ -381,20 +525,15 @@ async function main() {
       });
       log(`published: /blog/${res.slug}/ (cover: ${res.cover_path || 'none'})`);
 
-      // Every post must have a photo — if the cover didn't make it (bad source
-      // image, fetch error), retry with progressively generic queries.
+      // Every post must have a photo — if the cover still didn't make it
+      // (upload-side failure; download flakes are already handled locally),
+      // retry with progressively generic queries.
       if (!res.cover_path) {
         for (const q of ['modern website laptop', 'laptop office desk', 'computer work desk']) {
           const c2 = await findCover(q, usedCovers);
           if (!c2) continue;
           try {
-            const fix = await edge('set_cover', {
-              slug: res.slug,
-              cover_image_url: c2.cover_image_url,
-              cover_alt: art.title_pl,
-              cover_credit: c2.cover_credit,
-              cover_source_url: c2.cover_source_url,
-            });
+            const fix = await edge('set_cover', { slug: res.slug, cover_alt: art.title_pl, ...c2 });
             log(`cover attached retroactively: ${fix.cover_path}`);
             break;
           } catch (err) {
@@ -426,23 +565,28 @@ async function main() {
     errors.push(`log_keywords: ${String(err)}`);
   }
 
-  // 7) Rebuild the static site so new posts get real pages
+  // 7) Rebuild the static site so new posts get real pages — and VERIFY they
+  // actually serve. On 2026-07-06 the dispatched build + Pages deployment both
+  // reported success while the CDN kept serving the previous day's content;
+  // nothing noticed until the owner did. Published-in-DB is not done —
+  // reachable-on-the-site is done.
   if (published.length && CONFIG.github?.pat) {
-    try {
-      const r = await fetch(`https://api.github.com/repos/${CONFIG.github.repo}/dispatches`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${CONFIG.github.pat}`,
-          Accept: 'application/vnd.github+json',
-          'User-Agent': UA,
-        },
-        body: JSON.stringify({ event_type: 'blog-publish' }),
-      });
-      log(`github dispatch: ${r.status}`);
-      if (r.status >= 300) errors.push(`github dispatch HTTP ${r.status}`);
-    } catch (err) {
-      log('github dispatch failed:', String(err));
-      errors.push(`github dispatch: ${String(err)}`);
+    const dispatched = await githubDispatch();
+    if (dispatched) {
+      log('verifying new posts on the live site (build usually takes ~2 min)…');
+      let missing = await verifyLive(published, 10 * 60_000);
+      if (missing.length) {
+        log(`still missing after 10 min: ${missing.join(', ')} — re-dispatching once`);
+        await githubDispatch();
+        missing = await verifyLive(missing, 12 * 60_000);
+      }
+      if (missing.length) {
+        errors.push(`live verification failed: ${missing.map((s) => `/blog/${s}/`).join(', ')} not on the site after rebuild + retry`);
+      } else {
+        log('live verification OK — all new posts are on the site');
+      }
+    } else {
+      errors.push('github dispatch failed — site not rebuilt');
     }
   } else if (published.length) {
     log('no GitHub PAT configured — site will pick posts up on the next scheduled build');

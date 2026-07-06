@@ -43,6 +43,15 @@ jobs:
       - name: Build Astro site
         run: npm run build
 
+      # Machine-readable stamp served at /build.json — the verify step below
+      # (and anyone debugging) can tell WHICH run's output is actually live.
+      # Needed because on 2026-07-06 a deployment reported success while the
+      # CDN kept serving the previous build.
+      - name: Stamp build
+        run: |
+          printf '{"run_id":"%s","run_attempt":"%s","built_at":"%s"}\n' \
+            "${{ github.run_id }}" "${{ github.run_attempt }}" "$(date -u +%FT%TZ)" > dist/build.json
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
@@ -80,3 +89,46 @@ jobs:
         with:
           error_count: 15
           timeout: 600000
+
+      # A "successful" deployment is not proof the site updated: on 2026-07-06
+      # deploy-pages and the Pages API both said success while the live site
+      # kept serving yesterday's build. Trust only the content: poll
+      # /build.json until it carries THIS run's id (cache-buster query dodges
+      # Fastly's max-age=600), redeploy once if stale, and fail the run loudly
+      # if it is still stale — a red run beats a silently missing blog post.
+      - name: Verify live content
+        id: verify
+        run: |
+          for i in $(seq 1 15); do
+            sleep 20
+            live=$(curl -fsS --max-time 15 "https://barabashflow.pl/build.json?run=${{ github.run_id }}-a$i" \
+              | python3 -c "import json,sys; print(json.load(sys.stdin).get('run_id',''))" 2>/dev/null || echo "")
+            if [ "$live" = "${{ github.run_id }}" ]; then
+              echo "live site serves this run (attempt $i)"; exit 0
+            fi
+            echo "attempt $i: live run_id='$live', want '${{ github.run_id }}'"
+          done
+          echo "stale=true" >> "$GITHUB_OUTPUT"
+          echo "live content still stale after ~5 min — redeploying"
+
+      - name: Redeploy (stale live content)
+        if: steps.verify.outputs.stale == 'true'
+        uses: actions/deploy-pages@v4
+        with:
+          error_count: 15
+          timeout: 600000
+
+      - name: Verify after redeploy
+        if: steps.verify.outputs.stale == 'true'
+        run: |
+          for i in $(seq 1 15); do
+            sleep 20
+            live=$(curl -fsS --max-time 15 "https://barabashflow.pl/build.json?run=${{ github.run_id }}-b$i" \
+              | python3 -c "import json,sys; print(json.load(sys.stdin).get('run_id',''))" 2>/dev/null || echo "")
+            if [ "$live" = "${{ github.run_id }}" ]; then
+              echo "live site serves this run after redeploy (attempt $i)"; exit 0
+            fi
+            echo "attempt $i: live run_id='$live', want '${{ github.run_id }}'"
+          done
+          echo "::error::GitHub Pages still serves stale content after redeploy — investigate"
+          exit 1
