@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase-config.js?v=2026-07-04a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-07-04a';
 import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-07-04a';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -30,6 +30,7 @@ const state = {
   _pasteEmails: new Set(),
   selectedTemplate: null,
   selectedLocale: 'pl',
+  attachments: [],                 // { path, filename, size, mime }
   // banner timer
   _bannerTimer: 0,
 };
@@ -593,6 +594,8 @@ function bindSend() {
 
   $('#send-dry-run').addEventListener('click', () => sendMail(true));
   $('#send-go').addEventListener('click', () => sendMail(false));
+
+  bindComposerMedia();
 }
 
 function renderTemplates() {
@@ -766,14 +769,225 @@ function wrapBrandedLocal(subject, bodyHtml) {
 </body></html>`;
 }
 
+// ── Inline images: never ship base64 to the Edge Function ─────────────────
+// WORKER_RESOURCE_LIMIT incident 2026-07-27: an image pasted into the RTE
+// lands as a multi-MB data: URI; send-mail then copies that string per
+// recipient (wrap + DB insert + Resend POST) and the worker dies on memory.
+// Fix: images are uploaded to Storage and referenced by URL — at paste time,
+// and again defensively right before send (covers quoted replies etc.).
+
+const MAX_PAYLOAD_CHARS = 600_000;   // hard client-side cap (~0.6 MB JSON)
+const MAX_ATTACH_FILE   = 15 * 1024 * 1024;
+const MAX_ATTACH_TOTAL  = 25 * 1024 * 1024;
+
+// Downscale + re-encode for e-mail (JPEG — safest across mail clients;
+// transparency flattened onto the white card background). GIF/SVG pass through.
+async function optimizeEmailImage(blob) {
+  if (/gif|svg/i.test(blob.type || '')) {
+    return { blob, type: blob.type, ext: /svg/i.test(blob.type) ? 'svg' : 'gif' };
+  }
+  try {
+    const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+    const maxEdge = 1200; // e-mail card is 600px wide → 2× retina is plenty
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close?.();
+    const out = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.85));
+    if (out) return { blob: out, type: 'image/jpeg', ext: 'jpg' };
+  } catch (err) {
+    console.warn('[mail] image optimize failed — uploading original', err);
+  }
+  const ext = (blob.type?.split('/')[1] || 'bin').replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';
+  return { blob, type: blob.type || 'application/octet-stream', ext };
+}
+
+async function uploadInlineImage(blob) {
+  const { blob: out, type, ext } = await optimizeEmailImage(blob);
+  const path = `mail/img/${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from(MEDIA_BUCKET).upload(path, out, {
+    cacheControl: '31536000',
+    contentType: type || undefined,
+    upsert: false,
+  });
+  if (error) throw error;
+  return mediaUrl(path);
+}
+
+function insertHtmlAtCursor(html) {
+  const editor = $('#send-body');
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) {
+    document.execCommand('insertHTML', false, html);
+  } else {
+    editor.insertAdjacentHTML('beforeend', html);
+  }
+  refreshPreview();
+}
+
+async function insertImagesAtCursor(files) {
+  for (const f of files) {
+    banner(`Wgrywam obrazek… (${f.name || 'schowek'})`);
+    try {
+      const url = await uploadInlineImage(f);
+      insertHtmlAtCursor(`<img src="${url}" alt="" style="max-width:100%;height:auto;">`);
+      banner('Obrazek wgrany', 'ok');
+    } catch (err) {
+      console.error('[mail] inline image upload failed', err);
+      banner(`Nie udało się wgrać obrazka: ${err.message || err}`, 'error');
+    }
+  }
+}
+
+// Replace every data:/blob: <img> living in the editor with a Storage URL.
+// Returns true when the editor is clean afterwards.
+async function externalizeEditorImages() {
+  const editor = $('#send-body');
+  const imgs = $$('img', editor).filter((im) => /^(data:|blob:)/i.test(im.getAttribute('src') || ''));
+  if (!imgs.length) return true;
+  banner(`Przenoszę ${imgs.length} obrazki do chmury…`);
+  let clean = true;
+  for (const im of imgs) {
+    if (im.dataset.bfUploading) { clean = false; continue; }
+    im.dataset.bfUploading = '1';
+    try {
+      const blob = await (await fetch(im.getAttribute('src'))).blob();
+      im.src = await uploadInlineImage(blob);
+      im.style.maxWidth = '100%';
+      im.style.height = 'auto';
+    } catch (err) {
+      console.error('[mail] externalize failed', err);
+      clean = false;
+    } finally {
+      delete im.dataset.bfUploading;
+    }
+  }
+  refreshPreview();
+  if (clean) banner('Obrazki przeniesione do chmury', 'ok');
+  return clean;
+}
+
+function bindComposerMedia() {
+  const editor = $('#send-body');
+  editor.addEventListener('paste', (e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const files = items
+      .filter((it) => it.kind === 'file' && /^image\//.test(it.type))
+      .map((it) => it.getAsFile())
+      .filter(Boolean);
+    if (files.length) {
+      e.preventDefault();
+      insertImagesAtCursor(files);
+      return;
+    }
+    // Pasted rich HTML can still smuggle data: URIs — clean up after insertion.
+    setTimeout(() => { externalizeEditorImages(); }, 80);
+  });
+  editor.addEventListener('drop', (e) => {
+    const files = Array.from(e.dataTransfer?.files || []).filter((f) => /^image\//.test(f.type));
+    if (files.length) {
+      e.preventDefault();
+      insertImagesAtCursor(files);
+    }
+  });
+
+  // Załączniki (PDF, dokumenty…) — upload do prywatnego bucketa crm-files.
+  const input = $('#attach-input');
+  const addBtn = $('#attach-add');
+  if (!input || !addBtn) return;
+  addBtn.addEventListener('click', () => input.click());
+  input.addEventListener('change', async () => {
+    const files = Array.from(input.files || []);
+    input.value = '';
+    for (const f of files) await addAttachment(f);
+  });
+}
+
+async function addAttachment(file) {
+  if (file.size > MAX_ATTACH_FILE) {
+    banner(`${file.name}: plik za duży (maks. 15 MB)`, 'error');
+    return;
+  }
+  const total = state.attachments.reduce((s, a) => s + a.size, 0) + file.size;
+  if (total > MAX_ATTACH_TOTAL) {
+    banner('Załączniki łącznie przekraczają 25 MB', 'error');
+    return;
+  }
+  const safeName = (file.name || 'plik').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120);
+  const path = `mail-att/${crypto.randomUUID()}/${safeName}`;
+  banner(`Wgrywam załącznik… (${file.name})`);
+  const { error } = await sb.storage.from('crm-files').upload(path, file, {
+    cacheControl: '3600',
+    contentType: file.type || undefined,
+    upsert: false,
+  });
+  if (error) {
+    console.error('[mail] attachment upload failed', error);
+    banner(`Nie udało się wgrać ${file.name}: ${error.message || error}`, 'error');
+    return;
+  }
+  state.attachments.push({ path, filename: file.name || safeName, size: file.size, mime: file.type || null });
+  renderAttachList();
+  banner('Załącznik wgrany', 'ok');
+}
+
+function renderAttachList() {
+  const wrap = $('#attach-list');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  for (const a of state.attachments) {
+    const kb = a.size >= 1024 * 1024 ? `${(a.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(a.size / 1024))} KB`;
+    const chip = document.createElement('span');
+    chip.className = 'attach-chip';
+    chip.innerHTML = `<span class="a-name">${escapeHtml(a.filename)}</span><span class="a-size">${kb}</span><button type="button" title="Usuń">×</button>`;
+    chip.querySelector('button').addEventListener('click', async () => {
+      state.attachments = state.attachments.filter((x) => x !== a);
+      renderAttachList();
+      await sb.storage.from('crm-files').remove([a.path]).catch(() => {});
+    });
+    wrap.appendChild(chip);
+  }
+}
+
 // ── Send ──────────────────────────────────────────────────────────────────
 async function sendMail(dryRun) {
   const recipients = collectRecipients();
   if (recipients.length === 0) { banner('Brak odbiorców', 'error'); return; }
   const subject = $('#send-subject').value.trim();
-  const body = $('#send-body').innerHTML.trim();
   if (!subject) { banner('Brak tematu', 'error'); return; }
-  if (!body)    { banner('Brak treści', 'error'); return; }
+
+  // Safety net: any data:/blob: image still in the editor (pasted HTML,
+  // quoted reply…) goes to Storage first. Never ship base64 to the function.
+  const cleanImgs = await externalizeEditorImages();
+  if (!cleanImgs) {
+    banner('Nie udało się przenieść obrazków do chmury — spróbuj ponownie lub usuń obrazek z treści', 'error');
+    return;
+  }
+
+  let body = $('#send-body').innerHTML.trim();
+  if (!body) { banner('Brak treści', 'error'); return; }
+
+  // Strip unresolvable cid: images (leftovers from quoted inbound mail).
+  {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = body;
+    let mutated = false;
+    for (const im of $$('img', tmp)) {
+      const src = im.getAttribute('src') || '';
+      if (/^cid:/i.test(src)) { im.remove(); mutated = true; }
+      if (/^(data:|blob:)/i.test(src)) {
+        banner('W treści został obrazek base64 — usuń go i spróbuj ponownie', 'error');
+        return;
+      }
+    }
+    if (mutated) body = tmp.innerHTML;
+  }
   const throttle = parseInt($('#send-throttle').value, 10);
   const throttle_ms = Number.isFinite(throttle) && throttle >= 0 ? throttle : 250;
 
@@ -788,6 +1002,39 @@ async function sendMail(dryRun) {
   $('#send-progress-label').textContent = dryRun ? 'Dry-run…' : 'Wysyłanie…';
 
   try {
+    // Attachments: short-lived signed URLs from the private crm-files bucket.
+    // The Edge Function hands them to Resend as remote paths — bytes never
+    // pass through the worker.
+    let attachments = null;
+    if (state.attachments.length) {
+      attachments = [];
+      for (const a of state.attachments) {
+        const { data, error } = await sb.storage.from('crm-files').createSignedUrl(a.path, 60 * 60 * 24);
+        if (error || !data?.signedUrl) {
+          banner(`Załącznik ${a.filename}: nie udało się przygotować (${error?.message || 'brak URL'})`, 'error');
+          return;
+        }
+        attachments.push({ filename: a.filename, url: data.signedUrl });
+      }
+    }
+
+    const payload = JSON.stringify({
+      recipients,
+      subject,
+      body_html: body,
+      template_id: state.selectedTemplate?.id || null,
+      locale: state.selectedLocale,
+      throttle_ms,
+      dry_run: dryRun,
+      in_reply_to: state._replyContext?.in_reply_to || null,
+      refs: state._replyContext?.refs || null,
+      attachments,
+    });
+    if (payload.length > MAX_PAYLOAD_CHARS) {
+      banner(`Treść e-maila jest za duża (${Math.round(payload.length / 1024)} KB, limit ${Math.round(MAX_PAYLOAD_CHARS / 1024)} KB). Duże pliki dodaj jako załącznik.`, 'error');
+      return;
+    }
+
     const { data: { session } } = await sb.auth.getSession();
     const resp = await fetch(`${FUNCTIONS_URL}/send-mail`, {
       method: 'POST',
@@ -795,17 +1042,7 @@ async function sendMail(dryRun) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({
-        recipients,
-        subject,
-        body_html: body,
-        template_id: state.selectedTemplate?.id || null,
-        locale: state.selectedLocale,
-        throttle_ms,
-        dry_run: dryRun,
-        in_reply_to: state._replyContext?.in_reply_to || null,
-        refs: state._replyContext?.refs || null,
-      }),
+      body: payload,
     });
     fill.style.width = '100%';
     if (!resp.ok) {

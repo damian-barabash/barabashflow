@@ -14,7 +14,7 @@
     rel="stylesheet"
   />
   <link rel="stylesheet" href="/assets/css/admin.css?v=2026-07-04a" />
-  <link rel="stylesheet" href="/assets/css/mail.css?v=2026-07-04a" />
+  <link rel="stylesheet" href="/assets/css/mail.css?v=2026-07-27a" />
   <script type="module" src="/assets/js/theme.js?v=2026-07-04a"></script>
 </head>
 <body class="is-booting">
@@ -192,6 +192,15 @@
               </div>
               <div class="rte" id="send-body" contenteditable="true"></div>
             </div>
+            <div class="field">
+              <label class="field-label">Załączniki (PDF, dokumenty — dołączane jako pliki)</label>
+              <div class="attach-row">
+                <button class="btn small" id="attach-add" type="button">＋ Dodaj załącznik</button>
+                <input id="attach-input" type="file" multiple hidden />
+                <div class="attach-list" id="attach-list"></div>
+              </div>
+              <div class="coords">Maks. 15 MB / plik, 25 MB łącznie. Obrazki możesz też wklejać prosto do treści.</div>
+            </div>
           </div>
 
           <div class="section">
@@ -269,6 +278,6 @@
 
   <div class="banner" id="banner"></div>
 
-  <script type="module" src="/assets/js/mail.js?v=2026-07-04a"></script>
+  <script type="module" src="/assets/js/mail.js?v=2026-07-27a"></script>
 </body>
 </html>

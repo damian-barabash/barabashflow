@@ -978,3 +978,24 @@ body:not(.is-booting) .boot-splash { display: none; }
     border-radius: 22px;
   }
 }
+
+/* ── Załączniki + inline obrazki w RTE (2026-07-27) ─────────────────────── */
+.attach-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.attach-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.attach-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--card, #fcfcfa);
+  border: 1px solid var(--hair, rgba(22, 22, 20, 0.14));
+  border-radius: 999px;
+  padding: 5px 8px 5px 12px;
+  font-size: 12px;
+  max-width: 280px;
+}
+.attach-chip .a-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-chip .a-size { opacity: 0.55; flex: none; }
+.attach-chip button {
+  border: 0; background: transparent; cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 2px 4px; color: inherit; opacity: 0.6;
+}
+.attach-chip button:hover { opacity: 1; }
+.rte img { max-width: 100%; height: auto; }
