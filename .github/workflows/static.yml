@@ -12,8 +12,12 @@ on:
   # published and the day's posts never appeared (2026-07-05 incident).
   repository_dispatch:
     types: [blog-publish]
+  # Two slots: GH skips scheduled runs often enough that a single daily slot
+  # is a real single point of failure when the dispatch path is down too
+  # (2026-08-03: expired PAT → dispatch 401, only the cron could save the day).
   schedule:
     - cron: "30 12 * * *"
+    - cron: "45 17 * * *"
 
 permissions:
   contents: read
