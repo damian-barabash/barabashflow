@@ -25,7 +25,13 @@
 // Reliability contract:
 //   - launchd runs it at 08:40 AND 13:40; the second run is a catch-up — the
 //     script counts posts already published today and only writes the missing
-//     ones (idempotent, safe to run any number of times per day)
+//     ones (idempotent, safe to run any number of times per day). Even when
+//     there is nothing to write, the catch-up run still verifies today's posts
+//     serve 200 on the live site and self-heals with a rebuild if they don't
+//     (2026-08-03: the morning dispatch got 401 and posts sat DB-only all day
+//     while the catch-up said "nothing to do" and overwrote the error status)
+//   - the GitHub PAT is validated on EVERY run and an alert goes out starting
+//     7 days before it expires — fine-grained PATs die silently otherwise
 //   - a single failing post never kills the run: keyword logging, the GitHub
 //     dispatch and the status report always execute
 //   - qwen3.5 is a THINKING model: every request sends think:false, otherwise
@@ -366,7 +372,7 @@ async function translateInto(art: any, lang: { code: 'en' | 'ru'; name: string }
   return out;
 }
 
-async function githubDispatch(): Promise<boolean> {
+async function githubDispatch(): Promise<number> {
   try {
     const r = await fetch(`https://api.github.com/repos/${CONFIG.github.repo}/dispatches`, {
       method: 'POST',
@@ -378,10 +384,49 @@ async function githubDispatch(): Promise<boolean> {
       body: JSON.stringify({ event_type: 'blog-publish' }),
     });
     log(`github dispatch: ${r.status}`);
-    return r.status < 300;
+    return r.status;
   } catch (err) {
     log('github dispatch failed:', String(err));
-    return false;
+    return 0;
+  }
+}
+
+// The PAT is the single credential the whole publish→rebuild chain hangs on,
+// and fine-grained tokens expire SILENTLY — on 2026-08-03 the dispatch got 401
+// and the day's posts sat DB-only while the site served yesterday's build.
+// Validate on every run and start alerting a week before expiry, not the
+// morning after.
+async function checkGithubToken(): Promise<string | null> {
+  if (!CONFIG.github?.pat) {
+    return 'GitHub PAT nie jest ustawiony w config.json — strona nie przebuduje się po publikacji';
+  }
+  try {
+    const r = await fetch(`https://api.github.com/repos/${CONFIG.github.repo}`, {
+      headers: {
+        Authorization: `Bearer ${CONFIG.github.pat}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': UA,
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (r.status === 401 || r.status === 403) {
+      return `GitHub PAT niewazny/wygasl (HTTP ${r.status}) — wygeneruj nowy fine-grained token (repo ${CONFIG.github.repo}, Contents: Read+Write) i wpisz go w ~/blog-agent/config.json na Mac Studio`;
+    }
+    if (!r.ok) return `GitHub PAT check: HTTP ${r.status}`;
+    // Header format: "2026-09-02 11:44:31 UTC" (absent on non-expiring tokens).
+    const exp = r.headers.get('github-authentication-token-expiration');
+    if (exp) {
+      const ms = Date.parse(exp.replace(' UTC', '').replace(' ', 'T') + 'Z');
+      if (Number.isFinite(ms)) {
+        const daysLeft = Math.floor((ms - Date.now()) / 864e5);
+        if (daysLeft <= 7) {
+          return `GitHub PAT wygasa za ${Math.max(0, daysLeft)} dni (${exp}) — wygeneruj nowy token ZAWCZASU i podmien w ~/blog-agent/config.json`;
+        }
+      }
+    }
+    return null;
+  } catch (err) {
+    return `GitHub PAT check failed: ${String(err)}`;
   }
 }
 
@@ -389,6 +434,19 @@ async function githubDispatch(): Promise<boolean> {
 // Returns the slugs that are still missing. The cache-buster query matters:
 // GH Pages sits behind Fastly with max-age=600, and a stale cached 404 would
 // make a freshly deployed page look missing for another 10 minutes.
+async function probeLive(slug: string): Promise<boolean> {
+  try {
+    const r = await fetch(`https://barabashflow.pl/blog/${slug}/?live=${Date.now()}`, {
+      headers: { 'User-Agent': UA },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
+    });
+    return r.status === 200;
+  } catch {
+    return false;
+  }
+}
+
 async function verifyLive(slugs: string[], timeoutMs: number): Promise<string[]> {
   const deadline = Date.now() + timeoutMs;
   let missing = [...slugs];
@@ -396,20 +454,34 @@ async function verifyLive(slugs: string[], timeoutMs: number): Promise<string[]>
     await Bun.sleep(30_000);
     const still: string[] = [];
     for (const slug of missing) {
-      try {
-        const r = await fetch(`https://barabashflow.pl/blog/${slug}/?live=${Date.now()}`, {
-          headers: { 'User-Agent': UA },
-          redirect: 'follow',
-          signal: AbortSignal.timeout(15000),
-        });
-        if (r.status !== 200) still.push(slug);
-      } catch {
-        still.push(slug);
-      }
+      if (!(await probeLive(slug))) still.push(slug);
     }
     missing = still;
   }
   return missing;
+}
+
+// Dispatch a rebuild and poll until every slug serves 200. Appends to errors
+// instead of throwing — callers always continue to the status report.
+async function rebuildAndVerify(slugs: string[], errors: string[]) {
+  const status = await githubDispatch();
+  if (status === 0 || status >= 300) {
+    const patHint = status === 401 || status === 403 ? ' (PAT niewazny/wygasl?)' : '';
+    errors.push(`github dispatch failed (HTTP ${status || 'network'})${patHint} — site not rebuilt`);
+    return;
+  }
+  log('verifying new posts on the live site (build usually takes ~2 min)…');
+  let missing = await verifyLive(slugs, 10 * 60_000);
+  if (missing.length) {
+    log(`still missing after 10 min: ${missing.join(', ')} — re-dispatching once`);
+    await githubDispatch();
+    missing = await verifyLive(missing, 12 * 60_000);
+  }
+  if (missing.length) {
+    errors.push(`live verification failed: ${missing.map((s) => `/blog/${s}/`).join(', ')} not on the site after rebuild + retry`);
+  } else {
+    log('live verification OK — all new posts are on the site');
+  }
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -417,6 +489,11 @@ async function main() {
   log('blog agent start');
   const { posts: recentPosts, keywords: recentKw, config } = await edge('recent');
   if (!config.enabled) { log('autopilot disabled in admin — exiting'); return; }
+
+  // A dead/dying PAT must surface in EVERY run's status (alert email), not
+  // only when there is something to publish.
+  const tokenIssue = await checkGithubToken();
+  if (tokenIssue) log('github token:', tokenIssue);
 
   // Idempotency: launchd fires at 08:40 and again at 13:40 (catch-up). Count
   // what today already has and only write the difference.
@@ -427,8 +504,36 @@ async function main() {
     : randInt(config.posts_min ?? 1, config.posts_max ?? 2);
   const n = Number.isFinite(forced) && forced > 0 ? forced : target - postsToday;
   if (n <= 0) {
-    log(`already ${postsToday} post(s) published today (target ${target}) — nothing to do`);
-    await reportStatus({ ok: true, planned: 0, published: [], errors: [], note: `already ${postsToday}/${target} today` });
+    // Nothing to write — but "published in the DB" is not "done". Verify
+    // today's posts actually serve on the live site and self-heal with a
+    // rebuild if any are missing (a failed morning dispatch used to leave
+    // them invisible all day while this branch reported ok:true).
+    log(`already ${postsToday} post(s) published today (target ${target}) — verifying they are live`);
+    const errors: string[] = tokenIssue ? [tokenIssue] : [];
+    const todaySlugs: string[] = recentPosts
+      .filter((p: any) => String(p.published_at || '').slice(0, 10) === TODAY && (p.status ?? 'published') === 'published')
+      .map((p: any) => String(p.slug));
+    const missing: string[] = [];
+    for (const slug of todaySlugs) {
+      if (!(await probeLive(slug))) missing.push(slug);
+    }
+    if (missing.length) {
+      log(`published in DB but missing on the site: ${missing.join(', ')} — self-healing rebuild`);
+      if (CONFIG.github?.pat) {
+        await rebuildAndVerify(missing, errors);
+      } else {
+        errors.push(`posts missing on the site and no PAT to rebuild: ${missing.map((s) => `/blog/${s}/`).join(', ')}`);
+      }
+    } else {
+      log(`all ${todaySlugs.length} of today's post(s) are live — nothing to do`);
+    }
+    await reportStatus({
+      ok: errors.length === 0,
+      planned: 0,
+      published: [],
+      errors: errors.slice(0, 6),
+      note: `already ${postsToday}/${target} today${missing.length ? '; self-heal rebuild' : '; live-check OK'}`,
+    });
     return;
   }
   log(`plan: ${n} post(s) (${postsToday} already today); ${recentPosts.length} recent posts known`);
@@ -571,26 +676,14 @@ async function main() {
   // nothing noticed until the owner did. Published-in-DB is not done —
   // reachable-on-the-site is done.
   if (published.length && CONFIG.github?.pat) {
-    const dispatched = await githubDispatch();
-    if (dispatched) {
-      log('verifying new posts on the live site (build usually takes ~2 min)…');
-      let missing = await verifyLive(published, 10 * 60_000);
-      if (missing.length) {
-        log(`still missing after 10 min: ${missing.join(', ')} — re-dispatching once`);
-        await githubDispatch();
-        missing = await verifyLive(missing, 12 * 60_000);
-      }
-      if (missing.length) {
-        errors.push(`live verification failed: ${missing.map((s) => `/blog/${s}/`).join(', ')} not on the site after rebuild + retry`);
-      } else {
-        log('live verification OK — all new posts are on the site');
-      }
-    } else {
-      errors.push('github dispatch failed — site not rebuilt');
-    }
+    await rebuildAndVerify(published, errors);
   } else if (published.length) {
-    log('no GitHub PAT configured — site will pick posts up on the next scheduled build');
+    errors.push('no GitHub PAT configured — site not rebuilt, posts stay invisible until the fallback build');
   }
+
+  // A PAT that is about to expire (or already dead) must page the owner even
+  // on a day when everything else worked.
+  if (tokenIssue && !errors.some((e) => e.includes('PAT'))) errors.push(tokenIssue);
 
   // 8) Status → admin panel (+ alert email from the Edge Function on failure)
   await reportStatus({
