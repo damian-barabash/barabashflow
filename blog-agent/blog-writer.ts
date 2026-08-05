@@ -30,6 +30,17 @@
 //     serve 200 on the live site and self-heals with a rebuild if they don't
 //     (2026-08-03: the morning dispatch got 401 and posts sat DB-only all day
 //     while the catch-up said "nothing to do" and overwrote the error status)
+//   - the day's post target is a hash of the date, NOT Math.random(): both
+//     runs must agree on it, otherwise the catch-up can roll a smaller target
+//     than the morning did and mask a missing post as "nothing to do"
+//   - topic/slug dedup runs against EVERY post that exists, not a recency
+//     window: the edge's `recent` returns the last 60 and on 2026-08-05 the
+//     LLM re-picked a topic whose twin had fallen out of that window — the
+//     insert died on the slug unique constraint and the day shipped 1/2.
+//     All slugs = edge all_slugs (v9+) ∪ live sitemap ∪ recent posts; picked
+//     topics are also stem-checked against existing slugs so near-duplicate
+//     content ("firma transportowa" two days in a row) gets rejected and
+//     re-picked, and a slug collision on INSERT retries once with a suffix
 //   - the GitHub PAT is validated on EVERY run and an alert goes out starting
 //     7 days before it expires — fine-grained PATs die silently otherwise
 //   - a single failing post never kills the run: keyword logging, the GitHub
@@ -356,7 +367,76 @@ function slugify(s: string): string {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
     .slice(0, 70) || `wpis-${TODAY}`;
 }
-const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
+// Stable within a day, varied across days. Both daily runs derive the same
+// number, so the 13:40 catch-up always finishes what the morning planned.
+function dailyTarget(min: number, max: number): number {
+  let h = 2166136261;
+  for (const c of TODAY) h = ((h ^ c.charCodeAt(0)) * 16777619) >>> 0;
+  return min + (h % (Math.max(min, max) - min + 1));
+}
+
+// ── Topic dedup against the full post corpus ─────────────────────────────────
+// Slug tokens that appear in nearly every post and carry no topical signal.
+const SLUG_STOP = new Set([
+  'strona', 'strony', 'stronie', 'stron', 'internetowa', 'internetowe', 'internetowej', 'internetowy', 'internetowych',
+  'www', 'dla', 'firmy', 'firma', 'firm', 'jak', 'czy', 'co', 'ile', 'gdzie', 'kiedy', 'warto', 'jest', 'sie',
+  'na', 'w', 'z', 'i', 'o', 'u', 'do', 'od', 'po', 'za', 'ze', 'przy', 'oraz', 'czym', 'czego', 'ktora', 'ktory', 'ktore',
+  'wybrac', 'zrobic', 'stworzyc', 'tworzenie', 'tworzeniu', 'musi', 'moze', 'trzeba', 'wiedziec', 'zawierac',
+  'potrzebuje', 'krok', 'kroku', 'krokow', 'poradnik', 'przewodnik', 'praktyce', 'przyklady', 'przyklad',
+  'analiza', 'rozwiazania', 'wymagania', 'wszystko', 'kompletny', 'prawdziwy', 'najlepszy', 'najlepsze',
+  String(new Date().getFullYear()), String(new Date().getFullYear() + 1),
+]);
+
+// First 5 chars ≈ a Polish stem: transportowej/transportowa → "trans",
+// sklepem/sklepu → "sklep". Coarse on purpose — it occasionally over-rejects
+// (wizyt/wizytówka share a stem), which is the safe direction: a rejected
+// topic just gets re-picked, an under-rejected one dies on the DB constraint.
+function slugStems(slug: string): Set<string> {
+  const out = new Set<string>();
+  for (const tok of slug.split('-')) {
+    if (tok.length < 3 || SLUG_STOP.has(tok)) continue;
+    out.add(tok.slice(0, 5));
+  }
+  return out;
+}
+
+// Why a candidate topic must be rejected, or null if it is fresh.
+// Hard rules: exact slug exists; ≥2 topical stems shared with ANY existing
+// post (near-duplicate content); ≥1 stem shared with a post ≤21 days old
+// (same subject back-to-back — the transportowa/transportowa case).
+function topicConflict(candSlug: string, allSlugs: Set<string>, recentDays: Map<string, number>): string | null {
+  if (allSlugs.has(candSlug)) return `slug already exists: ${candSlug}`;
+  const cand = slugStems(candSlug);
+  if (!cand.size) return null;
+  for (const existing of allSlugs) {
+    const shared = [...slugStems(existing)].filter((s) => cand.has(s));
+    if (!shared.length) continue;
+    if (shared.length >= 2) return `near-duplicate of "${existing}" (shared: ${shared.join(', ')})`;
+    const days = recentDays.get(existing);
+    if (days !== undefined && days <= 21) return `same subject as ${days}d-old "${existing}" (${shared[0]})`;
+  }
+  return null;
+}
+
+// Every published post, straight from the live sitemap — survives even if the
+// edge still runs an older version that only returns the last 60 posts.
+async function fetchSitemapSlugs(): Promise<string[]> {
+  try {
+    const idx = await (await fetch('https://barabashflow.pl/sitemap-index.xml', {
+      headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000),
+    })).text();
+    const maps = [...idx.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+    const slugs = new Set<string>();
+    for (const url of maps.slice(0, 10)) {
+      const xml = await (await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000) })).text();
+      for (const m of xml.matchAll(/\/blog\/([a-z0-9-]+)\//g)) slugs.add(m[1]);
+    }
+    return [...slugs];
+  } catch (err) {
+    log('sitemap slug fetch failed (continuing with edge data only):', String(err));
+    return [];
+  }
+}
 
 // One language per call — the combined EN+RU response was the biggest output
 // of the whole pipeline and the first thing to truncate.
@@ -487,7 +567,7 @@ async function rebuildAndVerify(slugs: string[], errors: string[]) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   log('blog agent start');
-  const { posts: recentPosts, keywords: recentKw, config } = await edge('recent');
+  const { posts: recentPosts, keywords: recentKw, config, all_slugs } = await edge('recent');
   if (!config.enabled) { log('autopilot disabled in admin — exiting'); return; }
 
   // A dead/dying PAT must surface in EVERY run's status (alert email), not
@@ -501,7 +581,7 @@ async function main() {
   const forced = Number(process.env.FORCE_POSTS);
   const target = Number.isFinite(forced) && forced > 0
     ? forced
-    : randInt(config.posts_min ?? 1, config.posts_max ?? 2);
+    : dailyTarget(config.posts_min ?? 1, config.posts_max ?? 2);
   const n = Number.isFinite(forced) && forced > 0 ? forced : target - postsToday;
   if (n <= 0) {
     // Nothing to write — but "published in the DB" is not "done". Verify
@@ -539,9 +619,21 @@ async function main() {
   log(`plan: ${n} post(s) (${postsToday} already today); ${recentPosts.length} recent posts known`);
 
   const suggestions = await research(config.seed_keywords ?? []);
-  const usedSlugs = new Set(recentPosts.map((p: any) => p.slug));
+
+  // The full slug corpus: edge all_slugs (v9+, includes hidden drafts) ∪ live
+  // sitemap (every published post, even on an older edge) ∪ the recent window.
+  const usedSlugs = new Set<string>(recentPosts.map((p: any) => String(p.slug)));
+  (Array.isArray(all_slugs) ? all_slugs : []).forEach((s: unknown) => usedSlugs.add(String(s)));
+  (await fetchSitemapSlugs()).forEach((s) => usedSlugs.add(s));
+  const recentDays = new Map<string, number>();
+  for (const p of recentPosts) {
+    const ms = Date.parse(String(p.published_at || ''));
+    if (Number.isFinite(ms)) recentDays.set(String(p.slug), Math.floor((Date.now() - ms) / 864e5));
+  }
+  log(`dedup corpus: ${usedSlugs.size} known slugs`);
+
   const usedCovers = new Set<string>(recentPosts.map((p: any) => String(p.cover_source_url || '')).filter(Boolean));
-  const recentTitles = recentPosts.slice(0, 40).map((p: any) => p.title_pl);
+  const recentTitles = recentPosts.map((p: any) => p.title_pl);
   const recentPicked = recentKw.filter((k: any) => k.picked).map((k: any) => k.keyword);
 
   // Mniej wiecej co trzeci run: jeden temat popularny (head/mid-tail) —
@@ -551,25 +643,56 @@ async function main() {
     ? 'DZISIAJ DODATKOWO: dokladnie JEDEN z tematow zrob POPULARNY zamiast long-tail — krotka, wysokowolumenowa fraza, ktora ludzie wpisuja najczesciej (np. "tworzenie stron internetowych", "strona internetowa dla firmy", "jak zalozyc sklep internetowy"). Mimo wiekszej konkurencji taki wpis buduje topical authority. Zasady roznorodnosci i zakaz powtorki ceny obowiazuja takze dla niego. Pozostale tematy nadal long-tail.\n\n'
     : '';
 
-  // 1) Topic selection
-  const topicsResp = await llmJson(
-    `Jesteś strategiem SEO polskiego studia web-developmentu BarabashFlow (Dmytrii Barabash, Warszawa; barabashflow.pl; usługi: strony internetowe, platformy/aplikacje webowe, panele CMS, sklepy internetowe). Odpowiadasz WYŁĄCZNIE poprawnym JSON-em.`,
-    `Świeże podpowiedzi z Google (co ludzie realnie wpisują dzisiaj):\n${suggestions.slice(0, 90).join('\n')}\n\n` +
-    (config.seed_keywords?.length ? `Tematy wskazane przez właściciela (PRIORYTET):\n${config.seed_keywords.join('\n')}\n\n` : '') +
-    `Ostatnie wpisy bloga (NIE powtarzaj tematów):\n${recentTitles.join('\n') || '(brak)'}\n\n` +
-    `Słowa już użyte:\n${recentPicked.slice(0, 60).join(', ') || '(brak)'}\n\n` +
-    `Wybierz ${n} tematów na dzisiejsze wpisy blogowe. Kryteria: intencja komercyjna lub pytanie potencjalnego klienta, długi ogon (mniejsza konkurencja), brak powtórek z ostatnich wpisów.\n\nRÓŻNORODNOŚĆ (najważniejsze kryterium): każdy z dzisiejszych tematów MUSI należeć do INNEJ kategorii intencji, a żaden nie może powtarzać kategorii dominującej w 5 ostatnich wpisach bloga (rozpoznasz ją po tytułach wyżej). Kategorie: (1) cena — "ile kosztuje…"; (2) porównanie — "X czy Y", "co lepsze"; (3) proces — "jak długo trwa", "jak wygląda", "etapy"; (4) wybór wykonawcy — "jak wybrać", "na co uważać"; (5) błędy i checklisty — "najczęstsze błędy", "o czym pamiętać przed…"; (6) technologia prosto wyjaśniona — "co to jest…", "czym różni się…"; (7) SEO i widoczność w Google/AI; (8) strona dla konkretnej branży — "strona internetowa dla <branża>". Tematu o cenie NIE wybieraj, jeśli którykolwiek z 5 ostatnich wpisów był o cenie.\n\n${popularHint}Zwróć JSON:\n` +
-    `{"topics":[{"primary_keyword":"...","category":"nazwa kategorii z listy","supporting_keywords":["..."],"slug":"kebab-case-po-polsku-bez-znakow","title_hint":"...","angle":"jedna linia o ujęciu tematu","image_query_en":"2-4 English words for a stock photo"}]}`,
-    0.4,
-    2048,
-    TOPICS_SCHEMA,
-  );
-  const topics = (topicsResp?.topics ?? []).slice(0, n);
-  if (!topics.length) throw new Error('no topics from LLM');
+  // 1) Topic selection — over-ask (n+2), then hard-filter every candidate
+  // against the full slug corpus. The LLM prompt asks for freshness too, but
+  // prompts are advisory; the filter is the guarantee. One re-ask with the
+  // rejected topics listed as forbidden if the first round leaves a shortfall.
+  const topics: any[] = [];
+  const rejected: string[] = [];
+  for (let round = 1; round <= 2 && topics.length < n; round++) {
+    const askFor = n - topics.length + 2;
+    const bannedBlock = rejected.length
+      ? `\n\nTe tematy własnie ODRZUCONO jako powtórki istniejących wpisów — NIE proponuj ich ani niczego zbliżonego:\n${rejected.join('\n')}\n`
+      : '';
+    const topicsResp = await llmJson(
+      `Jesteś strategiem SEO polskiego studia web-developmentu BarabashFlow (Dmytrii Barabash, Warszawa; barabashflow.pl; usługi: strony internetowe, platformy/aplikacje webowe, panele CMS, sklepy internetowe). Odpowiadasz WYŁĄCZNIE poprawnym JSON-em.`,
+      `Świeże podpowiedzi z Google (co ludzie realnie wpisują dzisiaj):\n${suggestions.slice(0, 90).join('\n')}\n\n` +
+      (config.seed_keywords?.length ? `Tematy wskazane przez właściciela (PRIORYTET):\n${config.seed_keywords.join('\n')}\n\n` : '') +
+      `Ostatnie wpisy bloga (NIE powtarzaj tematów):\n${recentTitles.join('\n') || '(brak)'}\n\n` +
+      `Słowa już użyte:\n${recentPicked.slice(0, 60).join(', ') || '(brak)'}\n${bannedBlock}\n` +
+      `Wybierz ${askFor} tematów na dzisiejsze wpisy blogowe. Kryteria: intencja komercyjna lub pytanie potencjalnego klienta, długi ogon (mniejsza konkurencja), brak powtórek z ostatnich wpisów.\n\nRÓŻNORODNOŚĆ (najważniejsze kryterium): każdy z dzisiejszych tematów MUSI należeć do INNEJ kategorii intencji, a żaden nie może powtarzać kategorii dominującej w 5 ostatnich wpisach bloga (rozpoznasz ją po tytułach wyżej). Kategorie: (1) cena — "ile kosztuje…"; (2) porównanie — "X czy Y", "co lepsze"; (3) proces — "jak długo trwa", "jak wygląda", "etapy"; (4) wybór wykonawcy — "jak wybrać", "na co uważać"; (5) błędy i checklisty — "najczęstsze błędy", "o czym pamiętać przed…"; (6) technologia prosto wyjaśniona — "co to jest…", "czym różni się…"; (7) SEO i widoczność w Google/AI; (8) strona dla konkretnej branży — "strona internetowa dla <branża>". Tematu o cenie NIE wybieraj, jeśli którykolwiek z 5 ostatnich wpisów był o cenie.\n\n${popularHint}Zwróć JSON:\n` +
+      `{"topics":[{"primary_keyword":"...","category":"nazwa kategorii z listy","supporting_keywords":["..."],"slug":"kebab-case-po-polsku-bez-znakow","title_hint":"...","angle":"jedna linia o ujęciu tematu","image_query_en":"2-4 English words for a stock photo"}]}`,
+      round === 1 ? 0.4 : 0.7,
+      2048,
+      TOPICS_SCHEMA,
+    );
+    for (const t of topicsResp?.topics ?? []) {
+      if (topics.length >= n) break;
+      const candSlug = slugify(t.slug || t.primary_keyword || '');
+      const intraRun = topics.some((a) => {
+        const shared = [...slugStems(slugify(a.slug || a.primary_keyword || ''))].filter((s) => slugStems(candSlug).has(s));
+        return shared.length >= 1;
+      });
+      const conflict = intraRun
+        ? 'same subject as another topic picked today'
+        : topicConflict(candSlug, usedSlugs, recentDays);
+      if (conflict) {
+        log(`topic rejected: "${t.primary_keyword}" — ${conflict}`);
+        rejected.push(String(t.primary_keyword || candSlug));
+        continue;
+      }
+      topics.push(t);
+    }
+  }
+  if (!topics.length) throw new Error(`no usable topics from LLM (${rejected.length} rejected as duplicates)`);
+  if (topics.length < n) log(`warning: only ${topics.length}/${n} fresh topics survived dedup — writing what we have`);
 
   const published: string[] = [];
   const errors: string[] = [];
   const pickedKw = new Set<string>();
+  if (topics.length < n) {
+    errors.push(`topic dedup shortfall: only ${topics.length}/${n} fresh topics (rejected: ${rejected.slice(0, 6).join('; ')})`);
+  }
 
   // Each topic is isolated: one failed post must not kill the others, the
   // keyword log, the rebuild dispatch or the status report.
@@ -579,6 +702,7 @@ async function main() {
       if (usedSlugs.has(slug)) slug = `${slug}-${TODAY.replace(/-/g, '')}`.slice(0, 78);
 
       log(`writing: ${t.primary_keyword} -> ${slug}`);
+      usedSlugs.add(slug);
 
       // 2) Polish article
       const YEAR = new Date().getFullYear();
@@ -607,10 +731,13 @@ async function main() {
       // 4) Cover from Openverse
       const cover = await findCover(t.image_query_en || 'modern website design laptop', usedCovers);
 
-      // 5) Publish
-      const res = await edge('ingest_post', {
+      // 5) Publish. A slug collision on INSERT should be impossible after the
+      // corpus-wide dedup above, but the DB constraint is the last line of
+      // defense — losing a fully written post to it is not acceptable, so
+      // retry once with a random suffix instead of dying (2026-08-05).
+      const buildPost = (postSlug: string) => ({
         post: {
-          slug,
+          slug: postSlug,
           title_pl: art.title_pl,
           excerpt_pl: art.excerpt_pl,
           body_pl: art.body_pl,
@@ -628,6 +755,17 @@ async function main() {
           meta: { agent: 'mac-studio', model: CONFIG.model, primary_keyword: t.primary_keyword, day: TODAY },
         },
       });
+      let res: any;
+      try {
+        res = await edge('ingest_post', buildPost(slug));
+      } catch (err) {
+        if (!/duplicate key/i.test(String(err))) throw err;
+        const alt = `${slug.slice(0, 70)}-${crypto.randomUUID().slice(0, 4)}`;
+        log(`slug collision on insert ("${slug}") — retrying once as "${alt}"`);
+        slug = alt;
+        usedSlugs.add(slug);
+        res = await edge('ingest_post', buildPost(slug));
+      }
       log(`published: /blog/${res.slug}/ (cover: ${res.cover_path || 'none'})`);
 
       // Every post must have a photo — if the cover still didn't make it

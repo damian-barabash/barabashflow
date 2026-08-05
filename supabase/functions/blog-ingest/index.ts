@@ -3,11 +3,16 @@
 // (same pattern as mail-refresh's x-cron-secret). verify_jwt is off.
 //
 // Actions (POST { action, ... }):
-//   recent        -> { posts, keywords, config } — config comes from
-//                    site_settings.blog_config (admin-editable: enabled,
+//   recent        -> { posts, keywords, config, all_slugs } — config comes
+//                    from site_settings.blog_config (admin-editable: enabled,
 //                    posts_min/max, seed_keywords). Posts include
 //                    cover_source_url so the worker never reuses a photo,
 //                    and status so the live self-check skips hidden drafts.
+//                    all_slugs (v9) is EVERY slug in the table regardless of
+//                    status or age — the worker dedups topics against it; the
+//                    60-post recency window alone let a 31-day-old topic get
+//                    re-picked and die on the slug unique constraint
+//                    (2026-08-05 incident).
 //   ingest_post   -> stores the cover in the public `media` bucket under blog/,
 //                    inserts a published blog_posts row. The worker downloads
 //                    the image itself and sends cover_b64 (see IMG_UA note
@@ -82,7 +87,17 @@ Deno.serve(async (req) => {
           .eq('key', 'blog_config')
           .maybeSingle();
         const config = { ...DEFAULT_CONFIG, ...(cfgRow?.value_meta ?? {}) };
-        return json({ ok: true, posts: posts ?? [], keywords: keywords ?? [], config });
+        const { data: slugRows } = await svc
+          .from('blog_posts')
+          .select('slug')
+          .limit(5000);
+        return json({
+          ok: true,
+          posts: posts ?? [],
+          keywords: keywords ?? [],
+          config,
+          all_slugs: (slugRows ?? []).map((r) => r.slug),
+        });
       }
 
       case 'ingest_post': {
