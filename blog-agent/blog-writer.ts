@@ -41,6 +41,13 @@
 //     topics are also stem-checked against existing slugs so near-duplicate
 //     content ("firma transportowa" two days in a row) gets rejected and
 //     re-picked, and a slug collision on INSERT retries once with a suffix
+//   - topic selection must never kill the day: if both LLM rounds yield only
+//     duplicates (2026-08-06: 8/8 rejected → 0 posts shipped), fresh topics
+//     are taken deterministically from the ranked research suggestions that
+//     pass the same corpus filter; the LLM only structures them, it does not
+//     get to choose. Price/city words are stop-listed in the stem filter and
+//     the same-subject window is 10 days — generic stems ("koszt", "warsz")
+//     must not act as a 3-week ban on half the topic space
 //   - the GitHub PAT is validated on EVERY run and an alert goes out starting
 //     7 days before it expires — fine-grained PATs die silently otherwise
 //   - a single failing post never kills the run: keyword logging, the GitHub
@@ -377,6 +384,10 @@ function dailyTarget(min: number, max: number): number {
 
 // ── Topic dedup against the full post corpus ─────────────────────────────────
 // Slug tokens that appear in nearly every post and carry no topical signal.
+// Price words and city names are modifiers, not subjects: on 2026-08-06 the
+// stem "koszt" (shared with the previous day's shop-pricing post) and "warsz"
+// (shared with an unrelated Warsaw-jobs post) rejected perfectly fresh topics
+// — together with other false positives that killed the whole day (0 topics).
 const SLUG_STOP = new Set([
   'strona', 'strony', 'stronie', 'stron', 'internetowa', 'internetowe', 'internetowej', 'internetowy', 'internetowych',
   'www', 'dla', 'firmy', 'firma', 'firm', 'jak', 'czy', 'co', 'ile', 'gdzie', 'kiedy', 'warto', 'jest', 'sie',
@@ -384,6 +395,8 @@ const SLUG_STOP = new Set([
   'wybrac', 'zrobic', 'stworzyc', 'tworzenie', 'tworzeniu', 'musi', 'moze', 'trzeba', 'wiedziec', 'zawierac',
   'potrzebuje', 'krok', 'kroku', 'krokow', 'poradnik', 'przewodnik', 'praktyce', 'przyklady', 'przyklad',
   'analiza', 'rozwiazania', 'wymagania', 'wszystko', 'kompletny', 'prawdziwy', 'najlepszy', 'najlepsze',
+  'koszt', 'koszty', 'kosztuje', 'kosztow', 'cena', 'ceny', 'cennik', 'cenowa', 'cenowy', 'kosztach',
+  'warszawa', 'warszawie', 'polsce', 'polska',
   String(new Date().getFullYear()), String(new Date().getFullYear() + 1),
 ]);
 
@@ -402,8 +415,13 @@ function slugStems(slug: string): Set<string> {
 
 // Why a candidate topic must be rejected, or null if it is fresh.
 // Hard rules: exact slug exists; ≥2 topical stems shared with ANY existing
-// post (near-duplicate content); ≥1 stem shared with a post ≤21 days old
-// (same subject back-to-back — the transportowa/transportowa case).
+// post (near-duplicate content); ≥1 stem shared with a post ≤10 days old
+// (same subject back-to-back — the transportowa/transportowa case). The
+// window was 21 days but at 2 posts/day that meant ~40 posts each banning a
+// stem — combined they rejected everything the LLM could think of
+// (2026-08-06: 8/8 rejected, day shipped 0 posts). 10 days still kills
+// back-to-back repeats while leaving the topic space breathable.
+const SAME_SUBJECT_DAYS = 10;
 function topicConflict(candSlug: string, allSlugs: Set<string>, recentDays: Map<string, number>): string | null {
   if (allSlugs.has(candSlug)) return `slug already exists: ${candSlug}`;
   const cand = slugStems(candSlug);
@@ -412,8 +430,12 @@ function topicConflict(candSlug: string, allSlugs: Set<string>, recentDays: Map<
     const shared = [...slugStems(existing)].filter((s) => cand.has(s));
     if (!shared.length) continue;
     if (shared.length >= 2) return `near-duplicate of "${existing}" (shared: ${shared.join(', ')})`;
+    // Every topical stem of the candidate already lives in this post — the
+    // topic adds nothing new, whatever its age ("firma budowlana" a third
+    // time a month later is still the same article).
+    if (shared.length === cand.size) return `adds nothing vs "${existing}" (${shared.join(', ')})`;
     const days = recentDays.get(existing);
-    if (days !== undefined && days <= 21) return `same subject as ${days}d-old "${existing}" (${shared[0]})`;
+    if (days !== undefined && days <= SAME_SUBJECT_DAYS) return `same subject as ${days}d-old "${existing}" (${shared[0]})`;
   }
   return null;
 }
@@ -647,6 +669,10 @@ async function main() {
   // against the full slug corpus. The LLM prompt asks for freshness too, but
   // prompts are advisory; the filter is the guarantee. One re-ask with the
   // rejected topics listed as forbidden if the first round leaves a shortfall.
+  // The prompt carries the FULL slug corpus, not just the recent titles — with
+  // only 60 titles visible the LLM kept re-proposing old favourites ("firma
+  // budowlana" twice in one run on 2026-08-06) and burned both rounds.
+  const corpusForPrompt = [...usedSlugs].sort();
   const topics: any[] = [];
   const rejected: string[] = [];
   for (let round = 1; round <= 2 && topics.length < n; round++) {
@@ -658,7 +684,8 @@ async function main() {
       `Jesteś strategiem SEO polskiego studia web-developmentu BarabashFlow (Dmytrii Barabash, Warszawa; barabashflow.pl; usługi: strony internetowe, platformy/aplikacje webowe, panele CMS, sklepy internetowe). Odpowiadasz WYŁĄCZNIE poprawnym JSON-em.`,
       `Świeże podpowiedzi z Google (co ludzie realnie wpisują dzisiaj):\n${suggestions.slice(0, 90).join('\n')}\n\n` +
       (config.seed_keywords?.length ? `Tematy wskazane przez właściciela (PRIORYTET):\n${config.seed_keywords.join('\n')}\n\n` : '') +
-      `Ostatnie wpisy bloga (NIE powtarzaj tematów):\n${recentTitles.join('\n') || '(brak)'}\n\n` +
+      `WSZYSTKIE istniejące wpisy bloga (każdy slug = opublikowany artykuł; NIE proponuj tematu pokrywającego się z KTÓRYMKOLWIEK z nich):\n${corpusForPrompt.join('\n') || '(brak)'}\n\n` +
+      `Ostatnie wpisy bloga (unikaj też ich kategorii dominującej):\n${recentTitles.slice(0, 15).join('\n') || '(brak)'}\n\n` +
       `Słowa już użyte:\n${recentPicked.slice(0, 60).join(', ') || '(brak)'}\n${bannedBlock}\n` +
       `Wybierz ${askFor} tematów na dzisiejsze wpisy blogowe. Kryteria: intencja komercyjna lub pytanie potencjalnego klienta, długi ogon (mniejsza konkurencja), brak powtórek z ostatnich wpisów.\n\nRÓŻNORODNOŚĆ (najważniejsze kryterium): każdy z dzisiejszych tematów MUSI należeć do INNEJ kategorii intencji, a żaden nie może powtarzać kategorii dominującej w 5 ostatnich wpisach bloga (rozpoznasz ją po tytułach wyżej). Kategorie: (1) cena — "ile kosztuje…"; (2) porównanie — "X czy Y", "co lepsze"; (3) proces — "jak długo trwa", "jak wygląda", "etapy"; (4) wybór wykonawcy — "jak wybrać", "na co uważać"; (5) błędy i checklisty — "najczęstsze błędy", "o czym pamiętać przed…"; (6) technologia prosto wyjaśniona — "co to jest…", "czym różni się…"; (7) SEO i widoczność w Google/AI; (8) strona dla konkretnej branży — "strona internetowa dla <branża>". Tematu o cenie NIE wybieraj, jeśli którykolwiek z 5 ostatnich wpisów był o cenie.\n\n${popularHint}Zwróć JSON:\n` +
       `{"topics":[{"primary_keyword":"...","category":"nazwa kategorii z listy","supporting_keywords":["..."],"slug":"kebab-case-po-polsku-bez-znakow","title_hint":"...","angle":"jedna linia o ujęciu tematu","image_query_en":"2-4 English words for a stock photo"}]}`,
@@ -684,7 +711,60 @@ async function main() {
       topics.push(t);
     }
   }
-  if (!topics.length) throw new Error(`no usable topics from LLM (${rejected.length} rejected as duplicates)`);
+  // 1b) Deterministic fallback — the day must NEVER die on topic selection
+  // (2026-08-06: both LLM rounds produced only duplicates, the script threw
+  // and shipped 0 posts while 318 live Google suggestions sat unused). Walk
+  // the ranked research suggestions, keep the ones that pass the very same
+  // corpus filter, and hand them to the LLM as FIXED topics to structure —
+  // it no longer gets to choose, only to fill in the supporting fields.
+  if (topics.length < n) {
+    const takenStems = () => topics.map((a) => slugStems(slugify(a.slug || a.primary_keyword || '')));
+    const fallbackKw: { kw: string; slug: string }[] = [];
+    for (const sug of suggestions) {
+      if (topics.length + fallbackKw.length >= n) break;
+      if (recentPicked.some((k: string) => String(k).toLowerCase() === sug)) continue;
+      const candSlug = slugify(sug);
+      if (candSlug.length < 12) continue;
+      const cand = slugStems(candSlug);
+      const intra = [...takenStems(), ...fallbackKw.map((f) => slugStems(f.slug))]
+        .some((set) => [...set].some((s) => cand.has(s)));
+      if (intra || topicConflict(candSlug, usedSlugs, recentDays)) continue;
+      fallbackKw.push({ kw: sug, slug: candSlug });
+    }
+    if (fallbackKw.length) {
+      log(`fallback topics from research suggestions: ${fallbackKw.map((f) => `"${f.kw}"`).join(', ')}`);
+      // One best-effort enrichment call; on any failure the raw keyword still
+      // becomes a topic — findCover degrades to generic queries on its own.
+      let enriched: any[] = [];
+      try {
+        const resp = await llmJson(
+          `Jesteś strategiem SEO studia BarabashFlow. Odpowiadasz WYŁĄCZNIE poprawnym JSON-em.`,
+          `Dla KAŻDEJ z poniższych fraz przygotuj wpis blogowy. primary_keyword MUSI być dokładnie podaną frazą (nie zmieniaj jej). Frazy:\n${fallbackKw.map((f) => f.kw).join('\n')}\n\nZwróć JSON:\n{"topics":[{"primary_keyword":"...","category":"...","supporting_keywords":["..."],"slug":"kebab-case-po-polsku-bez-znakow","title_hint":"...","angle":"jedna linia o ujęciu tematu","image_query_en":"2-4 English words for a stock photo"}]}`,
+          0.4,
+          2048,
+          TOPICS_SCHEMA,
+        );
+        enriched = resp?.topics ?? [];
+      } catch (err) {
+        log('fallback enrichment failed — using raw keywords:', String(err));
+      }
+      for (const f of fallbackKw) {
+        const e = enriched.find((t: any) => slugify(String(t?.primary_keyword || '')) === f.slug);
+        topics.push({
+          primary_keyword: f.kw,
+          category: e?.category || 'fallback',
+          supporting_keywords: e?.supporting_keywords || [],
+          // The slug stays OURS (already filter-cleared) — the enrichment call
+          // must not be able to reintroduce a duplicate.
+          slug: f.slug,
+          title_hint: e?.title_hint || '',
+          angle: e?.angle || '',
+          image_query_en: e?.image_query_en || '',
+        });
+      }
+    }
+  }
+  if (!topics.length) throw new Error(`no usable topics from LLM (${rejected.length} rejected as duplicates) and no fresh research suggestions either`);
   if (topics.length < n) log(`warning: only ${topics.length}/${n} fresh topics survived dedup — writing what we have`);
 
   const published: string[] = [];
