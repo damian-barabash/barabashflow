@@ -1,7 +1,9 @@
 ---
 import Base from '../layouts/Base.astro';
+import SiteFooter from '../components/SiteFooter.astro';
 import '../styles/main.css';
-import { restGet } from '../lib/supabase';
+import { restGet, mediaUrl } from '../lib/supabase';
+import { formatDatePl, isoDate, pickExistingSlug, type BlogPost } from '../lib/blog';
 
 // Build-time fetch so crawlers and social/LLM bots see real project names in
 // the static HTML (the interactive graph hydrates on top at runtime). Falls
@@ -10,6 +12,30 @@ import { restGet } from '../lib/supabase';
 const seoProjects = await restGet<{ title_pl: string; category_key: string }>(
   'projects?select=title_pl,category_key&is_published=eq.true&order=sort_order.asc',
 );
+
+// Blog → home internal links (topic cluster). Latest posts for the "from the
+// blog" section + the full slug/title map so services and FAQ can link to a
+// specific article with a descriptive anchor — only when the post exists.
+type PostLink = Pick<BlogPost, 'slug' | 'title_pl' | 'title_en' | 'title_ru' | 'excerpt_pl' | 'excerpt_en' | 'excerpt_ru' | 'cover_path' | 'cover_alt' | 'published_at'>;
+const blogIndex = await restGet<PostLink>(
+  'blog_posts?select=slug,title_pl,title_en,title_ru,excerpt_pl,excerpt_en,excerpt_ru,cover_path,cover_alt,published_at&status=eq.published&order=published_at.desc&limit=500',
+);
+const latestPosts = blogIndex.slice(0, 3);
+const bySlug = new Map(blogIndex.map((p) => [p.slug, p]));
+const slugSet = new Set(bySlug.keys());
+const link = (preferred: string[]): PostLink | null => {
+  const slug = pickExistingSlug(preferred, slugSet);
+  return slug ? bySlug.get(slug) ?? null : null;
+};
+const LINKS = {
+  site: link(['tworzenie-stron-internetowych', 'tworzenie-stron-internetowych-etapy-i-proces', 'strona-internetowa-dla-firmy']),
+  platform: link(['tworzenie-stron-internetowych-od-zero-do-wdrozenia', 'panel-administracyjny-strony-internetowej-co-to-i-jak-dziala']),
+  cms: link(['panel-administracyjny-strony-internetowej-co-to-i-jak-dziala', 'panel-administracyjny-strony-internetowej-co-to-i-jak-z-nim-pracowac']),
+  shop: link(['ile-kosztuje-strona-internetowa-ze-sklepem-rozbicie-kosztow', 'ile-kosztuje-strona-internetowa-sklepu-internetowego-w-2026']),
+  faqPrice: link(['ile-kosztuje-strona-internetowa', 'ile-kosztuje-strona-internetowa-w-2026', 'strona-internetowa-cennik']),
+  faqTime: link(['jak-dlugo-trwa-stworzenie-strony-internetowej', 'tworzenie-stron-internetowych-etapy-i-proces']),
+  faqTech: link(['strona-wizytowka-wordpress-czy-warto-wybrac-cms', 'tworzenie-stron-internetowych-ai-vs-zlecenie-programiscie']),
+};
 
 // Decorative data-viz garnish (deterministic, generated at build):
 // dot-meter columns for the mesh stat tiles + the colored "pulse" dot strip.
@@ -25,7 +51,7 @@ const pulseDots = Array.from({ length: 52 }, () => ({
   dim: rnd() < 0.45,
 }));
 ---
-<Base bodyClass="is-loading">
+<Base bodyClass="is-loading" withFaq={true}>
   <!-- ── Static semantic layer (SEO/GEO) — visually hidden, always in the DOM ── -->
   <section class="sr-only" aria-hidden="false">
     <h2>BarabashFlow — tworzenie stron internetowych i platform</h2>
@@ -56,8 +82,8 @@ const pulseDots = Array.from({ length: 52 }, () => ({
   <div class="app">
     <!-- ── Top bar ── -->
     <header class="topbar">
-      <a class="brand" href="/" aria-label="BarabashFlow">
-        <img class="brand-logo" src="/assets/img/logo.png" alt="" draggable="false" />
+      <a class="brand" href="/" aria-label="BarabashFlow — strona główna">
+        <img class="brand-logo" src="/assets/img/logo.png" alt="Logo BarabashFlow" width="28" height="35" draggable="false" />
         <span class="brand-name">Barabashflow</span>
       </a>
 
@@ -67,6 +93,8 @@ const pulseDots = Array.from({ length: 52 }, () => ({
           <span class="status-text" data-i18n="meta.available">Dostępny</span>
         </span>
         <a class="chip" href="/blog/" data-i18n="nav.blog">Blog</a>
+        <a class="chip" href="/o-mnie/" data-i18n="nav.about">O mnie</a>
+        <a class="chip" href="/kontakt/" data-i18n="nav.contact">Kontakt</a>
         <div class="nav-group lang pill" aria-label="Language switcher"></div>
       </nav>
 
@@ -184,7 +212,7 @@ const pulseDots = Array.from({ length: 52 }, () => ({
     </section>
 
     <!-- ── Services ── -->
-    <section class="services" data-reveal>
+    <section class="services" id="services" data-reveal>
       <div class="section-head">
         <span class="chip kicker" data-i18n="sec.services.kicker">Usługi</span>
         <h2 class="section-title" data-i18n="sec.services.title">Co mogę dla Ciebie zbudować</h2>
@@ -197,6 +225,7 @@ const pulseDots = Array.from({ length: 52 }, () => ({
           </span>
           <h3 class="svc-title" data-i18n="svc.site.t">Strony internetowe</h3>
           <p class="svc-desc" data-i18n="svc.site.d">Szybkie, dopracowane strony firmowe i wizytówki, które ładują się natychmiast i dobrze pozycjonują.</p>
+          {LINKS.site && <span class="svc-link"><span data-i18n="svc.more">Czytaj na blogu:</span> <a href={`/blog/${LINKS.site.slug}/`} data-lm-pl={LINKS.site.title_pl} data-lm-en={LINKS.site.title_en || LINKS.site.title_pl} data-lm-ru={LINKS.site.title_ru || LINKS.site.title_pl}>{LINKS.site.title_pl}</a></span>}
         </article>
         <article class="svc-card">
           <span class="svc-icon" aria-hidden="true">
@@ -204,6 +233,7 @@ const pulseDots = Array.from({ length: 52 }, () => ({
           </span>
           <h3 class="svc-title" data-i18n="svc.platform.t">Platformy i aplikacje</h3>
           <p class="svc-desc" data-i18n="svc.platform.d">Aplikacje webowe na zamówienie: rezerwacje, kalendarze, portale klienta, integracje z API.</p>
+          {LINKS.platform && <span class="svc-link"><span data-i18n="svc.more">Czytaj na blogu:</span> <a href={`/blog/${LINKS.platform.slug}/`} data-lm-pl={LINKS.platform.title_pl} data-lm-en={LINKS.platform.title_en || LINKS.platform.title_pl} data-lm-ru={LINKS.platform.title_ru || LINKS.platform.title_pl}>{LINKS.platform.title_pl}</a></span>}
         </article>
         <article class="svc-card">
           <span class="svc-icon" aria-hidden="true">
@@ -211,6 +241,7 @@ const pulseDots = Array.from({ length: 52 }, () => ({
           </span>
           <h3 class="svc-title" data-i18n="svc.cms.t">Panele CMS i admin</h3>
           <p class="svc-desc" data-i18n="svc.cms.d">Własny panel do edycji treści, zdjęć i zamówień — bez abonamentów i bez WordPressa.</p>
+          {LINKS.cms && <span class="svc-link"><span data-i18n="svc.more">Czytaj na blogu:</span> <a href={`/blog/${LINKS.cms.slug}/`} data-lm-pl={LINKS.cms.title_pl} data-lm-en={LINKS.cms.title_en || LINKS.cms.title_pl} data-lm-ru={LINKS.cms.title_ru || LINKS.cms.title_pl}>{LINKS.cms.title_pl}</a></span>}
         </article>
         <article class="svc-card">
           <span class="svc-icon" aria-hidden="true">
@@ -218,6 +249,7 @@ const pulseDots = Array.from({ length: 52 }, () => ({
           </span>
           <h3 class="svc-title" data-i18n="svc.shop.t">Sklepy internetowe</h3>
           <p class="svc-desc" data-i18n="svc.shop.d">E-commerce z płatnościami, katalogiem i panelem sprzedaży — dopasowany do Twojego produktu.</p>
+          {LINKS.shop && <span class="svc-link"><span data-i18n="svc.more">Czytaj na blogu:</span> <a href={`/blog/${LINKS.shop.slug}/`} data-lm-pl={LINKS.shop.title_pl} data-lm-en={LINKS.shop.title_en || LINKS.shop.title_pl} data-lm-ru={LINKS.shop.title_ru || LINKS.shop.title_pl}>{LINKS.shop.title_pl}</a></span>}
         </article>
       </div>
     </section>
@@ -266,6 +298,7 @@ const pulseDots = Array.from({ length: 52 }, () => ({
             <span class="faq-plus" aria-hidden="true"></span>
           </summary>
           <p data-i18n="faq.1.a">Koszt zależy od zakresu — od prostej strony-wizytówki po rozbudowaną platformę z panelem CMS. Napisz przez formularz, przygotuję wycenę dopasowaną do projektu.</p>
+          {LINKS.faqPrice && <p class="faq-more"><span data-i18n="faq.more">Więcej w artykule:</span> <a href={`/blog/${LINKS.faqPrice.slug}/`} data-lm-pl={LINKS.faqPrice.title_pl} data-lm-en={LINKS.faqPrice.title_en || LINKS.faqPrice.title_pl} data-lm-ru={LINKS.faqPrice.title_ru || LINKS.faqPrice.title_pl}>{LINKS.faqPrice.title_pl}</a></p>}
         </details>
         <details class="faq-item">
           <summary>
@@ -273,6 +306,7 @@ const pulseDots = Array.from({ length: 52 }, () => ({
             <span class="faq-plus" aria-hidden="true"></span>
           </summary>
           <p data-i18n="faq.2.a">Strona-wizytówka to zwykle 1–2 tygodnie, platforma z panelem — od kilku tygodni. Dokładny harmonogram dostajesz razem z wyceną.</p>
+          {LINKS.faqTime && <p class="faq-more"><span data-i18n="faq.more">Więcej w artykule:</span> <a href={`/blog/${LINKS.faqTime.slug}/`} data-lm-pl={LINKS.faqTime.title_pl} data-lm-en={LINKS.faqTime.title_en || LINKS.faqTime.title_pl} data-lm-ru={LINKS.faqTime.title_ru || LINKS.faqTime.title_pl}>{LINKS.faqTime.title_pl}</a></p>}
         </details>
         <details class="faq-item">
           <summary>
@@ -280,9 +314,38 @@ const pulseDots = Array.from({ length: 52 }, () => ({
             <span class="faq-plus" aria-hidden="true"></span>
           </summary>
           <p data-i18n="faq.3.a">Astro, React, Next.js, Supabase, Three.js. Strony są statyczne i wdrażane na GitHub Pages / Cloudflare — dzięki temu ładują się natychmiast.</p>
+          {LINKS.faqTech && <p class="faq-more"><span data-i18n="faq.more">Więcej w artykule:</span> <a href={`/blog/${LINKS.faqTech.slug}/`} data-lm-pl={LINKS.faqTech.title_pl} data-lm-en={LINKS.faqTech.title_en || LINKS.faqTech.title_pl} data-lm-ru={LINKS.faqTech.title_ru || LINKS.faqTech.title_pl}>{LINKS.faqTech.title_pl}</a></p>}
         </details>
       </div>
     </section>
+
+    <!-- ── From the blog (internal links / topic cluster) ── -->
+    {latestPosts.length > 0 && (
+      <section class="home-blog" data-reveal aria-labelledby="home-blog-title">
+        <div class="section-head">
+          <div>
+            <span class="chip kicker" data-i18n="nav.blog">Blog</span>
+            <h2 class="section-title" id="home-blog-title" data-i18n="home.blog.title">Ostatnio na blogu</h2>
+            <p class="section-sub" data-i18n="home.blog.sub">Praktyczne odpowiedzi na pytania, które klienci zadają przed zleceniem strony lub platformy.</p>
+          </div>
+          <a class="ghost-cta" href="/blog/" data-i18n="home.blog.all">Wszystkie wpisy</a>
+        </div>
+        <div class="blog-grid">
+          {latestPosts.map((p) => (
+            <a class="blog-card" href={`/blog/${p.slug}/`}>
+              {p.cover_path
+                ? <img class="blog-card-cover" src={mediaUrl(p.cover_path)} alt={p.cover_alt || p.title_pl} loading="lazy" decoding="async" />
+                : <div class="blog-card-cover is-empty" aria-hidden="true"></div>}
+              <div class="blog-card-body">
+                <time class="blog-card-date" datetime={isoDate(p.published_at)}>{formatDatePl(p.published_at)}</time>
+                <h3 class="blog-card-title" data-lm-pl={p.title_pl} data-lm-en={p.title_en || p.title_pl} data-lm-ru={p.title_ru || p.title_pl}>{p.title_pl}</h3>
+                {p.excerpt_pl && <p class="blog-card-excerpt" data-lm-pl={p.excerpt_pl} data-lm-en={p.excerpt_en || p.excerpt_pl} data-lm-ru={p.excerpt_ru || p.excerpt_pl}>{p.excerpt_pl}</p>}
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
 
     <!-- ── Contact band ── -->
     <section class="contact-band" data-reveal>
@@ -303,12 +366,7 @@ const pulseDots = Array.from({ length: 52 }, () => ({
     </section>
 
     <!-- ── Footer ── -->
-    <footer class="footer">
-      <span class="footer-item strong">Barabashflow · MMXXVI</span>
-      <a class="footer-item" href="/blog/" data-i18n="nav.blog">Blog</a>
-      <span class="footer-item" data-i18n="meta.location">Warszawa → Świat</span>
-      <a class="footer-item" href="mailto:office@barabashflow.pl">office@barabashflow.pl</a>
-    </footer>
+    <SiteFooter />
   </div>
 
   <!-- ── Project modal ── -->
@@ -393,28 +451,16 @@ const pulseDots = Array.from({ length: 52 }, () => ({
           <div class="modal-cat">Polityka cookies</div>
           <h2 class="modal-title">Pliki cookie i dane lokalne</h2>
           <div class="cookie-policy-body">
-            <p>BarabashFlow szanuje Twoją prywatność. Strona używa wyłącznie <strong>kukisów przeglądarki</strong> (mechanizm pamięci lokalnej) — żadnych ciasteczek śledzących, żadnych zewnętrznych skryptów analitycznych, żadnych third-party.</p>
+            <p>BarabashFlow szanuje Twoją prywatność. Strona używa wyłącznie <strong>pamięci lokalnej przeglądarki</strong> — żadnych ciasteczek śledzących, żadnych zewnętrznych skryptów analitycznych, żadnych third-party.</p>
             <h4>Co zapamiętujemy</h4>
             <ul>
               <li>motyw (jasny / ciemny) — <code>bf:theme</code></li>
               <li>język interfejsu (PL / EN / RU) — <code>bf:locale</code></li>
               <li>Twoją zgodę na ten dialog — <code>bf:cookies-accepted</code></li>
               <li>zamknięcie okienka maskotki w bieżącej sesji — <code>bf:mascot-dismissed</code></li>
-              <li>anonimowy licznik odwiedzin (bez plików cookie, bez identyfikacji) — <code>bf:sess</code></li>
+              <li>anonimowy licznik odwiedzin (bez identyfikacji) — <code>bf:sess</code></li>
             </ul>
-            <h4>Czego NIE używamy</h4>
-            <ul>
-              <li>Google Analytics, Facebook Pixel, Hotjar ani innych narzędzi analitycznych zewnętrznych firm.</li>
-              <li>Kukisów reklamowych.</li>
-              <li>Kukisów śledzących między stronami.</li>
-              <li>Nie sprzedajemy, nie wymieniamy ani nie udostępniamy Twoich danych nikomu.</li>
-            </ul>
-            <h4>Twoje wiadomości</h4>
-            <p>Gdy wyślesz wiadomość przez formularz kontaktowy lub okienko maskotki, Twój adres e-mail i treść trafiają wyłącznie do skrzynki właściciela strony, w celu odpowiedzi na zapytanie. Dane przechowywane są w bazie Supabase z restrykcyjnymi politykami RLS — czyta je tylko właściciel.</p>
-            <h4>Jak wyczyścić zapisane dane</h4>
-            <p>W każdej chwili możesz wyczyścić kukisy w ustawieniach swojej przeglądarki. Strona nadal będzie działać — po prostu zapomni Twoje preferencje motywu i języka. Ten dialog zgody pojawi się ponownie.</p>
-            <h4>Kontakt</h4>
-            <p>W razie pytań lub żądań związanych z danymi — formularz kontaktowy na stronie głównej lub adres e-mail właściciela.</p>
+            <p>Bez Google Analytics, pikseli reklamowych i śledzenia między stronami. Wiadomości z formularza trafiają wyłącznie do właściciela strony. Pełna treść: <a href="/polityka-prywatnosci/">Polityka prywatności</a>.</p>
           </div>
           <div class="modal-actions">
             <button type="button" class="btn primary" data-close-modal>Rozumiem</button>
@@ -432,7 +478,7 @@ const pulseDots = Array.from({ length: 52 }, () => ({
       </button>
       <div class="mascot-row">
         <div class="mascot-avatar">
-          <img src="/assets/img/maskot.png" alt="" draggable="false" />
+          <img src="/assets/img/maskot.png" alt="Maskotka BarabashFlow" width="266" height="266" draggable="false" />
         </div>
         <div class="mascot-body">
           <div class="mascot-stage" data-stage="ask">

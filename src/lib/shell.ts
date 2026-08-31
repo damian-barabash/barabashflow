@@ -4,6 +4,7 @@
 import { getTheme, toggleTheme, onThemeChange } from './theme';
 import { LOCALES, getLocale, setLocale, onLocaleChange, applyDom, type Locale } from './i18n';
 import { restInsert } from './supabase';
+import { t } from './i18n';
 
 export function mountShell() {
   applyDom();
@@ -13,6 +14,7 @@ export function mountShell() {
   setupTopbarMorph();
   setupBurger();
   setupSmoothScroll();
+  bindContactPageForm();
   trackPageView();
 }
 
@@ -176,17 +178,41 @@ function bindLangSwitcher() {
 // .post-body[data-locale] blocks) and swapped client-side.
 function applyBlogLocale() {
   const loc = getLocale();
-  const key = ('lm' + loc[0].toUpperCase() + loc.slice(1)) as 'lmPl' | 'lmEn' | 'lmRu';
-
-  document.querySelectorAll<HTMLElement>('[data-lm-pl]').forEach((el) => {
-    const v = el.dataset[key] || el.dataset.lmPl;
-    if (v) el.textContent = v;
-  });
-
+  // data-lm-* text swaps live in i18n.applyDom (shared with the home page).
   const bodies = document.querySelectorAll<HTMLElement>('.post-body[data-locale]');
   if (bodies.length) {
     const has = [...bodies].some((el) => el.dataset.locale === loc && el.innerHTML.trim());
     const show = has ? loc : 'pl';
     bodies.forEach((el) => { el.hidden = el.dataset.locale !== show; });
   }
+}
+
+// Static /kontakt/ page form → contact_submissions (same table + RLS as the
+// home-page modal; source distinguishes the origin in the admin inbox).
+export function bindContactPageForm() {
+  const form = document.getElementById('contact-page-form') as HTMLFormElement | null;
+  if (!form) return;
+  const status = form.querySelector<HTMLElement>('.form-status');
+  const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const name = String(fd.get('name') || '').trim();
+    const email = String(fd.get('email') || '').trim();
+    const message = String(fd.get('message') || '').trim();
+    if (!name || !email || !message) {
+      if (status) status.textContent = t('contact.required');
+      return;
+    }
+    if (submit) submit.disabled = true;
+    if (status) status.textContent = t('contact.sending');
+    const { error } = await restInsert('contact_submissions', { name, email, message, source: 'kontakt-page' });
+    if (submit) submit.disabled = false;
+    if (error) {
+      if (status) status.textContent = t('contact.error');
+      return;
+    }
+    form.reset();
+    if (status) status.textContent = t('contact.success');
+  });
 }

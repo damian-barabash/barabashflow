@@ -1,36 +1,49 @@
 ---
 import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
 import '../../styles/main.css';
 import { mediaUrl } from '../../lib/supabase';
-import { fetchAllPosts, formatDatePl, renderMarkdown, type BlogPost } from '../../lib/blog';
+import {
+  fetchAllPosts, formatDatePl, isoDate, wasUpdated, relatedPosts, renderMarkdown, type BlogPost,
+} from '../../lib/blog';
+import { SITE, AUTHOR_NAME, PERSON_ID, ORG_ID } from '../../lib/site';
 
 export async function getStaticPaths() {
   const posts = await fetchAllPosts();
-  return posts.map((post) => ({ params: { slug: post.slug }, props: { post } }));
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: { post, related: relatedPosts(post, posts, 3) },
+  }));
 }
 
-const { post } = Astro.props as { post: BlogPost };
-const site = 'https://barabashflow.pl';
+const { post, related } = Astro.props as { post: BlogPost; related: BlogPost[] };
+const site = SITE;
 const url = `${site}/blog/${post.slug}/`;
 const coverUrl = post.cover_path ? mediaUrl(post.cover_path) : `${site}/assets/img/og.png`;
 const bodyHtml = renderMarkdown(post.body_pl);
-const title = `${post.title_pl} — Blog BarabashFlow`;
+// Keep <title> near the 60-char budget: brand suffix only when there is room.
+const title = post.title_pl.length > 42 ? post.title_pl : `${post.title_pl} | Blog BarabashFlow`;
 const description = post.excerpt_pl || post.title_pl;
 const faq = Array.isArray(post.faq) ? post.faq.filter((f) => f?.q && f?.a) : [];
+const updated = wasUpdated(post);
+const modified = updated ? post.updated_at! : post.published_at;
 
 const postLd = {
   '@context': 'https://schema.org',
   '@type': 'BlogPosting',
+  '@id': `${url}#article`,
   headline: post.title_pl,
   description,
   image: coverUrl,
   url,
   datePublished: post.published_at,
-  dateModified: post.published_at,
+  dateModified: modified,
   inLanguage: 'pl',
   keywords: (post.keywords || []).join(', '),
-  author: { '@type': 'Person', name: 'Dmytrii Barabash', url: site },
-  publisher: { '@type': 'Organization', name: 'BarabashFlow', url: site },
+  author: { '@id': PERSON_ID },
+  publisher: { '@id': ORG_ID },
+  isPartOf: { '@id': `${site}/blog/#blog` },
   mainEntityOfPage: { '@type': 'WebPage', '@id': url },
 };
 const crumbsLd = {
@@ -53,39 +66,11 @@ const faqLd = faq.length
       })),
     }
   : null;
+const jsonLd = [postLd, crumbsLd, ...(faqLd ? [faqLd] : [])];
 ---
-<Base title={title} description={description}>
-  <script type="application/ld+json" set:html={JSON.stringify(postLd)} />
-  <script type="application/ld+json" set:html={JSON.stringify(crumbsLd)} />
-  {faqLd && <script type="application/ld+json" set:html={JSON.stringify(faqLd)} />}
-
+<Base title={title} description={description} ogType="article" ogImage={coverUrl!} jsonLd={jsonLd}>
   <div class="app">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="BarabashFlow">
-        <img class="brand-logo" src="/assets/img/logo.png" alt="" draggable="false" />
-        <span class="brand-name">Barabashflow</span>
-      </a>
-      <nav class="nav" aria-label="Site navigation">
-        <a class="chip" href="/" data-i18n="nav.home">Strona główna</a>
-        <a class="chip" href="/blog/">Blog</a>
-        <div class="nav-group lang pill" aria-label="Language switcher"></div>
-      </nav>
-
-      <div class="nav-tools">
-        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme" title="Theme">
-          <svg viewBox="0 0 20 20" fill="none" id="theme-icon" aria-hidden="true">
-            <path d="M14.5 11.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <button class="icon-btn nav-burger" id="nav-burger" type="button" aria-label="Menu" aria-expanded="false">
-          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path class="burger-l1" d="M4 6.6h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path class="burger-l2" d="M4 10h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path class="burger-l3" d="M4 13.4h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </div>
-    </header>
+    <SiteHeader active="blog" />
 
     <article class="post">
       <nav class="post-crumbs" aria-label="Breadcrumb">
@@ -94,7 +79,6 @@ const faqLd = faq.length
 
       <header class="post-head">
         <div class="hero-chips">
-          <span class="chip">{formatDatePl(post.published_at)}</span>
           {(post.tags || []).slice(0, 4).map((t) => <span class="chip chip-xs">{t}</span>)}
         </div>
         <h1
@@ -111,6 +95,17 @@ const faqLd = faq.length
             data-lm-ru={post.excerpt_ru || post.excerpt_pl}
           >{post.excerpt_pl}</p>
         )}
+        <p class="post-byline">
+          <span><span data-i18n="blog.by">Autor</span>: <a href="/o-mnie/" rel="author">{AUTHOR_NAME}</a></span>
+          <span aria-hidden="true">·</span>
+          <span><span data-i18n="blog.published">Opublikowano</span> <time datetime={isoDate(post.published_at)}>{formatDatePl(post.published_at)}</time></span>
+          {updated && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span><span data-i18n="blog.updated">Aktualizacja</span> <time datetime={isoDate(post.updated_at)}>{formatDatePl(post.updated_at!)}</time></span>
+            </>
+          )}
+        </p>
       </header>
 
       {post.cover_path && (
@@ -145,25 +140,38 @@ const faqLd = faq.length
       )}
 
       <aside class="author-box">
-        <img class="author-logo" src="/assets/img/logo.png" alt="" aria-hidden="true" />
+        <img class="author-logo" src="/assets/img/logo.png" alt="Logo BarabashFlow" width="40" height="49" />
         <div class="author-text">
-          <strong>Dmytrii Barabash — BarabashFlow</strong>
+          <strong><a href="/o-mnie/" rel="author">{AUTHOR_NAME}</a> — BarabashFlow</strong>
           <p data-i18n="blog.author">Projektuję i wdrażam strony internetowe, platformy i aplikacje webowe dla firm. Warszawa → cały świat.</p>
+          <a class="author-more" href="/o-mnie/" data-i18n="blog.author.link">Więcej o autorze →</a>
         </div>
-        <a class="cta cta-lime" href="/#works">
+        <a class="cta cta-lime" href="/kontakt/">
           <span class="cta-label">Zlecić projekt</span>
           <svg class="cta-arrow" viewBox="0 0 14 14" fill="none" aria-hidden="true">
             <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </a>
       </aside>
+
+      {related.length > 0 && (
+        <section class="related" aria-labelledby="related-title">
+          <h2 class="section-title" id="related-title" data-i18n="blog.related">Czytaj także</h2>
+          <ul class="related-list">
+            {related.map((r) => (
+              <li>
+                <a class="related-card" href={`/blog/${r.slug}/`}>
+                  <time class="blog-card-date" datetime={isoDate(r.published_at)}>{formatDatePl(r.published_at)}</time>
+                  <strong data-lm-pl={r.title_pl} data-lm-en={r.title_en || r.title_pl} data-lm-ru={r.title_ru || r.title_pl}>{r.title_pl}</strong>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </article>
 
-    <footer class="footer">
-      <span class="footer-item strong">Barabashflow · MMXXVI</span>
-      <a class="footer-item" href="/blog/" data-i18n="blog.all">← Wszystkie wpisy</a>
-      <a class="footer-item" href="mailto:office@barabashflow.pl">office@barabashflow.pl</a>
-    </footer>
+    <SiteFooter />
   </div>
 
   <script>

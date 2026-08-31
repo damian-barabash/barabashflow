@@ -1,0 +1,105 @@
+---
+// Author / about page — the E-E-A-T anchor: who writes the blog and builds
+// the projects, how they work, editorial policy for the blog, public profiles.
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import '../styles/main.css';
+import { restGet } from '../lib/supabase';
+import { SITE, AUTHOR_NAME, EMAIL, PERSON_ID, SOCIAL } from '../lib/site';
+
+const title = 'O mnie — Dmytrii Barabash, web developer | BarabashFlow';
+const description =
+  'Dmytrii Barabash — web developer z Warszawy, założyciel BarabashFlow. Strony, platformy i aplikacje webowe dla firm: jak pracuję, technologie, zasady bloga.';
+
+const STACK = ['Astro', 'React', 'Next.js', 'TypeScript', 'Supabase', 'PostgreSQL', 'Three.js', 'Flutter', 'GitHub Pages', 'Cloudflare', 'Resend'];
+
+const seoProjects = await restGet<{ title_pl: string }>(
+  'projects?select=title_pl&is_published=eq.true&order=sort_order.asc',
+);
+
+const profileLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ProfilePage',
+  '@id': `${SITE}/o-mnie/#profile`,
+  url: `${SITE}/o-mnie/`,
+  name: title,
+  description,
+  inLanguage: 'pl',
+  mainEntity: { '@id': PERSON_ID },
+};
+const crumbsLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'BarabashFlow', item: SITE + '/' },
+    { '@type': 'ListItem', position: 2, name: 'O mnie', item: SITE + '/o-mnie/' },
+  ],
+};
+---
+<Base title={title} description={description} ogType="profile" jsonLd={[profileLd, crumbsLd]}>
+  <div class="app">
+    <SiteHeader active="about" />
+
+    <main class="page">
+      <nav class="post-crumbs" aria-label="Breadcrumb">
+        <a href="/">BarabashFlow</a><span>/</span><span data-i18n="nav.about">O mnie</span>
+      </nav>
+      <header class="page-head">
+        <div class="hero-chips">
+          <span class="chip kicker" data-i18n="about.kicker">O mnie</span>
+          <span class="chip" data-i18n="meta.location">Warszawa → Świat</span>
+          <span class="chip chip-lime">PL · EN · RU</span>
+        </div>
+        <h1 class="page-title" data-i18n="about.title">Dmytrii Barabash — web developer i założyciel BarabashFlow</h1>
+        <p class="hero-sub" data-i18n="about.lead">Projektuję i buduję strony internetowe, platformy i aplikacje webowe dla firm. Pracuję z Warszawy, dla klientów z Polski i zagranicy — po polsku, angielsku i rosyjsku.</p>
+      </header>
+
+      <div class="prose">
+        <h2 data-i18n="about.h.what">Czym się zajmuję</h2>
+        <p data-i18n="about.p.what">Całym procesem — od briefu i wyceny, przez projekt graficzny i kod, po wdrożenie na domenie i opiekę po starcie. Nie używam gotowych szablonów: każdy projekt to kod pisany pod konkretną firmę, jej klientów i cele. Zrealizowane projekty zobaczysz na mapie na stronie głównej.</p>
+        <p><a href="/#works">Mapa zrealizowanych projektów</a> · <a href="/#services">Usługi: strony, platformy, panele CMS, sklepy</a></p>
+        {seoProjects.length > 0 && (
+          <ul>
+            {seoProjects.map((p) => <li>{p.title_pl}</li>)}
+          </ul>
+        )}
+
+        <h2 data-i18n="about.h.how">Jak pracuję</h2>
+        <p data-i18n="about.p.how">Szybko i przejrzyście. Na brief odpowiadam w 24 godziny z planem i konkretną wyceną. Postęp widzisz na żywo i zgłaszasz uwagi na bieżąco. Strony buduję jako statyczne (Astro, React, Next.js) z backendem Supabase — ładują się natychmiast i dobrze pozycjonują w Google.</p>
+
+        <h2 data-i18n="about.h.stack">Technologie</h2>
+        <div class="stack-chips">
+          {STACK.map((s) => <span class="chip">{s}</span>)}
+        </div>
+
+        <h2 data-i18n="about.h.editorial">Zasady redakcyjne bloga</h2>
+        <p data-i18n="about.p.editorial">Wpisy na blogu odpowiadają na realne pytania, które klienci zadają przed zleceniem strony — tematy wybieram na podstawie wyszukiwań w Google i rozmów z klientami. Nie wymyślam statystyk ani opinii klientów, podaję realne widełki cenowe, a starsze artykuły aktualizuję, gdy zmieniają się ceny lub technologie (data aktualizacji jest widoczna przy każdym wpisie). Blog nie zawiera reklam ani linków afiliacyjnych. Zdjęcia pochodzą z bibliotek na licencjach Creative Commons, z podaniem autora.</p>
+        <p><a href="/blog/">Blog o stronach internetowych, platformach i SEO</a></p>
+
+        <h2 data-i18n="about.h.contact">Kontakt</h2>
+        <p data-i18n="about.p.contact">Najszybciej przez formularz lub e-mail. Odpowiadam w ciągu 24 godzin w dni robocze.</p>
+        <p>
+          <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
+          {SOCIAL.map((s) => <> · <a href={s.url} rel="me noopener" target="_blank">{s.label} ↗</a></>)}
+        </p>
+        <div class="page-actions">
+          <a class="cta cta-lime" href="/kontakt/">
+            <span class="cta-label" data-i18n="about.cta">Napisz do mnie</span>
+            <svg class="cta-arrow" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+          <a class="ghost-cta" href="/polityka-prywatnosci/" data-i18n="nav.privacy">Polityka prywatności</a>
+        </div>
+      </div>
+    </main>
+
+    <SiteFooter />
+  </div>
+
+  <script>
+    import { mountShell } from '../lib/shell';
+    mountShell();
+  </script>
+</Base>

@@ -1,0 +1,106 @@
+---
+// Dedicated contact page: e-mail, location, response time + a static form
+// (same contact_submissions table as the home modal, source='kontakt-page').
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import '../styles/main.css';
+import { SITE, EMAIL, ORG_ID } from '../lib/site';
+
+const title = 'Kontakt — wycena strony lub platformy | BarabashFlow';
+const description =
+  'Skontaktuj się z BarabashFlow: formularz, e-mail office@barabashflow.pl, Warszawa. Odpowiedź z planem i wyceną strony, platformy lub sklepu w ciągu 24 godzin.';
+
+const contactLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ContactPage',
+  '@id': `${SITE}/kontakt/#contact`,
+  url: `${SITE}/kontakt/`,
+  name: title,
+  description,
+  inLanguage: 'pl',
+  about: { '@id': ORG_ID },
+};
+const crumbsLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'BarabashFlow', item: SITE + '/' },
+    { '@type': 'ListItem', position: 2, name: 'Kontakt', item: SITE + '/kontakt/' },
+  ],
+};
+---
+<Base title={title} description={description} jsonLd={[contactLd, crumbsLd]}>
+  <div class="app">
+    <SiteHeader active="contact" />
+
+    <main class="page">
+      <nav class="post-crumbs" aria-label="Breadcrumb">
+        <a href="/">BarabashFlow</a><span>/</span><span data-i18n="nav.contact">Kontakt</span>
+      </nav>
+      <header class="page-head">
+        <div class="hero-chips">
+          <span class="chip kicker" data-i18n="contact.kicker">Kontakt</span>
+          <span class="chip"><span class="status-dot" aria-hidden="true"></span> <span data-i18n="meta.available">Dostępny</span></span>
+        </div>
+        <h1 class="page-title" data-i18n="contact.page.title">Porozmawiajmy o Twoim projekcie</h1>
+        <p class="hero-sub" data-i18n="contact.page.lead">Opisz pomysł w kilku zdaniach — w ciągu 24 godzin odpiszę z planem, zakresem i wyceną. Strona, platforma, sklep czy panel: zaczynamy od rozmowy.</p>
+      </header>
+
+      <div class="contact-grid">
+        <dl class="contact-facts">
+          <div class="contact-fact">
+            <dt data-i18n="contact.page.email">E-mail</dt>
+            <dd><a href={`mailto:${EMAIL}`}>{EMAIL}</a></dd>
+          </div>
+          <div class="contact-fact">
+            <dt data-i18n="contact.page.location">Lokalizacja</dt>
+            <dd data-i18n="contact.page.location.v">Warszawa, Polska — praca zdalna dla klientów z całego świata</dd>
+          </div>
+          <div class="contact-fact">
+            <dt data-i18n="contact.page.reply">Czas odpowiedzi</dt>
+            <dd data-i18n="contact.page.reply.v">do 24 godzin w dni robocze</dd>
+          </div>
+          <div class="contact-fact">
+            <dt data-i18n="contact.page.langs">Języki</dt>
+            <dd>Polski · English · Русский</dd>
+          </div>
+          <div class="contact-fact">
+            <dt>Dmytrii Barabash</dt>
+            <dd><a href="/o-mnie/" data-i18n="blog.author.link">Więcej o autorze →</a></dd>
+          </div>
+        </dl>
+
+        <div class="contact-form-card">
+          <h2 data-i18n="contact.page.form">Formularz kontaktowy</h2>
+          <form class="form" id="contact-page-form" autocomplete="on" novalidate>
+            <div class="field">
+              <label for="cp-name" data-i18n="contact.name">Imię</label>
+              <input id="cp-name" name="name" type="text" required maxlength="120" autocomplete="name" />
+            </div>
+            <div class="field">
+              <label for="cp-email" data-i18n="contact.email">E-mail</label>
+              <input id="cp-email" name="email" type="email" required maxlength="160" autocomplete="email" />
+            </div>
+            <div class="field">
+              <label for="cp-msg" data-i18n="contact.message">Wiadomość</label>
+              <textarea id="cp-msg" name="message" required maxlength="4000" rows="5"></textarea>
+            </div>
+            <div class="form-status" aria-live="polite"></div>
+            <div class="modal-actions">
+              <button type="submit" class="btn primary" data-i18n="contact.submit">Wyślij wiadomość</button>
+            </div>
+            <p class="form-consent"><span data-i18n="contact.consent">Wysyłając wiadomość, akceptujesz politykę prywatności.</span> <a href="/polityka-prywatnosci/" data-i18n="nav.privacy">Polityka prywatności</a></p>
+          </form>
+        </div>
+      </div>
+    </main>
+
+    <SiteFooter />
+  </div>
+
+  <script>
+    import { mountShell } from '../lib/shell';
+    mountShell();
+  </script>
+</Base>

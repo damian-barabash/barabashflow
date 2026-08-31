@@ -22,10 +22,11 @@ export interface BlogPost {
   keywords: string[];
   faq: { q: string; a: string }[];
   published_at: string;
+  updated_at?: string | null;
 }
 
 const LIST_FIELDS =
-  'slug,title_pl,title_en,title_ru,excerpt_pl,excerpt_en,excerpt_ru,cover_path,cover_alt,tags,published_at';
+  'slug,title_pl,title_en,title_ru,excerpt_pl,excerpt_en,excerpt_ru,cover_path,cover_alt,tags,published_at,updated_at';
 
 // Strict fetch: THROWS on any failure so the whole build goes red. The public
 // graph uses the forgiving restGet (page still renders without data), but for
@@ -76,4 +77,48 @@ export function escapeXml(s: string): string {
   return String(s ?? '').replace(/[<>&'"]/g, (c) =>
     ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]!),
   );
+}
+
+// ISO date (YYYY-MM-DD) for <time datetime> — never the raw timestamp.
+export function isoDate(iso?: string | null): string {
+  return String(iso ?? '').slice(0, 10);
+}
+
+// True when the post was materially edited after publication (the DB trigger
+// only bumps updated_at on content changes; anything within the same day as
+// publication is not a real "update" worth showing).
+export function wasUpdated(post: Pick<BlogPost, 'published_at' | 'updated_at'>): boolean {
+  if (!post.updated_at) return false;
+  const pub = new Date(post.published_at).getTime();
+  const upd = new Date(post.updated_at).getTime();
+  return Number.isFinite(pub) && Number.isFinite(upd) && upd - pub > 24 * 3600 * 1000;
+}
+
+// Related posts by tag overlap (case-insensitive), most recent first on ties;
+// falls back to the latest posts so every article gets a cluster section.
+export function relatedPosts(post: BlogPost, all: BlogPost[], n = 3): BlogPost[] {
+  const norm = (t: string) => String(t ?? '').trim().toLowerCase();
+  const mine = new Set((post.tags || []).map(norm).filter(Boolean));
+  const scored = all
+    .filter((p) => p.slug !== post.slug)
+    .map((p) => ({
+      p,
+      score: (p.tags || []).map(norm).filter((t) => mine.has(t)).length,
+      ts: new Date(p.published_at).getTime() || 0,
+    }))
+    .sort((a, b) => b.score - a.score || b.ts - a.ts);
+  const picked = scored.filter((x) => x.score > 0).slice(0, n).map((x) => x.p);
+  for (const x of scored) {
+    if (picked.length >= n) break;
+    if (!picked.includes(x.p)) picked.push(x.p);
+  }
+  return picked;
+}
+
+// First slug from `preferred` that actually exists in the published corpus —
+// lets static pages link into the blog without ever producing a 404 when a
+// post gets hidden or renamed.
+export function pickExistingSlug(preferred: string[], slugs: Set<string>): string | null {
+  for (const s of preferred) if (slugs.has(s)) return s;
+  return null;
 }

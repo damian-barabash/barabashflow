@@ -1,0 +1,40 @@
+---
+// Shared topbar for the non-graph pages (blog, about, contact, privacy).
+// The home page keeps its own header (status pill + contact modal button).
+export interface Props {
+  active?: 'home' | 'blog' | 'about' | 'contact' | 'privacy';
+}
+const { active = 'home' } = Astro.props;
+const item = (key: Props['active'], href: string, label: string, i18n: string) =>
+  active === key
+    ? `<span class="chip chip-lime" aria-current="page" data-i18n="${i18n}">${label}</span>`
+    : `<a class="chip" href="${href}" data-i18n="${i18n}">${label}</a>`;
+---
+<header class="topbar">
+  <a class="brand" href="/" aria-label="BarabashFlow — strona główna">
+    <img class="brand-logo" src="/assets/img/logo.png" alt="Logo BarabashFlow" width="28" height="35" draggable="false" />
+    <span class="brand-name">Barabashflow</span>
+  </a>
+  <nav class="nav" aria-label="Site navigation">
+    <Fragment set:html={item('home', '/', 'Strona główna', 'nav.home')} />
+    <Fragment set:html={item('blog', '/blog/', 'Blog', 'nav.blog')} />
+    <Fragment set:html={item('about', '/o-mnie/', 'O mnie', 'nav.about')} />
+    <Fragment set:html={item('contact', '/kontakt/', 'Kontakt', 'nav.contact')} />
+    <div class="nav-group lang pill" aria-label="Language switcher"></div>
+  </nav>
+
+  <div class="nav-tools">
+    <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme" title="Theme">
+      <svg viewBox="0 0 20 20" fill="none" id="theme-icon" aria-hidden="true">
+        <path d="M14.5 11.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <button class="icon-btn nav-burger" id="nav-burger" type="button" aria-label="Menu" aria-expanded="false">
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path class="burger-l1" d="M4 6.6h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path class="burger-l2" d="M4 10h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path class="burger-l3" d="M4 13.4h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+</header>

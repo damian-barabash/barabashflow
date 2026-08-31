@@ -1,51 +1,51 @@
 ---
 // Shared <head> for public pages. Carries the full SEO/GEO layer from the
 // approved seo-plan: canonical, robots, Open Graph, hreflang, JSON-LD.
+// Identity (author / publisher / sameAs) comes from lib/site.ts.
+import { SITE, SITE_NAME, personLd, organizationLd } from '../lib/site';
+
 export interface Props {
   title?: string;
   description?: string;
   noindex?: boolean;
   bodyClass?: string;
+  ogType?: 'website' | 'article' | 'profile';
+  ogImage?: string;
+  // Page-level JSON-LD objects (already carrying @context) rendered in <head>.
+  jsonLd?: Record<string, unknown>[];
+  // Home page only: the FAQPage graph belongs to the page that shows the FAQ.
+  withFaq?: boolean;
 }
 const {
-  title = 'BarabashFlow — Dmytrii Barabash | tworzenie stron internetowych i platform',
-  description = 'BarabashFlow — studio Dmytrija Barabasha. Tworzenie nowoczesnych stron internetowych, platform i aplikacji webowych. Websites & internet platforms. Разработка сайтов и платформ.',
+  title = 'BarabashFlow — tworzenie stron internetowych i platform',
+  description = 'Studio Dmytrija Barabasha z Warszawy: tworzenie stron internetowych, platform i aplikacji webowych dla firm. Kod na miarę, wycena projektu w 24 h.',
   noindex = false,
   bodyClass = '',
+  ogType = 'website',
+  ogImage = `${SITE}/assets/img/og.png`,
+  jsonLd = [],
+  withFaq = false,
 } = Astro.props;
 
-const site = 'https://barabashflow.pl';
+const site = SITE;
 const canonical = new URL(Astro.url.pathname, site).href;
-const ogImage = `${site}/assets/img/og.png`;
 
-const personLd = {
+// Person + Organization/ProfessionalService + WebSite as one graph, so the
+// author entity is the same @id on every page (home, blog posts, about).
+const siteGraphLd = {
   '@context': 'https://schema.org',
-  '@type': 'Person',
-  name: 'Dmytrii Barabash',
-  url: site,
-  jobTitle: 'Web Developer',
-  knowsAbout: ['Web development', 'Next.js', 'Astro', 'Supabase', 'React', 'Three.js', 'UI/UX'],
-  worksFor: { '@type': 'Organization', name: 'BarabashFlow' },
-  address: { '@type': 'PostalAddress', addressLocality: 'Warszawa', addressCountry: 'PL' },
-};
-const serviceLd = {
-  '@context': 'https://schema.org',
-  '@type': 'ProfessionalService',
-  name: 'BarabashFlow',
-  url: site,
-  image: ogImage,
-  description,
-  areaServed: 'PL',
-  serviceType: ['Tworzenie stron internetowych', 'Platformy internetowe', 'Aplikacje webowe', 'Sklepy internetowe'],
-  founder: { '@type': 'Person', name: 'Dmytrii Barabash' },
-  address: { '@type': 'PostalAddress', addressLocality: 'Warszawa', addressCountry: 'PL' },
-};
-const websiteLd = {
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: 'BarabashFlow',
-  url: site,
-  inLanguage: ['pl', 'en', 'ru'],
+  '@graph': [
+    personLd,
+    { ...organizationLd, description },
+    {
+      '@type': 'WebSite',
+      '@id': `${site}/#website`,
+      name: SITE_NAME,
+      url: site,
+      inLanguage: ['pl', 'en', 'ru'],
+      publisher: { '@id': organizationLd['@id'] },
+    },
+  ],
 };
 const faqLd = {
   '@context': 'https://schema.org',
@@ -91,13 +91,13 @@ const faqLd = {
   <link rel="apple-touch-icon" href="/assets/img/logo.png" />
 
   <!-- hreflang: single-URL strategy (Variant A) — PL indexed, EN/RU same URL. -->
-  <link rel="alternate" hreflang="pl" href={site + '/'} />
-  <link rel="alternate" hreflang="en" href={site + '/'} />
-  <link rel="alternate" hreflang="ru" href={site + '/'} />
-  <link rel="alternate" hreflang="x-default" href={site + '/'} />
+  <link rel="alternate" hreflang="pl" href={canonical} />
+  <link rel="alternate" hreflang="en" href={canonical} />
+  <link rel="alternate" hreflang="ru" href={canonical} />
+  <link rel="alternate" hreflang="x-default" href={canonical} />
 
   <!-- Open Graph -->
-  <meta property="og:type" content="website" />
+  <meta property="og:type" content={ogType} />
   <meta property="og:site_name" content="BarabashFlow" />
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
@@ -120,10 +120,9 @@ const faqLd = {
   />
 
   {!noindex && <>
-    <script type="application/ld+json" set:html={JSON.stringify(personLd)} />
-    <script type="application/ld+json" set:html={JSON.stringify(serviceLd)} />
-    <script type="application/ld+json" set:html={JSON.stringify(websiteLd)} />
-    <script type="application/ld+json" set:html={JSON.stringify(faqLd)} />
+    <script type="application/ld+json" set:html={JSON.stringify(siteGraphLd)} />
+    {withFaq && <script type="application/ld+json" set:html={JSON.stringify(faqLd)} />}
+    {jsonLd.map((ld) => <script type="application/ld+json" set:html={JSON.stringify(ld)} />)}
   </>}
 
   <!-- Anti-FOUC: apply saved theme + locale before first paint. -->

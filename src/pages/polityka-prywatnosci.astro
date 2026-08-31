@@ -1,0 +1,95 @@
+---
+// Privacy policy (PL). Mirrors what the site actually does: local-storage
+// preferences only, first-party cookie-less page views, contact-form data in
+// Supabase read by the owner, outbound e-mail via Resend. No third parties.
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import '../styles/main.css';
+import { SITE, AUTHOR_NAME, EMAIL, ORG_ID } from '../lib/site';
+
+const title = 'Polityka prywatności | BarabashFlow';
+const description =
+  'Polityka prywatności barabashflow.pl: jakie dane zbiera strona, jak długo je przechowuje i jakie masz prawa. Bez śledzenia i zewnętrznych skryptów.';
+const UPDATED = '2026-08-31';
+
+const pageLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  '@id': `${SITE}/polityka-prywatnosci/#page`,
+  url: `${SITE}/polityka-prywatnosci/`,
+  name: 'Polityka prywatności',
+  description,
+  inLanguage: 'pl',
+  dateModified: UPDATED,
+  publisher: { '@id': ORG_ID },
+};
+---
+<Base title={title} description={description} jsonLd={[pageLd]}>
+  <div class="app">
+    <SiteHeader active="privacy" />
+
+    <main class="page">
+      <nav class="post-crumbs" aria-label="Breadcrumb">
+        <a href="/">BarabashFlow</a><span>/</span><span>Polityka prywatności</span>
+      </nav>
+      <header class="page-head">
+        <div class="hero-chips">
+          <span class="chip kicker">Dokument</span>
+          <span class="chip">Aktualizacja: <time datetime={UPDATED}>31 sierpnia 2026</time></span>
+        </div>
+        <h1 class="page-title">Polityka prywatności i plików cookie</h1>
+        <p class="hero-sub">Strona barabashflow.pl nie śledzi użytkowników, nie używa zewnętrznych narzędzi analitycznych ani reklamowych. Poniżej — dokładnie, jakie dane są przetwarzane i dlaczego.</p>
+      </header>
+
+      <div class="prose">
+        <h2>1. Administrator danych</h2>
+        <p>Administratorem danych osobowych jest {AUTHOR_NAME}, prowadzący studio BarabashFlow z siedzibą w Warszawie. Kontakt w sprawach danych: <a href={`mailto:${EMAIL}`}>{EMAIL}</a> lub <a href="/kontakt/">formularz kontaktowy</a>.</p>
+
+        <h2>2. Jakie dane zbieramy i po co</h2>
+        <h3>Formularz kontaktowy i okienko maskotki</h3>
+        <p>Gdy wysyłasz wiadomość (formularz na stronie głównej, strona <a href="/kontakt/">Kontakt</a> lub okienko maskotki), zapisujemy: imię (jeśli podasz), adres e-mail i treść wiadomości. Cel: odpowiedź na zapytanie i ewentualne przygotowanie wyceny (art. 6 ust. 1 lit. b i f RODO — działania przed zawarciem umowy oraz prawnie uzasadniony interes administratora). Dane przechowywane są w bazie Supabase (serwery w Unii Europejskiej, region eu-west-1) i dostępne wyłącznie dla administratora. Wiadomości wysyłane do Ciebie e-mailem obsługuje dostawca Resend.</p>
+        <h3>Anonimowe statystyki odwiedzin</h3>
+        <p>Strona liczy odsłony w sposób anonimowy i bez plików cookie: zapisujemy ścieżkę strony, źródło wejścia (adres strony odsyłającej, jeśli jest), język interfejsu i informację, czy ekran jest mobilny. Nie zapisujemy adresu IP, identyfikatorów urządzenia ani żadnych danych pozwalających Cię zidentyfikować. Cel: wiedzieć, które treści są czytane (art. 6 ust. 1 lit. f RODO).</p>
+        <h3>Logi hostingu</h3>
+        <p>Strona jest serwowana z GitHub Pages. Dostawca hostingu może przetwarzać standardowe logi serwera (adres IP, czas żądania) na własnych zasadach — szczegóły w polityce prywatności GitHub.</p>
+
+        <h2>3. Pliki cookie i pamięć przeglądarki</h2>
+        <p>Nie używamy ciasteczek śledzących. Strona zapisuje w pamięci lokalnej Twojej przeglądarki (localStorage / sessionStorage) wyłącznie ustawienia potrzebne do działania:</p>
+        <ul>
+          <li><code>bf:theme</code> — wybrany motyw (jasny / ciemny),</li>
+          <li><code>bf:locale</code> — język interfejsu (PL / EN / RU),</li>
+          <li><code>bf:cookies-accepted</code> — informacja, że zamknąłeś komunikat o prywatności,</li>
+          <li><code>bf:mascot-dismissed</code> — zamknięcie okienka maskotki w bieżącej sesji,</li>
+          <li><code>bf:sess</code> — znacznik bieżącej sesji do anonimowego licznika odwiedzin.</li>
+        </ul>
+        <p>Te dane nie opuszczają Twojej przeglądarki i nie służą do identyfikacji. Możesz je w każdej chwili usunąć w ustawieniach przeglądarki — strona nadal będzie działać, po prostu zapomni Twoje preferencje.</p>
+
+        <h2>4. Czego nie robimy</h2>
+        <ul>
+          <li>Nie używamy Google Analytics, Meta Pixel, Hotjar ani innych narzędzi analitycznych firm trzecich.</li>
+          <li>Nie wyświetlamy reklam, nie używamy ciasteczek reklamowych ani śledzenia między witrynami.</li>
+          <li>Nie sprzedajemy, nie wymieniamy i nie udostępniamy Twoich danych podmiotom trzecim — poza dostawcami technicznymi wymienionymi wyżej (Supabase, Resend, GitHub, Google Fonts dla czcionek), którzy przetwarzają dane wyłącznie w naszym imieniu.</li>
+        </ul>
+
+        <h2>5. Jak długo przechowujemy dane</h2>
+        <p>Wiadomości z formularza — do zakończenia korespondencji i ewentualnej współpracy, nie dłużej niż 3 lata od ostatniego kontaktu, chyba że przepisy (np. podatkowe) wymagają dłużej. Anonimowe statystyki odwiedzin — bezterminowo, ponieważ nie zawierają danych osobowych.</p>
+
+        <h2>6. Twoje prawa</h2>
+        <p>Masz prawo dostępu do swoich danych, ich sprostowania, usunięcia, ograniczenia przetwarzania, przenoszenia oraz wniesienia sprzeciwu wobec przetwarzania. Aby skorzystać z tych praw, napisz na <a href={`mailto:${EMAIL}`}>{EMAIL}</a>. Masz też prawo wnieść skargę do Prezesa Urzędu Ochrony Danych Osobowych (uodo.gov.pl).</p>
+
+        <h2>7. Zmiany polityki</h2>
+        <p>Polityka może być aktualizowana wraz ze zmianami w działaniu strony. Data ostatniej aktualizacji jest widoczna na górze dokumentu.</p>
+
+        <p class="meta">Zobacz też: <a href="/o-mnie/">O mnie</a> · <a href="/kontakt/">Kontakt</a> · <a href="/blog/">Blog</a></p>
+      </div>
+    </main>
+
+    <SiteFooter />
+  </div>
+
+  <script>
+    import { mountShell } from '../lib/shell';
+    mountShell();
+  </script>
+</Base>

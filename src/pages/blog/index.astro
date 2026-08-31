@@ -1,8 +1,11 @@
 ---
 import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
 import '../../styles/main.css';
 import { mediaUrl } from '../../lib/supabase';
-import { fetchPostList, formatDatePl } from '../../lib/blog';
+import { fetchPostList, formatDatePl, isoDate } from '../../lib/blog';
+import { SITE, PERSON_ID, ORG_ID } from '../../lib/site';
 
 const posts = await fetchPostList();
 const title = 'Blog — BarabashFlow | strony internetowe, platformy, SEO';
@@ -12,54 +15,31 @@ const description =
 const blogLd = {
   '@context': 'https://schema.org',
   '@type': 'Blog',
+  '@id': `${SITE}/blog/#blog`,
   name: 'Blog BarabashFlow',
-  url: 'https://barabashflow.pl/blog/',
+  url: `${SITE}/blog/`,
   description,
   inLanguage: 'pl',
-  publisher: { '@type': 'Organization', name: 'BarabashFlow', url: 'https://barabashflow.pl' },
-  author: { '@type': 'Person', name: 'Dmytrii Barabash', url: 'https://barabashflow.pl' },
+  publisher: { '@id': ORG_ID },
+  author: { '@id': PERSON_ID },
 };
 ---
-<Base title={title} description={description}>
-  <script type="application/ld+json" set:html={JSON.stringify(blogLd)} />
-
+<Base title={title} description={description} jsonLd={[blogLd]}>
   <div class="app">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="BarabashFlow">
-        <img class="brand-logo" src="/assets/img/logo.png" alt="" draggable="false" />
-        <span class="brand-name">Barabashflow</span>
-      </a>
-      <nav class="nav" aria-label="Site navigation">
-        <a class="chip" href="/" data-i18n="nav.home">Strona główna</a>
-        <span class="chip chip-lime">Blog</span>
-        <div class="nav-group lang pill" aria-label="Language switcher"></div>
-      </nav>
-
-      <div class="nav-tools">
-        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme" title="Theme">
-          <svg viewBox="0 0 20 20" fill="none" id="theme-icon" aria-hidden="true">
-            <path d="M14.5 11.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <button class="icon-btn nav-burger" id="nav-burger" type="button" aria-label="Menu" aria-expanded="false">
-          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path class="burger-l1" d="M4 6.6h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path class="burger-l2" d="M4 10h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path class="burger-l3" d="M4 13.4h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </div>
-    </header>
+    <SiteHeader active="blog" />
 
     <section class="hero blog-hero">
       <div class="hero-chips">
         <span class="chip kicker">Blog</span>
         <span class="chip" data-i18n="blog.chip">Strony · Platformy · SEO</span>
       </div>
-      <h1 class="hero-title">Blog</h1>
+      <h1 class="hero-title blog-h1" data-i18n="blog.h1">Blog o stronach internetowych, platformach i SEO</h1>
       <p class="hero-sub" data-i18n="blog.sub">
         Praktycznie o stronach internetowych, platformach i widoczności w Google —
         ceny, technologie i porady dla firm, bez żargonu.
+      </p>
+      <p class="post-byline">
+        <span data-i18n="blog.by">Autor</span>: <a href="/o-mnie/" rel="author">Dmytrii Barabash</a>
       </p>
     </section>
 
@@ -76,7 +56,7 @@ const blogLd = {
               ? <img class="blog-card-cover" src={mediaUrl(p.cover_path)} alt={p.cover_alt || p.title_pl} loading="lazy" decoding="async" />
               : <div class="blog-card-cover is-empty" aria-hidden="true"></div>}
             <div class="blog-card-body">
-              <span class="blog-card-date">{formatDatePl(p.published_at)}</span>
+              <time class="blog-card-date" datetime={isoDate(p.published_at)}>{formatDatePl(p.published_at)}</time>
               <h2
                 class="blog-card-title"
                 data-lm-pl={p.title_pl}
@@ -102,11 +82,7 @@ const blogLd = {
       </div>
     </section>
 
-    <footer class="footer">
-      <span class="footer-item strong">Barabashflow · MMXXVI</span>
-      <a class="footer-item" href="/blog/rss.xml">RSS</a>
-      <a class="footer-item" href="mailto:office@barabashflow.pl">office@barabashflow.pl</a>
-    </footer>
+    <SiteFooter />
   </div>
 
   <script>

@@ -1,0 +1,29 @@
+---
+// Shared footer: brand line, site map with descriptive anchors (about /
+// contact / privacy / blog / RSS), public profiles and contact — the
+// trust-signal links crawlers look for on every page.
+import { AUTHOR_NAME, EMAIL, SOCIAL } from '../lib/site';
+const year = new Date().getFullYear();
+---
+<footer class="footer footer-site">
+  <div class="footer-row">
+    <span class="footer-item strong">Barabashflow · MMXXVI</span>
+    <nav class="footer-links" aria-label="Mapa strony">
+      <a class="footer-item" href="/" data-i18n="nav.home">Strona główna</a>
+      <a class="footer-item" href="/blog/" data-i18n="nav.blog">Blog</a>
+      <a class="footer-item" href="/o-mnie/" data-i18n="nav.about">O mnie</a>
+      <a class="footer-item" href="/kontakt/" data-i18n="nav.contact">Kontakt</a>
+      <a class="footer-item" href="/polityka-prywatnosci/" data-i18n="nav.privacy">Polityka prywatności</a>
+      <a class="footer-item" href="/blog/rss.xml">RSS</a>
+    </nav>
+  </div>
+  <div class="footer-row">
+    <span class="footer-item">© {year} {AUTHOR_NAME} · <span data-i18n="meta.location">Warszawa → Świat</span></span>
+    <span class="footer-links">
+      {SOCIAL.map((s) => (
+        <a class="footer-item" href={s.url} rel="me noopener" target="_blank">{s.label} ↗</a>
+      ))}
+      <a class="footer-item" href={`mailto:${EMAIL}`}>{EMAIL}</a>
+    </span>
+  </div>
+</footer>
