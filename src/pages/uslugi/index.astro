@@ -7,8 +7,8 @@ import { fetchSettings, fetchServices, fetchFaq, lmRow, s, lm } from '../../lib/
 import { SITE } from '../../lib/site';
 
 const [settings, services, faq] = await Promise.all([fetchSettings(), fetchServices(), fetchFaq('home')]);
-const title = 'Usługi — strony internetowe, sklepy, platformy, CMS | BarabashFlow';
-const description = 'Tworzenie stron internetowych, sklepów online, platform i aplikacji webowych oraz panele CMS, SEO i opieka. Kod na miarę, wycena w 24 h — BarabashFlow, Warszawa.';
+const title = 'Usługi: strony, sklepy, platformy, CMS | BarabashFlow';
+const description = 'Tworzenie stron internetowych, sklepów online, platform i aplikacji webowych, panele CMS, SEO i opieka. Kod na miarę, wycena w 24 h — BarabashFlow, Warszawa.';
 const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
   { '@type': 'ListItem', position: 1, name: 'BarabashFlow', item: SITE + '/' },
   { '@type': 'ListItem', position: 2, name: 'Usługi', item: SITE + '/uslugi/' },

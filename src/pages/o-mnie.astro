@@ -9,8 +9,8 @@ import { fetchSettings, fetchServices, fetchProjects, s, lm, lmRow } from '../li
 import { SITE, AUTHOR_NAME, EMAIL, PERSON_ID, SOCIAL } from '../lib/site';
 
 const [settings, services, projects] = await Promise.all([fetchSettings(), fetchServices(), fetchProjects()]);
-const title = 'O mnie — Dmytrii Barabash, web developer | BarabashFlow';
-const description = 'Dmytrii Barabash — web developer z Warszawy, założyciel BarabashFlow. Strony, sklepy, platformy i aplikacje webowe dla firm: jak pracuję, technologie, zasady bloga.';
+const title = 'O mnie — Damian Barabash, web developer | BarabashFlow';
+const description = 'Damian Barabash — web developer z Warszawy, założyciel BarabashFlow. Strony, sklepy, platformy i aplikacje webowe dla firm: jak pracuję, technologie, zasady.';
 const STACK = ['Astro', 'React', 'Next.js', 'TypeScript', 'Supabase', 'PostgreSQL', 'Three.js', 'Flutter', 'WooCommerce', 'GitHub Pages', 'Cloudflare'];
 const ownerPhoto = mediaUrl(settings.owner_photo_path?.value_meta?.path);
 const profileLd = { '@context': 'https://schema.org', '@type': 'ProfilePage', '@id': `${SITE}/o-mnie/#profile`, url: `${SITE}/o-mnie/`, name: title, description, inLanguage: 'pl', mainEntity: { '@id': PERSON_ID } };
@@ -26,7 +26,7 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
       <div class="sec-inner page-head">
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span data-i18n="nav.about">O mnie</span></nav>
         <span class="kicker" data-i18n="about.kicker">O mnie</span>
-        <h1 data-i18n="about.title">Dmytrii Barabash — web developer i założyciel BarabashFlow</h1>
+        <h1 data-i18n="about.title">Damian Barabash — web developer i założyciel BarabashFlow</h1>
         <p class="lead" data-i18n="about.lead">Projektuję i buduję strony internetowe, sklepy, platformy i aplikacje webowe dla firm. Pracuję z Warszawy, dla klientów z Polski i zagranicy — po polsku, angielsku i rosyjsku.</p>
       </div>
     </section>
@@ -58,7 +58,7 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
 
           <h2 data-i18n="about.h.editorial">Zasady redakcyjne bloga</h2>
           <p data-i18n="about.p.editorial">Wpisy na blogu odpowiadają na realne pytania, które klienci zadają przed zleceniem strony — tematy wybieram na podstawie wyszukiwań w Google i rozmów z klientami. Nie wymyślam statystyk ani opinii klientów, podaję realne widełki cenowe, a starsze artykuły aktualizuję, gdy zmieniają się ceny lub technologie (data aktualizacji jest widoczna przy każdym wpisie). Blog nie zawiera reklam ani linków afiliacyjnych. Zdjęcia pochodzą z bibliotek na licencjach Creative Commons, z podaniem autora.</p>
-          <p><a href="/blog/" data-i18n="blog.h1">Blog o stronach internetowych, platformach i SEO</a></p>
+          <p><a href="/zasady-redakcyjne/" data-i18n="nav.editorial">Zasady redakcyjne</a> · <a href="/blog/" data-i18n="blog.h1">Blog o stronach internetowych, platformach i SEO</a></p>
 
           <h2 data-i18n="about.h.contact">Kontakt</h2>
           <p data-i18n="about.p.contact">Najszybciej przez formularz lub e-mail. Odpowiadam w ciągu 24 godzin w dni robocze.</p>

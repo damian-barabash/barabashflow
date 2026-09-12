@@ -1,0 +1,82 @@
+---
+// Editorial policy / ethics page — how the blog and the site content are
+// produced, sourced, updated and corrected (E-E-A-T trust signal).
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { fetchSettings, fetchServices } from '../lib/content';
+import { SITE, AUTHOR_NAME, EMAIL, ORG_ID, PERSON_ID } from '../lib/site';
+
+const [settings, services] = await Promise.all([fetchSettings(), fetchServices()]);
+const UPDATED = '2026-09-12';
+const title = 'Zasady redakcyjne i etyka treści — BarabashFlow';
+const description = 'Jak powstają wpisy na blogu BarabashFlow: autor, źródła, weryfikacja cen i faktów, aktualizacje, brak reklam i linków afiliacyjnych, licencje zdjęć, poprawki.';
+const pageLd = { '@context': 'https://schema.org', '@type': 'WebPage', '@id': `${SITE}/zasady-redakcyjne/#page`, url: `${SITE}/zasady-redakcyjne/`, name: 'Zasady redakcyjne', description, inLanguage: 'pl', dateModified: UPDATED, publisher: { '@id': ORG_ID }, author: { '@id': PERSON_ID } };
+const SOURCES = [
+  ['Google Search Central', 'https://developers.google.com/search/docs'],
+  ['web.dev — Core Web Vitals', 'https://web.dev/articles/vitals'],
+  ['schema.org', 'https://schema.org/'],
+  ['WCAG 2.2 (W3C)', 'https://www.w3.org/TR/WCAG22/'],
+  ['MDN Web Docs', 'https://developer.mozilla.org/'],
+  ['UODO — RODO w praktyce', 'https://uodo.gov.pl/'],
+];
+---
+<Base title={title} description={description} jsonLd={[pageLd]} modified={UPDATED}>
+  <SiteHeader active="privacy" />
+  <main class="container">
+    <section class="sec">
+      <div class="sec-inner page-head">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span>Zasady redakcyjne</span></nav>
+        <span class="kicker">Editorial policy · aktualizacja <time datetime={UPDATED}>12 września 2026</time></span>
+        <h1>Zasady redakcyjne i etyka treści</h1>
+        <p class="lead">Wszystko, co czytasz na barabashflow.pl — strona, opisy projektów i <a href="/blog/">blog</a> — powstaje według poniższych zasad. Autor i redaktor odpowiedzialny: <a href="/o-mnie/" rel="author">{AUTHOR_NAME}</a>.</p>
+      </div>
+    </section>
+    <div class="divider" aria-hidden="true"></div>
+    <section class="sec">
+      <div class="sec-inner sec-pad">
+        <div class="prose">
+          <h2>1. Cel treści</h2>
+          <p>Blog odpowiada na pytania, które firmy zadają przed zleceniem strony, sklepu lub platformy: ile to kosztuje, jak długo trwa, jaką technologię wybrać, czego wymagać od wykonawcy. Piszemy dla właścicieli firm, nie dla programistów — bez żargonu, z konkretnymi widełkami i przykładami.</p>
+
+          <h2>2. Kto pisze i jak powstają wpisy</h2>
+          <ul>
+            <li>Tematy pochodzą z realnych wyszukiwań w Google (podpowiedzi wyszukiwarki) i z rozmów z klientami.</li>
+            <li>Szkice wpisów przygotowuje asystent AI działający na własnym serwerze studia; każdy wpis jest oparty na wiedzy i doświadczeniu autora z realizacji projektów opisanych w <a href="/projekty/">portfolio</a>.</li>
+            <li>Za treść, ceny i rekomendacje odpowiada {AUTHOR_NAME} — wpisy, które nie spełniają tych zasad, są poprawiane lub usuwane.</li>
+          </ul>
+
+          <h2>3. Fakty, ceny i statystyki</h2>
+          <ul>
+            <li>Nie wymyślamy nazw klientów, opinii ani statystyk. Jeśli podajemy liczbę, jest to nasze doświadczenie projektowe albo dane ze źródła, do którego linkujemy.</li>
+            <li>Widełki cenowe odpowiadają aktualnemu cennikowi studia (<a href="/uslugi/">usługi</a>) i realiom polskiego rynku; są orientacyjne — każdą wycenę przygotowujemy indywidualnie.</li>
+          </ul>
+
+          <h2>4. Źródła, na których się opieramy</h2>
+          <ul>
+            {SOURCES.map(([label, url]) => <li><a href={url} rel="noopener" target="_blank">{label}</a></li>)}
+          </ul>
+
+          <h2>5. Aktualizacje i poprawki</h2>
+          <p>Wpisy są aktualizowane, gdy zmieniają się ceny, technologie lub zalecenia Google; data ostatniej istotnej aktualizacji jest widoczna przy każdym wpisie. Błąd lub nieaktualną informację można zgłosić na <a href={`mailto:${EMAIL}`}>{EMAIL}</a> — poprawiamy w ciągu kilku dni roboczych.</p>
+
+          <h2>6. Reklamy, afiliacja, sponsoring</h2>
+          <p>Strona i blog <strong>nie zawierają reklam, linków afiliacyjnych ani treści sponsorowanych</strong>. Nie otrzymujemy wynagrodzenia za polecanie narzędzi czy technologii — wymieniamy te, z których korzystamy w projektach. (No ads, no affiliate links, no sponsored content.)</p>
+
+          <h2>7. Zdjęcia i licencje</h2>
+          <p>Ilustracje wpisów pochodzą z bibliotek na licencjach Creative Commons dopuszczających użycie komercyjne (Openverse) z podaniem autora i licencji pod zdjęciem. Zrzuty ekranu projektów publikujemy za zgodą klientów.</p>
+
+          <h2>8. Prywatność czytelników</h2>
+          <p>Nie śledzimy czytelników, nie używamy cookies reklamowych ani analityki firm trzecich — szczegóły w <a href="/polityka-prywatnosci/">polityce prywatności</a>.</p>
+
+          <p class="meta">Zobacz też: <a href="/o-mnie/">O mnie</a> · <a href="/regulamin/">Regulamin</a> · <a href="/blog/">Blog</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <SiteFooter services={services} settings={settings} cta={false} />
+  <script>
+    import { mountShell } from '../lib/shell';
+    mountShell();
+  </script>
+</Base>

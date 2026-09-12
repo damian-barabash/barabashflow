@@ -174,3 +174,9 @@ drop table if exists public.imap_state;
 delete from vault.secrets where name in ('hostinger_office_password', 'mail_ingest_secret', 'mail_refresh_cron_secret');
 
 commit;
+
+-- ── addendum (same day): enquiry reference shown on the "receipt" animation
+-- and in the admin inbox; generated client-side (BF-XXXXXX) because anon
+-- inserts cannot read the row back under RLS.
+alter table public.contact_submissions add column if not exists ref text;
+create index if not exists contact_submissions_ref_idx on public.contact_submissions(ref);

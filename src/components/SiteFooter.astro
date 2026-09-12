@@ -65,7 +65,7 @@ const availability = s(settings, 'availability', 'pl', '');
               </div>
             </div>
           </div>
-          <ContactForm source="footer" services={services} variant="dark" id="cf-footer" />
+          <ContactForm source="footer" variant="dark" id="cf-footer" />
         </div>
       </section>
     </div>
@@ -78,7 +78,8 @@ const availability = s(settings, 'availability', 'pl', '');
         <a href="/projekty/" data-i18n="nav.projects">Projekty</a><i></i>
         <a href="/blog/" data-i18n="nav.blog">Blog</a><i></i>
         <a href="/o-mnie/" data-i18n="nav.about">O mnie</a><i></i>
-        <a href="/kontakt/" data-i18n="nav.contact">Kontakt</a>
+        <a href="/kontakt/" data-i18n="nav.contact">Kontakt</a><i></i>
+        <a href="/regulamin/" data-i18n="nav.terms">Regulamin</a>
       </nav>
       <div class="footer-brand">
         <div class="px is-tl" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
@@ -89,9 +90,11 @@ const availability = s(settings, 'availability', 'pl', '');
           {SOCIAL.map((so) => <a href={so.url} rel="me noopener" target="_blank">{so.label}</a>)}
           <a href={`mailto:${EMAIL}`}>E-mail</a>
           <a href="/blog/rss.xml">RSS</a>
-          <a href="/polityka-prywatnosci/" data-i18n="nav.privacy">Polityka prywatności</a>
+          <a href="/polityka-prywatnosci/" rel="privacy-policy" data-i18n="nav.privacy">Polityka prywatności</a>
+          <a href="/regulamin/" rel="terms-of-service" data-i18n="nav.terms">Regulamin</a>
+          <a href="/zasady-redakcyjne/" data-i18n="nav.editorial">Zasady redakcyjne</a>
         </div>
-        <p>© {year} {AUTHOR_NAME} · BarabashFlow · <span data-i18n="footer.rights">Wszelkie prawa zastrzeżone</span></p>
+        <p>© {year} <a href="/o-mnie/" rel="author">{AUTHOR_NAME}</a> · BarabashFlow · <span data-i18n="footer.address">Warszawa, Polska</span> · <span data-i18n="footer.rights">Wszelkie prawa zastrzeżone</span><br /><small class="footer-note" data-i18n="footer.disclosure">Strona bez reklam, linków afiliacyjnych i treści sponsorowanych.</small></p>
         <button class="scroll-top" type="button" data-scroll-top>
           <span data-i18n="footer.top">Do góry</span>
           <svg viewBox="0 0 16 16" fill="none"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>

@@ -4,12 +4,21 @@
 
 export const SITE = 'https://barabashflow.pl';
 export const SITE_NAME = 'BarabashFlow';
-export const AUTHOR_NAME = 'Dmytrii Barabash';
+export const AUTHOR_NAME = 'Damian Barabash';
 export const AUTHOR_URL = `${SITE}/o-mnie/`;
 export const CONTACT_URL = `${SITE}/kontakt/`;
 export const PRIVACY_URL = `${SITE}/polityka-prywatnosci/`;
 export const EMAIL = 'office@barabashflow.pl';
 export const LOCATION = { locality: 'Warszawa', country: 'PL' };
+// First public launch of barabashflow.pl (datePublished for the WebPage/WebSite entities).
+export const SITE_PUBLISHED = '2026-05-25';
+export const SOURCES: { label: string; url: string }[] = [
+  { label: 'Google Search Central', url: 'https://developers.google.com/search/docs' },
+  { label: 'web.dev', url: 'https://web.dev/articles/vitals' },
+  { label: 'schema.org', url: 'https://schema.org/' },
+  { label: 'WCAG 2.2', url: 'https://www.w3.org/TR/WCAG22/' },
+  { label: 'UODO', url: 'https://uodo.gov.pl/' },
+];
 
 // Public profiles (schema.org sameAs + footer links). Add LinkedIn / Behance /
 // Instagram here when available — everything downstream picks them up.

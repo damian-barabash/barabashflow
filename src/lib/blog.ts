@@ -73,6 +73,25 @@ export function renderMarkdown(md: string): string {
   return marked.parse(safe, { async: false }) as string;
 }
 
+// SEO budgets: <title> ≤ 60 chars, meta description ≤ 158 — cut at a word
+// boundary with an ellipsis (the H1 / on-page text keeps the full string).
+export function clampTitle(s: string, max = 60): string {
+  const t = String(s ?? '').trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max - 1);
+  const at = Math.max(cut.lastIndexOf(' '), cut.lastIndexOf(':'), cut.lastIndexOf('—'));
+  return (at > 30 ? cut.slice(0, at) : cut).replace(/[\s:—,-]+$/, '') + '…';
+}
+export function clampDescription(s: string, max = 158): string {
+  const t = String(s ?? '').replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max - 1);
+  const dot = cut.lastIndexOf('. ');
+  if (dot > 80) return cut.slice(0, dot + 1);
+  const sp = cut.lastIndexOf(' ');
+  return cut.slice(0, sp > 60 ? sp : max - 1).replace(/[\s,;:-]+$/, '') + '…';
+}
+
 export function escapeXml(s: string): string {
   return String(s ?? '').replace(/[<>&'"]/g, (c) =>
     ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]!),

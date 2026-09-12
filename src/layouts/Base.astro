@@ -2,7 +2,7 @@
 // Shared <head> for public pages. Carries the full SEO/GEO layer from the
 // approved seo-plan: canonical, robots, Open Graph, hreflang, JSON-LD.
 // Identity (author / publisher / sameAs) comes from lib/site.ts.
-import { SITE, SITE_NAME, personLd, organizationLd } from '../lib/site';
+import { SITE, SITE_NAME, AUTHOR_NAME, personLd, organizationLd } from '../lib/site';
 import '../styles/main.css';
 
 export interface Props {
@@ -14,15 +14,18 @@ export interface Props {
   ogImage?: string;
   // Page-level JSON-LD objects (already carrying @context) rendered in <head>.
   jsonLd?: Record<string, unknown>[];
+  // ISO date of the last content change (og/article:modified_time). Defaults to the build date.
+  modified?: string;
 }
 const {
-  title = 'BarabashFlow — tworzenie stron internetowych i platform',
-  description = 'Studio Dmytrija Barabasha z Warszawy: tworzenie stron internetowych, sklepów, platform i aplikacji webowych dla firm. Kod na miarę, własny CMS, wycena w 24 h.',
+  title = 'BarabashFlow — strony, sklepy i platformy, Warszawa',
+  description = 'Studio Damiana Barabasha z Warszawy: tworzenie stron internetowych, sklepów, platform i aplikacji webowych dla firm. Kod na miarę, własny CMS, wycena w 24 h.',
   noindex = false,
   bodyClass = '',
   ogType = 'website',
   ogImage = `${SITE}/assets/img/og.png`,
   jsonLd = [],
+  modified = new Date().toISOString().slice(0, 10),
 } = Astro.props;
 
 const site = SITE;
@@ -64,6 +67,13 @@ const siteGraphLd = {
   <meta name="theme-color" content="#f3f4f6" />
   <meta name="color-scheme" content="light" />
 
+  <meta name="author" content={AUTHOR_NAME} />
+  <link rel="author" href="/o-mnie/" />
+  <link rel="privacy-policy" href="/polityka-prywatnosci/" />
+  <link rel="terms-of-service" href="/regulamin/" />
+  <meta property="article:author" content={AUTHOR_NAME} />
+  <meta property="article:modified_time" content={modified} />
+  <meta property="og:updated_time" content={modified} />
   <link rel="icon" type="image/png" href="/assets/img/logo.png" />
   <link rel="apple-touch-icon" href="/assets/img/logo.png" />
 

@@ -42,7 +42,7 @@ export function renderInbox() {
     <article class="msg${m.is_read ? '' : ' is-unread'}${m.is_replied ? ' is-replied' : ''}" data-id="${m.id}">
       <header class="msg-head">
         <div>
-          <div class="msg-name">${escapeHtml(m.name || '—')} ${m.company ? `<span class="pill">${escapeHtml(m.company)}</span>` : ''} ${m.client_id ? '<span class="pill lime">w CRM</span>' : ''}</div>
+          <div class="msg-name">${m.ref ? `<span class="pill dark">${escapeHtml(m.ref)}</span> ` : ''}${escapeHtml(m.name || '—')} ${m.company ? `<span class="pill">${escapeHtml(m.company)}</span>` : ''} ${m.client_id ? '<span class="pill lime">w CRM</span>' : ''}</div>
           <div class="msg-meta">
             <a href="mailto:${attr(m.email)}">${escapeHtml(m.email)}</a>${m.phone ? ` · <a href="tel:${attr(m.phone)}">${escapeHtml(m.phone)}</a>` : ''}
             · ${fmtDate(m.created_at)} · ${escapeHtml(SOURCE_LABEL[m.source] || m.source || '')}${m.page ? ` <span class="soft">${escapeHtml(m.page)}</span>` : ''}

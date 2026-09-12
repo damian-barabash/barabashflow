@@ -11,8 +11,8 @@ import BlogCard from '../components/BlogCard.astro';
 import { mediaUrl } from '../lib/supabase';
 import { fetchSettings, fetchServices, fetchProjects, fetchFaq, s, lm, lmRow, projectCover, categoryLm, firstSentence, type Project } from '../lib/content';
 import { restGet } from '../lib/supabase';
-import { SITE } from '../lib/site';
-import type { BlogPost } from '../lib/blog';
+import { SITE, AUTHOR_NAME, SITE_PUBLISHED, SOURCES } from '../lib/site';
+import { formatDatePl, type BlogPost } from '../lib/blog';
 
 const [settings, services, projects, faq, posts] = await Promise.all([
   fetchSettings(), fetchServices(), fetchProjects(), fetchFaq('home'),
@@ -24,8 +24,25 @@ const stats: any[] = settings.home_stats?.value_meta?.items || [];
 const ownerPhoto = mediaUrl(settings.owner_photo_path?.value_meta?.path);
 const visionImg = projectCover(featured[0]);
 
-const title = 'BarabashFlow — tworzenie stron internetowych, sklepów i platform';
-const description = s(settings, 'hero_subtitle', 'pl', 'Projektuję i buduję szybkie strony internetowe, sklepy i aplikacje webowe dla firm — z własnym panelem do edycji i wyceną w 24 godziny.');
+const title = 'Strony, sklepy i platformy — Warszawa | BarabashFlow';
+const description = 'BarabashFlow, Warszawa: tworzenie stron internetowych, sklepów i platform na zamówienie. Kod na miarę, własny CMS, wycena projektu w 24 h — bez szablonów.';
+const heroSub = s(settings, 'hero_subtitle', 'pl', 'Kod na miarę, własny panel CMS i wycena projektu w 24 h.');
+const BUILT = new Date().toISOString().slice(0, 10);
+const priceLine = services.filter((sv) => sv.price_from).slice(0, 3);
+const webPageLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  '@id': `${SITE}/#webpage`,
+  url: `${SITE}/`,
+  name: title,
+  description,
+  inLanguage: 'pl',
+  datePublished: SITE_PUBLISHED,
+  dateModified: BUILT,
+  author: { '@id': `${SITE}/#person` },
+  publisher: { '@id': `${SITE}/#organization` },
+  isPartOf: { '@id': `${SITE}/#website` },
+};
 
 const faqLd = faq.length ? {
   '@context': 'https://schema.org',
@@ -50,7 +67,7 @@ const tagOf = (p: Project) => ({
   ru: p.tagline_ru || firstSentence(p.description_ru) || p.tagline_pl || firstSentence(p.description_pl),
 });
 ---
-<Base title={title} description={description} jsonLd={[servicesLd, ...(faqLd ? [faqLd] : [])]} bodyClass="is-home">
+<Base title={title} description={description} jsonLd={[webPageLd, servicesLd, ...(faqLd ? [faqLd] : [])]} bodyClass="is-home" modified={BUILT}>
   <SiteHeader active="home" />
 
   <main>
@@ -68,29 +85,32 @@ const tagOf = (p: Project) => ({
               <svg viewBox="0 0 24 24"><path fill="currentColor" d="M18 4h-3l-6 8 6 8h3l-6-8z"/></svg><svg viewBox="0 0 24 24"><path fill="currentColor" d="M18 4h-3l-6 8 6 8h3l-6-8z"/></svg><svg viewBox="0 0 24 24"><path fill="currentColor" d="M18 4h-3l-6 8 6 8h3l-6-8z"/></svg>
             </div>
 
-            <div class="hero-kicker">
-              <span class="kicker is-white"><span class="status-dot" aria-hidden="true"></span><span data-i18n="meta.available">Dostępny</span></span>
-              <span class="kicker is-white" {...lm(settings, 'hero_kicker')}>{s(settings, 'hero_kicker')}</span>
+            <div class="hero-copy">
+              <div class="hero-kicker">
+                <span class="kicker is-white"><span class="status-dot" aria-hidden="true"></span><span data-i18n="meta.available">Dostępny</span></span>
+                <span class="kicker is-white" {...lm(settings, 'hero_kicker')}>{s(settings, 'hero_kicker')}</span>
+              </div>
+              <h1 class="hero-h1" {...lm(settings, 'hero_title')}>{s(settings, 'hero_title', 'pl', 'Strony internetowe, sklepy i platformy na zamówienie — Warszawa')}</h1>
+              <p class="hero-sub" {...lm(settings, 'hero_subtitle')}>{heroSub}</p>
+              <div class="hero-actions">
+                <a class="btn btn-dark with-icon" href="#contact">
+                  <span class="btn-ico"><svg viewBox="0 0 16 16" fill="none"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                  <span {...lm(settings, 'cta_label', 'Wycena w 24 h')}>{s(settings, 'cta_label', 'pl', 'Wycena w 24 h')}</span>
+                </a>
+                <a class="btn btn-white" href="/projekty/" {...lm(settings, 'cta_secondary', 'Zobacz projekty')}>{s(settings, 'cta_secondary', 'pl', 'Zobacz projekty')}</a>
+              </div>
+              {priceLine.length > 0 && (
+                <p class="hero-price"><span class="hp-k" data-i18n="hero.prices">Orientacyjnie</span>{priceLine.map((sv) => <a href={`/uslugi/${sv.slug}/`}><span {...lmRow(sv, 'title')}>{sv.title_pl}</span> <b>{sv.price_from}</b></a>)}</p>
+              )}
             </div>
-
-            <h1 class="sr-only" {...lm(settings, 'hero_title')}>{s(settings, 'hero_title', 'pl', 'Strony, sklepy i platformy internetowe, które sprzedają')}</h1>
-            <div class="hero-words" aria-hidden="true">
-              <span class="hero-word is-a" {...lm(settings, 'hero_word_a')}>{s(settings, 'hero_word_a', 'pl', 'TWORZYMY')}</span>
+            <div class="hero-visual" aria-hidden="true">
+              <span class="hero-word" {...lm(settings, 'hero_word_a')}>{s(settings, 'hero_word_a', 'pl', 'TWORZYMY')}</span>
               <div class="hero-logo-card">
                 <div id="hero-logo" aria-label="Logo 3D BarabashFlow — przeciągnij, aby obrócić">
                   <div class="hero-logo-fallback"><img src="/assets/img/logo.png" alt="" width="326" height="402" /></div>
                 </div>
               </div>
-              <span class="hero-word is-b" {...lm(settings, 'hero_word_b')}>{s(settings, 'hero_word_b', 'pl', 'STRONY')}</span>
-            </div>
-
-            <p class="hero-sub" {...lm(settings, 'hero_subtitle')}>{description}</p>
-            <div class="hero-actions">
-              <a class="btn btn-white" href="/projekty/" {...lm(settings, 'cta_secondary', 'Zobacz projekty')}>{s(settings, 'cta_secondary', 'pl', 'Zobacz projekty')}</a>
-              <a class="btn btn-dark with-icon" href="#contact">
-                <span class="btn-ico"><svg viewBox="0 0 16 16" fill="none"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                <span {...lm(settings, 'cta_label', 'Wycena w 24 h')}>{s(settings, 'cta_label', 'pl', 'Wycena w 24 h')}</span>
-              </a>
+              <span class="hero-word" {...lm(settings, 'hero_word_b')}>{s(settings, 'hero_word_b', 'pl', 'STRONY')}</span>
             </div>
           </div>
         </div>
@@ -140,9 +160,18 @@ const tagOf = (p: Project) => ({
               </div>
             </div>
             <div class="about-media tile-pattern" data-reveal>
-              {ownerPhoto ? <img src={ownerPhoto} alt={s(settings, 'owner_name', 'pl', 'Dmytrii Barabash')} loading="lazy" /> : <><span class="tp-label">BarabashFlow</span><span class="tp-num">BF</span></>}
+              {ownerPhoto ? <img src={ownerPhoto} alt={s(settings, 'owner_name', 'pl', AUTHOR_NAME)} loading="lazy" /> : <><span class="tp-label">BarabashFlow</span><span class="tp-num">BF</span></>}
             </div>
           </div>
+          <aside class="author-strip" aria-label="Autor">
+            <img class="author-avatar" src={ownerPhoto || '/assets/img/logo.png'} alt="" width="48" height="48" />
+            <div class="author-text">
+              <span class="kicker" data-i18n="home.author.kicker">Autor strony</span>
+              <p><a href="/o-mnie/" rel="author"><strong>{s(settings, 'owner_name', 'pl', AUTHOR_NAME)}</strong></a> — <span data-i18n="home.author.role">web developer, założyciel BarabashFlow — projektuje i koduje wszystkie opisane tu realizacje oraz pisze wpisy na blogu.</span> <a class="author-more" href="/o-mnie/" data-i18n="home.author.more">O autorze</a></p>
+              <p class="author-dates"><span data-i18n="home.author.published">Strona opublikowana</span> <time datetime={SITE_PUBLISHED}>{formatDatePl(SITE_PUBLISHED)}</time> · <span data-i18n="home.author.updated">Ostatnia aktualizacja</span> <time datetime={BUILT}>{formatDatePl(BUILT)}</time></p>
+              <p class="author-sources"><span data-i18n="home.sources">Standardy i źródła, według których pracuję:</span> {SOURCES.map((src, i) => <><a href={src.url} rel="noopener" target="_blank">{src.label}</a>{i < SOURCES.length - 1 ? ' · ' : ''}</>)} · <a href="/zasady-redakcyjne/" data-i18n="nav.editorial">Zasady redakcyjne</a></p>
+            </div>
+          </aside>
         </div>
       </section>
       <div class="divider" aria-hidden="true"></div>

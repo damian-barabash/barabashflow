@@ -1,0 +1,94 @@
+---
+// Terms of service for studio work (PL only — legal document). Covers the
+// scope, quoting, payments in stages, IP transfer, cancellation / refunds
+// and complaints. Individual written offers take precedence.
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { fetchSettings, fetchServices } from '../lib/content';
+import { SITE, AUTHOR_NAME, EMAIL, ORG_ID } from '../lib/site';
+
+const [settings, services] = await Promise.all([fetchSettings(), fetchServices()]);
+const UPDATED = '2026-09-12';
+const title = 'Regulamin usług — BarabashFlow';
+const description = 'Regulamin współpracy z BarabashFlow: zakres usług, wycena i umowa, płatności etapami, prawa do kodu, odstąpienie, zwroty zaliczki, reklamacje i gwarancja.';
+const pageLd = { '@context': 'https://schema.org', '@type': 'WebPage', '@id': `${SITE}/regulamin/#page`, url: `${SITE}/regulamin/`, name: 'Regulamin usług', description, inLanguage: 'pl', dateModified: UPDATED, publisher: { '@id': ORG_ID } };
+---
+<Base title={title} description={description} jsonLd={[pageLd]} modified={UPDATED}>
+  <SiteHeader active="privacy" />
+  <main class="container">
+    <section class="sec">
+      <div class="sec-inner page-head">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span>Regulamin</span></nav>
+        <span class="kicker">Dokument · aktualizacja <time datetime={UPDATED}>12 września 2026</time></span>
+        <h1>Regulamin świadczenia usług</h1>
+        <p class="lead">Zasady współpracy przy projektowaniu i wdrażaniu stron internetowych, sklepów, platform i aplikacji webowych. Szczegóły każdego projektu (zakres, cena, terminy) ustala indywidualna oferta — w razie rozbieżności oferta ma pierwszeństwo.</p>
+      </div>
+    </section>
+    <div class="divider" aria-hidden="true"></div>
+    <section class="sec">
+      <div class="sec-inner sec-pad">
+        <div class="prose">
+          <h2>1. Usługodawca</h2>
+          <p>Usługi świadczy {AUTHOR_NAME}, prowadzący studio BarabashFlow z siedzibą w Warszawie (Polska). Kontakt: <a href={`mailto:${EMAIL}`}>{EMAIL}</a>, <a href="/kontakt/">formularz kontaktowy</a>. Dane rejestrowe (NIP/REGON) podawane są w ofercie i na fakturze.</p>
+
+          <h2>2. Zakres usług</h2>
+          <p>Projektowanie i wdrażanie <a href="/uslugi/strony-internetowe/">stron internetowych</a>, <a href="/uslugi/sklepy-internetowe/">sklepów internetowych</a>, <a href="/uslugi/platformy-i-aplikacje/">platform i aplikacji webowych</a> oraz <a href="/uslugi/cms-seo-opieka/">paneli CMS, SEO i opieki powdrożeniowej</a>. Dokładny zakres, harmonogram i cena każdego projektu są opisane w ofercie przygotowanej po briefie.</p>
+
+          <h2>3. Wycena i zawarcie umowy</h2>
+          <ul>
+            <li>Wycena przygotowywana jest bezpłatnie w ciągu 24 godzin w dni robocze od otrzymania briefu (formularz, e-mail lub rozmowa).</li>
+            <li>Oferta jest ważna 30 dni. Umowa zostaje zawarta z chwilą pisemnej (e-mail) akceptacji oferty i wpłaty zaliczki.</li>
+            <li>Zmiany zakresu w trakcie projektu są wyceniane osobno i wymagają akceptacji obu stron.</li>
+          </ul>
+
+          <h2>4. Płatności</h2>
+          <ul>
+            <li>Rozliczenie etapami: zaliczka 30–50% wartości projektu przy starcie, pozostała część po wdrożeniu na domenie klienta (przy większych projektach — w transzach za etapy opisane w ofercie).</li>
+            <li>Usługi cykliczne (opieka, hosting, monitoring, blog) rozliczane są w abonamencie miesięcznym z góry.</li>
+            <li>Ceny podawane są w złotych (PLN) netto; do faktury doliczany jest podatek VAT zgodnie z obowiązującymi przepisami. Termin płatności faktury: 7 dni.</li>
+          </ul>
+
+          <h2>5. Współpraca i terminy</h2>
+          <ul>
+            <li>Klient dostarcza materiały (teksty, zdjęcia, logo, dostępy do domeny) w terminach ustalonych w harmonogramie; opóźnienie w dostarczeniu materiałów przesuwa terminy odpowiednio.</li>
+            <li>Postęp prac jest widoczny na adresie testowym; w cenie mieszczą się dwie rundy poprawek na każdym etapie (projekt graficzny, wdrożenie), chyba że oferta stanowi inaczej.</li>
+            <li>Akceptacja etapu następuje pisemnie (e-mail) lub przez brak uwag w ciągu 5 dni roboczych od przekazania.</li>
+          </ul>
+
+          <h2>6. Prawa autorskie i własność kodu</h2>
+          <ul>
+            <li>Z chwilą zapłaty pełnego wynagrodzenia klient nabywa autorskie prawa majątkowe do projektu graficznego i kodu źródłowego strony w zakresie potrzebnym do jej używania, modyfikowania i przenoszenia — bez vendor lock-in.</li>
+            <li>Elementy open-source i biblioteki zewnętrzne pozostają na własnych licencjach. Materiały dostarczone przez klienta (teksty, zdjęcia, logo) pozostają jego własnością i klient odpowiada za prawo do ich użycia.</li>
+            <li>Usługodawca może prezentować zrealizowany projekt w swoim portfolio, chyba że klient zastrzeże inaczej w ofercie.</li>
+          </ul>
+
+          <h2>7. Odstąpienie od umowy, zwroty i reklamacje</h2>
+          <ul>
+            <li><strong>Odstąpienie przed rozpoczęciem prac</strong> (do 3 dni od wpłaty zaliczki, jeśli prace nie ruszyły) — zaliczka jest zwracana w całości w ciągu 14 dni.</li>
+            <li><strong>Rezygnacja w trakcie</strong> — rozliczana jest wykonana praca według etapów z oferty; niewykorzystana część zaliczki jest zwracana, a wykonane materiały przekazywane klientowi.</li>
+            <li><strong>Usługi abonamentowe</strong> można wypowiedzieć w każdej chwili ze skutkiem na koniec opłaconego okresu; opłaty za bieżący okres nie podlegają zwrotowi.</li>
+            <li><strong>Reklamacje</strong> należy zgłaszać na <a href={`mailto:${EMAIL}`}>{EMAIL}</a>; odpowiedź w ciągu 14 dni. Błędy wynikające z wdrożenia usuwane są bezpłatnie w ciągu 30 dni od startu strony (gwarancja powdrożeniowa), a w ramach opieki — przez cały okres abonamentu.</li>
+            <li>Konsumentom przysługują dodatkowo prawa wynikające z ustawy o prawach konsumenta, w tym prawo odstąpienia od umowy zawartej na odległość w terminie 14 dni, o ile usługa nie została w pełni wykonana za wyraźną zgodą konsumenta.</li>
+          </ul>
+
+          <h2>8. Odpowiedzialność</h2>
+          <p>Usługodawca odpowiada za wykonanie usługi zgodnie z ofertą i sztuką. Nie odpowiada za działanie usług zewnętrznych (hosting, domeny, bramki płatności, API), za treści dostarczone przez klienta ani za utracone korzyści. Łączna odpowiedzialność ograniczona jest do wysokości wynagrodzenia za dany projekt, chyba że przepisy bezwzględnie obowiązujące stanowią inaczej.</p>
+
+          <h2>9. Dane osobowe</h2>
+          <p>Zasady przetwarzania danych opisuje <a href="/polityka-prywatnosci/">Polityka prywatności</a>. W ramach projektu usługodawca może przetwarzać dane w imieniu klienta na podstawie odrębnej umowy powierzenia.</p>
+
+          <h2>10. Postanowienia końcowe</h2>
+          <p>Regulamin obowiązuje od daty wskazanej u góry dokumentu; zmiany nie dotyczą projektów w toku. W sprawach nieuregulowanych stosuje się prawo polskie. Spory rozstrzyga sąd właściwy dla siedziby usługodawcy, a w przypadku konsumentów — sąd właściwy według przepisów ogólnych.</p>
+
+          <p class="meta">Zobacz też: <a href="/polityka-prywatnosci/">Polityka prywatności</a> · <a href="/zasady-redakcyjne/">Zasady redakcyjne</a> · <a href="/kontakt/">Kontakt</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <SiteFooter services={services} settings={settings} cta={false} />
+  <script>
+    import { mountShell } from '../lib/shell';
+    mountShell();
+  </script>
+</Base>

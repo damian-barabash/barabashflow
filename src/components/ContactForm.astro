@@ -1,56 +1,49 @@
 ---
-// Enquiry form → contact_submissions (anon INSERT via RLS). `source` tells
-// the admin inbox where the message came from. Same markup in the dark
-// footer block and the light contact-page card (variant = styling only).
-import type { Service } from '../lib/content';
-export interface Props {
-  source: string;
-  services?: Service[];
-  variant?: 'dark' | 'light';
-  id?: string;
-}
-const { source, services = [], variant = 'dark', id = `cf-${source}` } = Astro.props;
-const BUDGETS = ['do 5 000 zł', '5 000 – 10 000 zł', '10 000 – 25 000 zł', '25 000 – 50 000 zł', 'powyżej 50 000 zł'];
+// Enquiry form — deliberately minimal: name, e-mail, message (+ honeypot).
+// On submit shell.ts prints an animated "receipt" (BF-XXXXXX reference) and
+// then swaps the form for a sequential success state. Rows land in
+// contact_submissions (anon INSERT via RLS); `source` tells the admin inbox
+// where the message came from.
+export interface Props { source: string; variant?: 'dark' | 'light'; id?: string }
+const { source, variant = 'dark', id = `cf-${source}` } = Astro.props;
 ---
-<form class={variant === 'light' ? 'form-card' : 'contact-form'} data-contact-form={source} id={id} autocomplete="on" novalidate>
-  <div class="f-grid">
-    <div class="f-field">
-      <label for={`${id}-name`} data-i18n="contact.name">Imię i nazwisko</label>
-      <input id={`${id}-name`} name="name" type="text" required maxlength="120" autocomplete="name" placeholder="Jan Kowalski" />
+<div class={`contact-form-wrap ${variant === 'light' ? 'is-light' : 'is-dark'}`}>
+  <form class={variant === 'light' ? 'form-card' : 'contact-form'} data-contact-form={source} id={id} autocomplete="on" novalidate>
+    <div class="f-grid">
+      <div class="f-field">
+        <label for={`${id}-name`} data-i18n="contact.name">Imię i nazwisko</label>
+        <input id={`${id}-name`} name="name" type="text" required maxlength="120" autocomplete="name" placeholder="Jan Kowalski" />
+      </div>
+      <div class="f-field">
+        <label for={`${id}-email`} data-i18n="contact.email">E-mail</label>
+        <input id={`${id}-email`} name="email" type="email" required maxlength="160" autocomplete="email" placeholder="jan@firma.pl" />
+      </div>
+      <div class="f-field is-full">
+        <label for={`${id}-msg`} data-i18n="contact.message">Opisz projekt</label>
+        <textarea id={`${id}-msg`} name="message" required maxlength="4000" rows="4" data-i18n-placeholder="contact.message.ph" placeholder="Kilka zdań: co robi Twoja firma, co ma robić strona, kiedy chcesz wystartować."></textarea>
+      </div>
+      <label class="f-hp" aria-hidden="true">Strona www<input type="text" name="website_url" tabindex="-1" autocomplete="off" /></label>
     </div>
-    <div class="f-field">
-      <label for={`${id}-email`} data-i18n="contact.email">E-mail</label>
-      <input id={`${id}-email`} name="email" type="email" required maxlength="160" autocomplete="email" placeholder="jan@firma.pl" />
+    <div class="form-status" aria-live="polite"></div>
+    <button type="submit" class="btn btn-dark is-block with-icon">
+      <span class="btn-ico"><svg viewBox="0 0 16 16" fill="none"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span data-i18n="contact.submit">Wyślij zapytanie</span>
+    </button>
+    <p class="form-consent"><span data-i18n="contact.consent">Wysyłając wiadomość, akceptujesz politykę prywatności.</span> <a href="/polityka-prywatnosci/" data-i18n="nav.privacy">Polityka prywatności</a></p>
+  </form>
+
+  <div class="form-success" hidden aria-live="polite">
+    <div class="fs-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none"><circle class="fs-ring" cx="32" cy="32" r="28" stroke="currentColor" stroke-width="2.5"/><path class="fs-tick" d="M20 33.5l8 8 16-17" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
-    <div class="f-field">
-      <label for={`${id}-phone`} data-i18n="contact.phone">Telefon (opcjonalnie)</label>
-      <input id={`${id}-phone`} name="phone" type="tel" maxlength="40" autocomplete="tel" placeholder="+48 …" />
-    </div>
-    <div class="f-field">
-      <label for={`${id}-company`} data-i18n="contact.company">Firma (opcjonalnie)</label>
-      <input id={`${id}-company`} name="company" type="text" maxlength="120" autocomplete="organization" />
-    </div>
-    <div class="f-field">
-      <label for={`${id}-service`} data-i18n="contact.service">Czego potrzebujesz?</label>
-      <select id={`${id}-service`} name="service">
-        <option value="" data-i18n="contact.service.any">Nie wiem jeszcze — doradź</option>
-        {services.map((s) => <option value={s.slug} data-lm-pl={s.title_pl} data-lm-en={s.title_en || s.title_pl} data-lm-ru={s.title_ru || s.title_pl}>{s.title_pl}</option>)}
-      </select>
-    </div>
-    <div class="f-field">
-      <label for={`${id}-budget`} data-i18n="contact.budget">Orientacyjny budżet</label>
-      <select id={`${id}-budget`} name="budget">
-        <option value="" data-i18n="contact.budget.any">Do ustalenia</option>
-        {BUDGETS.map((b) => <option value={b}>{b}</option>)}
-      </select>
-    </div>
-    <div class="f-field is-full">
-      <label for={`${id}-msg`} data-i18n="contact.message">Opisz projekt</label>
-      <textarea id={`${id}-msg`} name="message" required maxlength="4000" rows="4" data-i18n-placeholder="contact.message.ph" placeholder="Kilka zdań: co robi Twoja firma, co ma robić strona, kiedy chcesz wystartować."></textarea>
-    </div>
-    <label class="f-hp" aria-hidden="true">Strona www<input type="text" name="website_url" tabindex="-1" autocomplete="off" /></label>
+    <p class="fs-ref"><span data-i18n="success.ref">Numer zgłoszenia</span> <b data-success-ref>—</b></p>
+    <h3 class="fs-title" data-i18n="success.title">Dziękuję — zapytanie dotarło</h3>
+    <p class="fs-p" data-i18n="success.p">Przeczytam je osobiście i odpiszę w ciągu 24 godzin w dni robocze — z pytaniami, planem i orientacyjną wyceną.</p>
+    <ol class="fs-steps">
+      <li class="is-done"><i></i><span data-i18n="success.s1">Zapytanie przyjęte</span></li>
+      <li><i></i><span data-i18n="success.s2">Czytam brief i przygotowuję pytania</span></li>
+      <li><i></i><span data-i18n="success.s3">Odpowiedź z planem i wyceną — do 24 h</span></li>
+    </ol>
+    <p class="fs-foot"><span data-i18n="success.copy">Kopię zachowaj:</span> <b data-success-ref>—</b> · <button type="button" class="fs-again" data-success-again data-i18n="success.again">Wyślij kolejne zapytanie</button></p>
   </div>
-  <div class="form-status" aria-live="polite"></div>
-  <button type="submit" class={`btn ${variant === 'light' ? 'btn-dark' : 'btn-dark'} is-block`} data-i18n="contact.submit">Wyślij zapytanie</button>
-  <p class="form-consent"><span data-i18n="contact.consent">Wysyłając wiadomość, akceptujesz politykę prywatności.</span> <a href="/polityka-prywatnosci/" data-i18n="nav.privacy">Polityka prywatności</a></p>
-</form>
+</div>

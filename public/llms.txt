@@ -1,10 +1,10 @@
 # BarabashFlow
 
-> Studio Dmytrija Barabasha (Warszawa, Polska). Tworzenie nowoczesnych stron
+> Studio Damiana Barabasha (Warszawa, Polska). Tworzenie nowoczesnych stron
 > internetowych, platform i aplikacji webowych. Websites & internet platforms.
 > Разработка сайтов, платформ и веб-приложений.
 
-BarabashFlow to jednoosobowe studio web-developmentu prowadzone przez Dmytrija
+BarabashFlow to jednoosobowe studio web-developmentu prowadzone przez Damiana
 Barabasha. Specjalizacja: szybkie, statyczne strony i platformy w technologiach
 Astro, React, Next.js, Supabase i Three.js, wdrażane na GitHub Pages / Cloudflare.
 
@@ -18,7 +18,7 @@ Astro, React, Next.js, Supabase i Three.js, wdrażane na GitHub Pages / Cloudfla
 - Portfolio: https://barabashflow.pl/projekty/ (m.in. Mercedes-Maybach / Autoforum Warszawa, WellBeauty B2B, Ticket Flow, Sake Control, HUBIJAS, Heels on the Track)
 
 ## Autor
-- Dmytrii Barabash — web developer, założyciel BarabashFlow (Warszawa).
+- Damian Barabash — web developer, założyciel BarabashFlow (Warszawa).
 - O mnie + zasady redakcyjne bloga: https://barabashflow.pl/o-mnie/
 - GitHub: https://github.com/damian-barabash
 

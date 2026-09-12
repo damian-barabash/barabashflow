@@ -148,36 +148,151 @@ function setupProjectFilter() {
   });
 }
 
-// ── contact forms (home / contact page / footer) → contact_submissions ──────
+// ── contact forms → contact_submissions, then the "receipt" ─────────────────
+// Choreography (mirrors the HawkFix receipt, in BF style): the overlay with
+// the printer rises the moment the user submits ("Rejestruję zapytanie…"),
+// the paper prints once the row is stored, holds so it can be read, flies up,
+// and the form is replaced by a sequential success state. Esc / click skip.
+const PRINT_MS = 1700, HOLD_MS = 2300, FLY_MS = 900;
+
+function makeRef(): string {
+  const t = Date.now().toString(36).toUpperCase().slice(-5);
+  const r = Math.floor(Math.random() * 36).toString(36).toUpperCase();
+  return `BF-${t}${r}`;
+}
+function barsFor(seed: string): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < 44; i++) out.push(1 + ((seed.charCodeAt(i % seed.length) + i * 7) % 4));
+  return out;
+}
+const esc = (v: string) => v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+
+function openReceipt() {
+  const el = document.createElement('div');
+  el.className = 'rcp';
+  el.dataset.phase = 'wait';
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', 'polite');
+  el.innerHTML = `<div class="rcp-stage">
+    <div class="rcp-printer" aria-hidden="true"><span class="brand">barabashflow</span><span class="rcp-led"></span><span class="rcp-slot"></span></div>
+    <div class="rcp-paperwrap"><div class="rcp-paper"><div class="rcp-inner is-wait"><div class="rcp-brand">BF</div><div class="rcp-sub">${esc(t('receipt.wait'))}</div></div></div></div>
+    <div class="rcp-skip">${esc(t('receipt.skip'))}</div>
+  </div>`;
+  document.body.appendChild(el);
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => el.classList.add('is-open'));
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let finished = false;
+  let onFinish: (() => void) | null = null;
+  const timers: number[] = [];
+  const finish = () => {
+    if (finished) return; finished = true;
+    timers.forEach(clearTimeout);
+    el.classList.remove('is-open');
+    document.body.style.overflow = '';
+    document.removeEventListener('keydown', onKey);
+    setTimeout(() => el.remove(), 350);
+    onFinish?.();
+  };
+  const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && el.dataset.phase !== 'wait') finish(); };
+  document.addEventListener('keydown', onKey);
+  el.addEventListener('click', () => { if (el.dataset.phase !== 'wait') finish(); });
+  return {
+    print(data: { ref: string; name: string; email: string; message: string }, done: () => void) {
+      onFinish = done;
+      const date = new Date().toLocaleString(document.documentElement.lang || 'pl', { dateStyle: 'medium', timeStyle: 'short' });
+      el.querySelector('.rcp-paper')!.innerHTML = `<div class="rcp-inner">
+        <div class="rcp-brand">barabashflow</div>
+        <div class="rcp-thanks">${esc(t('receipt.thanks'))}</div>
+        <div class="rcp-sub">${esc(t('receipt.sub'))}</div>
+        <div class="rcp-tear" aria-hidden="true"></div>
+        <dl class="rcp-rows">
+          <div><dt>${esc(t('receipt.no'))}</dt><dd>${esc(data.ref)}</dd></div>
+          <div><dt>${esc(t('receipt.date'))}</dt><dd>${esc(date)}</dd></div>
+          <div><dt>${esc(t('receipt.from'))}</dt><dd>${esc(data.name)}<br><small>${esc(data.email)}</small></dd></div>
+          <div><dt>${esc(t('receipt.status'))}</dt><dd><span class="rcp-badge">${esc(t('receipt.status.v'))}</span></dd></div>
+        </dl>
+        <div class="rcp-msg">${esc(data.message.slice(0, 140))}${data.message.length > 140 ? '…' : ''}</div>
+        <div class="rcp-code" aria-hidden="true">${barsFor(data.ref).map((w) => `<span style="width:${w}px"></span>`).join('')}</div>
+        <div class="rcp-codeno" aria-hidden="true">${esc(data.ref)}</div>
+      </div>`;
+      // Paper must start collapsed for the 0fr → 1fr transition to run.
+      requestAnimationFrame(() => {
+        el.dataset.phase = 'print';
+        if (reduced) { timers.push(window.setTimeout(finish, 2200)); return; }
+        timers.push(window.setTimeout(() => { el.dataset.phase = 'hold'; }, PRINT_MS));
+        timers.push(window.setTimeout(() => { el.dataset.phase = 'fly'; }, PRINT_MS + HOLD_MS));
+        timers.push(window.setTimeout(finish, PRINT_MS + HOLD_MS + FLY_MS));
+      });
+    },
+    fail() { finished = true; el.classList.remove('is-open'); document.body.style.overflow = ''; document.removeEventListener('keydown', onKey); setTimeout(() => el.remove(), 350); },
+  };
+}
+
+function showSuccess(wrap: HTMLElement, form: HTMLFormElement, ref: string) {
+  const box = wrap.querySelector<HTMLElement>('.form-success');
+  if (!box) return;
+  box.querySelectorAll<HTMLElement>('[data-success-ref]').forEach((b) => { b.textContent = ref; });
+  form.hidden = true;
+  box.hidden = false;
+  const steps = box.querySelectorAll<HTMLElement>('.fs-steps li');
+  steps.forEach((li, i) => li.classList.toggle('is-done', i === 0));
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    box.classList.add('is-in');
+    // step 2 lights up as "in progress" after the list has revealed
+    setTimeout(() => steps[1]?.classList.add('is-now'), 2200);
+    box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }));
+  box.querySelector('[data-success-again]')?.addEventListener('click', () => {
+    box.classList.remove('is-in'); box.hidden = true;
+    steps.forEach((li) => li.classList.remove('is-now'));
+    form.hidden = false; form.classList.remove('is-sent');
+    form.querySelector<HTMLInputElement>('input[name=name]')?.focus();
+  }, { once: true });
+}
+
 export function bindContactForms() {
   document.querySelectorAll<HTMLFormElement>('form[data-contact-form]').forEach((form) => {
+    const wrap = form.closest<HTMLElement>('.contact-form-wrap') || form.parentElement!;
     const status = form.querySelector<HTMLElement>('.form-status');
     const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+    let busy = false;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (busy) return;
       const fd = new FormData(form);
       const get = (k: string) => String(fd.get(k) || '').trim();
       const name = get('name'), email = get('email'), message = get('message');
-      // Honeypot: bots fill every field.
-      if (get('website_url')) { form.reset(); return; }
-      if (!name || !email || !message) { if (status) status.textContent = t('contact.required'); return; }
+      if (get('website_url')) { form.reset(); return; } // honeypot
+      if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !message) { if (status) status.textContent = t('contact.required'); return; }
+      busy = true;
       if (submit) submit.disabled = true;
-      if (status) status.textContent = t('contact.sending');
+      if (status) status.textContent = '';
+      const ref = makeRef();
+      const receipt = openReceipt();
+      const started = Date.now();
       const { error } = await restInsert('contact_submissions', {
-        name, email, message,
-        phone: get('phone') || null,
-        company: get('company') || null,
-        service: get('service') || null,
-        budget: get('budget') || null,
+        name, email, message, ref,
         source: form.dataset.contactForm || 'website',
         page: location.pathname.slice(0, 200),
         locale: getLocale(),
       });
+      busy = false;
       if (submit) submit.disabled = false;
-      if (error) { if (status) status.textContent = t('contact.error'); return; }
-      form.reset();
-      form.classList.add('is-sent');
-      if (status) status.textContent = t('contact.success');
+      if (error) {
+        receipt.fail();
+        if (status) status.textContent = t('contact.error');
+        return;
+      }
+      // Let the printer "warm up" for at least a beat so the wait state reads.
+      const wait = Math.max(0, 700 - (Date.now() - started));
+      setTimeout(() => {
+        receipt.print({ ref, name, email, message }, () => {
+          form.reset();
+          form.classList.add('is-sent');
+          showSuccess(wrap, form, ref);
+        });
+      }, wait);
     });
   });
 }

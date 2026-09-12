@@ -10,11 +10,25 @@ export default defineConfig({
   base: '/',
   output: 'static',
   trailingSlash: 'ignore',
+  // English aliases → canonical Polish URLs (meta-refresh pages on GH Pages).
+  redirects: {
+    '/about': '/o-mnie/',
+    '/about-us': '/o-mnie/',
+    '/contact': '/kontakt/',
+    '/privacy': '/polityka-prywatnosci/',
+    '/privacy-policy': '/polityka-prywatnosci/',
+    '/terms': '/regulamin/',
+    '/terms-of-service': '/regulamin/',
+    '/editorial-policy': '/zasady-redakcyjne/',
+    '/services': '/uslugi/',
+    '/projects': '/projekty/',
+    '/mail': '/admin/',
+  },
   integrations: [
     react(),
     sitemap({
       // admin is private (behind auth) — keep it out of the sitemap.
-      filter: (page) => !/\/(admin|404)\/?$/.test(page),
+      filter: (page) => !/\/(admin|404|about|about-us|contact|privacy|privacy-policy|terms|terms-of-service|editorial-policy|services|projects|mail)\/?$/.test(page),
     }),
   ],
   build: {
