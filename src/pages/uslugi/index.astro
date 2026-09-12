@@ -1,0 +1,67 @@
+---
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import FaqList from '../../components/FaqList.astro';
+import { fetchSettings, fetchServices, fetchFaq, lmRow, s, lm } from '../../lib/content';
+import { SITE } from '../../lib/site';
+
+const [settings, services, faq] = await Promise.all([fetchSettings(), fetchServices(), fetchFaq('home')]);
+const title = 'Usługi — strony internetowe, sklepy, platformy, CMS | BarabashFlow';
+const description = 'Tworzenie stron internetowych, sklepów online, platform i aplikacji webowych oraz panele CMS, SEO i opieka. Kod na miarę, wycena w 24 h — BarabashFlow, Warszawa.';
+const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+  { '@type': 'ListItem', position: 1, name: 'BarabashFlow', item: SITE + '/' },
+  { '@type': 'ListItem', position: 2, name: 'Usługi', item: SITE + '/uslugi/' },
+] };
+const listLd = { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: services.map((sv, i) => ({ '@type': 'ListItem', position: i + 1, name: sv.title_pl, url: `${SITE}/uslugi/${sv.slug}/` })) };
+---
+<Base title={title} description={description} jsonLd={[crumbsLd, listLd]}>
+  <SiteHeader active="services" />
+  <main class="container">
+    <section class="sec">
+      <div class="sec-inner page-head">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span data-i18n="nav.services">Usługi</span></nav>
+        <span class="kicker" data-i18n="nav.services">Usługi</span>
+        <h1 data-i18n="services.h1">Usługi: strony, sklepy, platformy i opieka</h1>
+        <p class="lead" data-i18n="services.lead">Cztery obszary, jeden wykonawca. Wybierz to, czego potrzebujesz — albo napisz, a doradzę.</p>
+      </div>
+    </section>
+    <div class="divider" aria-hidden="true"></div>
+    <section class="sec">
+      <div class="sec-inner">
+        <div class="services-grid">
+          {services.map((sv, i) => (
+            <article class="svc" data-reveal data-reveal-delay={i * 80}>
+              <a class="over-link" href={`/uslugi/${sv.slug}/`} aria-label={sv.title_pl}></a>
+              <span class="kicker is-dark svc-tag" {...lmRow(sv, 'title')}>{sv.title_pl}</span>
+              <p class="tagline" {...lmRow(sv, 'tagline')}>{sv.tagline_pl}</p>
+              <div class="svc-num">0{i + 1}</div>
+              <ul>{sv.bullets_pl.map((b, j) => <li data-lm-pl={b} data-lm-en={sv.bullets_en[j] || b} data-lm-ru={sv.bullets_ru[j] || b}>{b}</li>)}</ul>
+              <div class="svc-foot">
+                {sv.price_from && <span class="svc-price"><b>{sv.price_from}</b></span>}
+                <a class="svc-link" href={`/uslugi/${sv.slug}/`} aria-label={`${sv.title_pl} — szczegóły`}><svg viewBox="0 0 16 16" fill="none"><path d="M5 2l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+    <div class="divider" aria-hidden="true"></div>
+    {faq.length > 0 && (
+      <section class="sec">
+        <div class="sec-inner sec-pad">
+          <div class="sec-head is-center">
+            <span class="kicker" data-i18n="home.faq.kicker">FAQ</span>
+            <h2 class="h-sec is-center" data-i18n="home.faq.title">Częste pytania</h2>
+          </div>
+          <FaqList items={faq} />
+        </div>
+      </section>
+    )}
+  </main>
+  <SiteFooter services={services} settings={settings} />
+  <script>
+    import { mountShell } from '../../lib/shell';
+    mountShell();
+  </script>
+</Base>

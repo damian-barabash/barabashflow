@@ -2,27 +2,21 @@
 import Base from '../../layouts/Base.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
-import '../../styles/main.css';
 import { mediaUrl } from '../../lib/supabase';
-import {
-  fetchAllPosts, formatDatePl, isoDate, wasUpdated, relatedPosts, renderMarkdown, type BlogPost,
-} from '../../lib/blog';
+import { fetchAllPosts, formatDatePl, isoDate, wasUpdated, relatedPosts, renderMarkdown, type BlogPost } from '../../lib/blog';
+import { fetchSettings, fetchServices, type Service, type Settings } from '../../lib/content';
 import { SITE, AUTHOR_NAME, PERSON_ID, ORG_ID } from '../../lib/site';
 
 export async function getStaticPaths() {
-  const posts = await fetchAllPosts();
-  return posts.map((post) => ({
-    params: { slug: post.slug },
-    props: { post, related: relatedPosts(post, posts, 3) },
-  }));
+  const [posts, settings, services] = await Promise.all([fetchAllPosts(), fetchSettings(), fetchServices()]);
+  return posts.map((post) => ({ params: { slug: post.slug }, props: { post, related: relatedPosts(post, posts, 3), settings, services } }));
 }
 
-const { post, related } = Astro.props as { post: BlogPost; related: BlogPost[] };
+const { post, related, settings, services } = Astro.props as { post: BlogPost; related: BlogPost[]; settings: Settings; services: Service[] };
 const site = SITE;
 const url = `${site}/blog/${post.slug}/`;
 const coverUrl = post.cover_path ? mediaUrl(post.cover_path) : `${site}/assets/img/og.png`;
 const bodyHtml = renderMarkdown(post.body_pl);
-// Keep <title> near the 60-char budget: brand suffix only when there is room.
 const title = post.title_pl.length > 42 ? post.title_pl : `${post.title_pl} | Blog BarabashFlow`;
 const description = post.excerpt_pl || post.title_pl;
 const faq = Array.isArray(post.faq) ? post.faq.filter((f) => f?.q && f?.a) : [];
@@ -30,150 +24,88 @@ const updated = wasUpdated(post);
 const modified = updated ? post.updated_at! : post.published_at;
 
 const postLd = {
-  '@context': 'https://schema.org',
-  '@type': 'BlogPosting',
-  '@id': `${url}#article`,
-  headline: post.title_pl,
-  description,
-  image: coverUrl,
-  url,
-  datePublished: post.published_at,
-  dateModified: modified,
-  inLanguage: 'pl',
+  '@context': 'https://schema.org', '@type': 'BlogPosting', '@id': `${url}#article`,
+  headline: post.title_pl, description, image: coverUrl, url,
+  datePublished: post.published_at, dateModified: modified, inLanguage: 'pl',
   keywords: (post.keywords || []).join(', '),
-  author: { '@id': PERSON_ID },
-  publisher: { '@id': ORG_ID },
-  isPartOf: { '@id': `${site}/blog/#blog` },
-  mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+  author: { '@id': PERSON_ID }, publisher: { '@id': ORG_ID },
+  isPartOf: { '@id': `${site}/blog/#blog` }, mainEntityOfPage: { '@type': 'WebPage', '@id': url },
 };
-const crumbsLd = {
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    { '@type': 'ListItem', position: 1, name: 'BarabashFlow', item: site + '/' },
-    { '@type': 'ListItem', position: 2, name: 'Blog', item: site + '/blog/' },
-    { '@type': 'ListItem', position: 3, name: post.title_pl, item: url },
-  ],
-};
-const faqLd = faq.length
-  ? {
-      '@context': 'https://schema.org',
-      '@type': 'FAQPage',
-      mainEntity: faq.map((f) => ({
-        '@type': 'Question',
-        name: f.q,
-        acceptedAnswer: { '@type': 'Answer', text: f.a },
-      })),
-    }
-  : null;
+const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+  { '@type': 'ListItem', position: 1, name: 'BarabashFlow', item: site + '/' },
+  { '@type': 'ListItem', position: 2, name: 'Blog', item: site + '/blog/' },
+  { '@type': 'ListItem', position: 3, name: post.title_pl, item: url },
+] };
+const faqLd = faq.length ? { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) } : null;
 const jsonLd = [postLd, crumbsLd, ...(faqLd ? [faqLd] : [])];
 ---
 <Base title={title} description={description} ogType="article" ogImage={coverUrl!} jsonLd={jsonLd}>
-  <div class="app">
-    <SiteHeader active="blog" />
+  <SiteHeader active="blog" />
+  <main class="container">
+    <section class="sec">
+      <article class="sec-inner post">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><a href="/blog/">Blog</a></nav>
+        <header class="post-head">
+          {(post.tags || []).length > 0 && <div class="post-tags">{(post.tags || []).slice(0, 4).map((t) => <span class="chip">{t}</span>)}</div>}
+          <h1 data-lm-pl={post.title_pl} data-lm-en={post.title_en || post.title_pl} data-lm-ru={post.title_ru || post.title_pl}>{post.title_pl}</h1>
+          {post.excerpt_pl && <p class="lead" data-lm-pl={post.excerpt_pl} data-lm-en={post.excerpt_en || post.excerpt_pl} data-lm-ru={post.excerpt_ru || post.excerpt_pl}>{post.excerpt_pl}</p>}
+          <p class="post-byline">
+            <span><span data-i18n="blog.by">Autor</span>: <a href="/o-mnie/" rel="author">{AUTHOR_NAME}</a></span>
+            <span aria-hidden="true">·</span>
+            <span><span data-i18n="blog.published">Opublikowano</span> <time datetime={isoDate(post.published_at)}>{formatDatePl(post.published_at)}</time></span>
+            {updated && <><span aria-hidden="true">·</span><span><span data-i18n="blog.updated">Aktualizacja</span> <time datetime={isoDate(post.updated_at)}>{formatDatePl(post.updated_at!)}</time></span></>}
+          </p>
+        </header>
 
-    <article class="post">
-      <nav class="post-crumbs" aria-label="Breadcrumb">
-        <a href="/">BarabashFlow</a><span>/</span><a href="/blog/">Blog</a>
-      </nav>
-
-      <header class="post-head">
-        <div class="hero-chips">
-          {(post.tags || []).slice(0, 4).map((t) => <span class="chip chip-xs">{t}</span>)}
-        </div>
-        <h1
-          class="post-title"
-          data-lm-pl={post.title_pl}
-          data-lm-en={post.title_en || post.title_pl}
-          data-lm-ru={post.title_ru || post.title_pl}
-        >{post.title_pl}</h1>
-        {post.excerpt_pl && (
-          <p
-            class="post-lead"
-            data-lm-pl={post.excerpt_pl}
-            data-lm-en={post.excerpt_en || post.excerpt_pl}
-            data-lm-ru={post.excerpt_ru || post.excerpt_pl}
-          >{post.excerpt_pl}</p>
+        {post.cover_path && (
+          <figure class="post-cover-wrap">
+            <img class="post-cover" src={coverUrl} alt={post.cover_alt || post.title_pl} loading="eager" decoding="async" width="1200" height="675" />
+            {post.cover_credit && <figcaption class="post-credit">{post.cover_source_url ? <a href={post.cover_source_url} rel="noopener nofollow" target="_blank">{post.cover_credit}</a> : post.cover_credit}</figcaption>}
+          </figure>
         )}
-        <p class="post-byline">
-          <span><span data-i18n="blog.by">Autor</span>: <a href="/o-mnie/" rel="author">{AUTHOR_NAME}</a></span>
-          <span aria-hidden="true">·</span>
-          <span><span data-i18n="blog.published">Opublikowano</span> <time datetime={isoDate(post.published_at)}>{formatDatePl(post.published_at)}</time></span>
-          {updated && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span><span data-i18n="blog.updated">Aktualizacja</span> <time datetime={isoDate(post.updated_at)}>{formatDatePl(post.updated_at!)}</time></span>
-            </>
-          )}
-        </p>
-      </header>
 
-      {post.cover_path && (
-        <figure class="post-cover-wrap">
-          <img class="post-cover" src={coverUrl} alt={post.cover_alt || post.title_pl} loading="eager" decoding="async" />
-          {post.cover_credit && (
-            <figcaption class="post-credit">
-              {post.cover_source_url
-                ? <a href={post.cover_source_url} rel="noopener nofollow" target="_blank">{post.cover_credit}</a>
-                : post.cover_credit}
-            </figcaption>
-          )}
-        </figure>
-      )}
-
-      <div class="post-body" data-locale="pl" set:html={bodyHtml} />
-      {post.body_en && <div class="post-body" data-locale="en" hidden set:html={renderMarkdown(post.body_en)} />}
-      {post.body_ru && <div class="post-body" data-locale="ru" hidden set:html={renderMarkdown(post.body_ru)} />}
-
-      {faq.length > 0 && (
-        <section class="post-faq">
-          <h2 class="section-title" data-i18n="sec.faq.title">Częste pytania</h2>
-          <div class="faq-list">
-            {faq.map((f) => (
-              <details class="faq-item">
-                <summary><span>{f.q}</span><span class="faq-plus" aria-hidden="true"></span></summary>
-                <p>{f.a}</p>
-              </details>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <aside class="author-box">
-        <img class="author-logo" src="/assets/img/logo.png" alt="Logo BarabashFlow" width="40" height="49" />
-        <div class="author-text">
-          <strong><a href="/o-mnie/" rel="author">{AUTHOR_NAME}</a> — BarabashFlow</strong>
-          <p data-i18n="blog.author">Projektuję i wdrażam strony internetowe, platformy i aplikacje webowe dla firm. Warszawa → cały świat.</p>
-          <a class="author-more" href="/o-mnie/" data-i18n="blog.author.link">Więcej o autorze →</a>
+        <div class="post-body">
+          <div data-locale="pl" set:html={bodyHtml} />
+          {post.body_en && <div data-locale="en" hidden set:html={renderMarkdown(post.body_en)} />}
+          {post.body_ru && <div data-locale="ru" hidden set:html={renderMarkdown(post.body_ru)} />}
         </div>
-        <a class="cta cta-lime" href="/kontakt/">
-          <span class="cta-label">Zlecić projekt</span>
-          <svg class="cta-arrow" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </a>
-      </aside>
 
-      {related.length > 0 && (
-        <section class="related" aria-labelledby="related-title">
-          <h2 class="section-title" id="related-title" data-i18n="blog.related">Czytaj także</h2>
-          <ul class="related-list">
-            {related.map((r) => (
-              <li>
-                <a class="related-card" href={`/blog/${r.slug}/`}>
-                  <time class="blog-card-date" datetime={isoDate(r.published_at)}>{formatDatePl(r.published_at)}</time>
+        {faq.length > 0 && (
+          <section class="post-faq">
+            <h2 class="h-sub" data-i18n="blog.faq">Częste pytania</h2>
+            <div class="faq-list">
+              {faq.map((f) => <details class="faq-item"><summary><span>{f.q}</span><span class="faq-plus" aria-hidden="true"></span></summary><p>{f.a}</p></details>)}
+            </div>
+          </section>
+        )}
+
+        <aside class="author-box">
+          <img src="/assets/img/logo.png" alt="Logo BarabashFlow" width="44" height="54" />
+          <div>
+            <strong><a href="/o-mnie/" rel="author">{AUTHOR_NAME}</a> — BarabashFlow</strong>
+            <p data-i18n="blog.author">Projektuję i wdrażam strony internetowe, platformy i aplikacje webowe dla firm. Warszawa → cały świat.</p>
+            <a class="more" href="/o-mnie/" data-i18n="blog.author.link">Więcej o autorze →</a>
+          </div>
+          <a class="btn btn-dark" href="/kontakt/" data-i18n="nav.cta">Wycena projektu</a>
+        </aside>
+
+        {related.length > 0 && (
+          <section class="related" aria-labelledby="related-title">
+            <h2 class="h-sub" id="related-title" data-i18n="blog.related">Czytaj także</h2>
+            <ul class="related-list">
+              {related.map((r) => (
+                <li><a class="related-card" href={`/blog/${r.slug}/`}>
+                  <time class="post-date" datetime={isoDate(r.published_at)}>{formatDatePl(r.published_at)}</time>
                   <strong data-lm-pl={r.title_pl} data-lm-en={r.title_en || r.title_pl} data-lm-ru={r.title_ru || r.title_pl}>{r.title_pl}</strong>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </article>
-
-    <SiteFooter />
-  </div>
-
+                </a></li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </article>
+    </section>
+  </main>
+  <SiteFooter services={services} settings={settings} />
   <script>
     import { mountShell } from '../../lib/shell';
     mountShell();

@@ -3,7 +3,8 @@ import react from '@astrojs/react';
 import sitemap from '@astrojs/sitemap';
 
 // barabashflow.pl — static portfolio on GitHub Pages (root domain).
-// Public page ships zero framework JS; /admin and /mail hydrate React islands.
+// Public pages: static Astro + a few KB of vanilla TS; three.js is a lazy chunk for the hero mark.
+// /admin is a vanilla SPA served from public/.
 export default defineConfig({
   site: 'https://barabashflow.pl',
   base: '/',
@@ -12,8 +13,8 @@ export default defineConfig({
   integrations: [
     react(),
     sitemap({
-      // admin + mail are private (behind auth) — keep them out of the sitemap.
-      filter: (page) => !/\/(admin|mail)\/?$/.test(page),
+      // admin is private (behind auth) — keep it out of the sitemap.
+      filter: (page) => !/\/(admin|404)\/?$/.test(page),
     }),
   ],
   build: {

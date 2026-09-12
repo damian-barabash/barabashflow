@@ -48,6 +48,9 @@
 //     get to choose. Price/city words are stop-listed in the stem filter and
 //     the same-subject window is 10 days — generic stems ("koszt", "warsz")
 //     must not act as a 3-week ban on half the topic space
+//   - every Edge Function call retries transient failures (5xx, network,
+//     "vault error" from a cold get_secret RPC) with backoff — 2026-09-12 the
+//     first call of the morning run failed once and the day shipped 0 posts
 //   - the GitHub PAT is validated on EVERY run and an alert goes out starting
 //     7 days before it expires — fine-grained PATs die silently otherwise
 //   - a single failing post never kills the run: keyword logging, the GitHub
@@ -86,18 +89,48 @@ const DEFAULT_SEEDS = [
 const log = (...a: unknown[]) => console.log(`[${new Date().toISOString()}]`, ...a);
 
 // ── Edge Function client ─────────────────────────────────────────────────────
+// Every call retries transient failures (network error, 5xx, edge-side
+// "vault error" when the get_secret RPC hiccups on a cold start). 2026-09-12:
+// the morning run died 7 s in on its FIRST call (`recent` → "vault error")
+// and the whole day shipped 0/2 — one retry would have saved it. 4xx
+// (unauthorized / bad payload) is deterministic and is not retried.
+const EDGE_RETRY_DELAYS_MS = [5_000, 20_000, 60_000];
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function edge(action: string, body: Record<string, unknown> = {}) {
-  const r = await fetch(CONFIG.edgeUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-blog-secret': CONFIG.secret,
-    },
-    body: JSON.stringify({ action, ...body }),
-  });
-  const data = await r.json();
-  if (!r.ok || data.error) throw new Error(`edge ${action}: ${data.error || r.status}`);
-  return data;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= EDGE_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const r = await fetch(CONFIG.edgeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-blog-secret': CONFIG.secret,
+        },
+        body: JSON.stringify({ action, ...body }),
+        signal: AbortSignal.timeout(120_000),
+      });
+      const text = await r.text();
+      let data: any = {};
+      try { data = text ? JSON.parse(text) : {}; }
+      catch { data = { error: `non-JSON response (${r.status}): ${text.slice(0, 120)}` }; }
+      if (r.ok && !data.error) return data;
+      const err = new Error(`edge ${action}: ${data.error || r.status}`);
+      const transient = r.status >= 500 || r.status === 429 || /vault error|non-JSON/i.test(String(data.error || ''));
+      if (!transient) throw err;
+      lastErr = err;
+    } catch (err) {
+      // fetch() itself failed (DNS/TLS/timeout) or a transient error above.
+      if (err instanceof Error && /^edge .*: (unauthorized|invalid json|method not allowed)/.test(err.message)) throw err;
+      lastErr = err;
+    }
+    if (attempt < EDGE_RETRY_DELAYS_MS.length) {
+      const wait = EDGE_RETRY_DELAYS_MS[attempt];
+      log(`edge ${action} failed (attempt ${attempt + 1}): ${String(lastErr)} — retrying in ${wait / 1000}s`);
+      await sleep(wait);
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 // Status report → admin panel. Best-effort: must never throw (it runs in error

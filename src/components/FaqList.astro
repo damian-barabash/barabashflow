@@ -1,0 +1,14 @@
+---
+import type { Faq } from '../lib/content';
+import { lmRow } from '../lib/content';
+export interface Props { items: Faq[]; }
+const { items } = Astro.props;
+---
+<div class="faq-list">
+  {items.map((f, i) => (
+    <details class="faq-item" open={i === 0}>
+      <summary><span {...lmRow(f, 'question')}>{f.question_pl}</span><span class="faq-plus" aria-hidden="true"></span></summary>
+      <p {...lmRow(f, 'answer')}>{f.answer_pl}</p>
+    </details>
+  ))}
+</div>

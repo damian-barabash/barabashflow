@@ -22,6 +22,7 @@
 //   set_cover     -> attach/replace a cover on an existing post by slug
 //                    (cover_b64 preferred, cover_image_url fallback).
 //   log_keywords  -> bulk-upserts the day's keyword research into seo_keywords.
+//   (v10, 2026-09-12: get_secret retried 3× — a single vault hiccup no longer 500s.)
 //   report_status -> stores the run status in site_settings.blog_agent_status
 //                    (shown in the admin Blog tab); a failed run also sends an
 //                    alert email to office@ via Resend.
@@ -58,8 +59,21 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  const { data: secret, error: secErr } = await svc.rpc('get_secret', { p_name: 'blog_ingest_secret' });
-  if (secErr || !secret) return json({ error: 'vault error' }, 500);
+  // The get_secret RPC occasionally fails on a cold start (2026-09-12: one
+  // "vault error" killed the whole morning run). Retry a few times before
+  // giving up — the worker retries too, but cheap here.
+  let secret: string | null = null;
+  let secErr: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await svc.rpc('get_secret', { p_name: 'blog_ingest_secret' });
+    if (!res.error && res.data) { secret = res.data as string; secErr = null; break; }
+    secErr = res.error || new Error('empty secret');
+    await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+  }
+  if (!secret) {
+    console.error('[blog-ingest] vault error', secErr);
+    return json({ error: 'vault error' }, 500);
+  }
   const provided = req.headers.get('x-blog-secret') || '';
   if (provided !== secret) return json({ error: 'unauthorized' }, 401);
 

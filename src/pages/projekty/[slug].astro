@@ -1,0 +1,138 @@
+---
+// Case study page: hero (title, tagline, meta), cover, description blocks,
+// gallery, results, next project. body_* (markdown) wins over the legacy
+// plain-text description_* when present.
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import { mediaUrl } from '../../lib/supabase';
+import { fetchSettings, fetchServices, fetchProjects, md, textToMd, lmRow, categoryLm, projectCover, firstSentence, type Service, type Project, type Settings } from '../../lib/content';
+import { SITE, ORG_ID, PERSON_ID } from '../../lib/site';
+
+export async function getStaticPaths() {
+  const [projects, services, settings] = await Promise.all([fetchProjects(), fetchServices(), fetchSettings()]);
+  return projects.map((project, i) => {
+    const next = projects[(i + 1) % projects.length];
+    const similar = projects.filter((p) => p.slug !== project.slug && p.services.some((sv) => project.services.includes(sv))).slice(0, 2);
+    return { params: { slug: project.slug }, props: { project, services, settings, next: next.slug === project.slug ? null : next, similar } };
+  });
+}
+const { project: p, services, settings, next, similar } = Astro.props as { project: Project; services: Service[]; settings: Settings; next: Project | null; similar: Project[] };
+const cover = projectCover(p);
+const gallery = p.photos.filter((ph) => mediaUrl(ph.storage_path) !== cover);
+const tag = { pl: p.tagline_pl || firstSentence(p.description_pl), en: p.tagline_en || firstSentence(p.description_en) || p.tagline_pl || firstSentence(p.description_pl), ru: p.tagline_ru || firstSentence(p.description_ru) || p.tagline_pl || firstSentence(p.description_pl) };
+const body = { pl: md(p.body_pl || textToMd(p.description_pl)), en: md(p.body_en || textToMd(p.description_en)), ru: md(p.body_ru || textToMd(p.description_ru)) };
+const svcOf = (slug: string) => services.find((sv) => sv.slug === slug);
+const title = `${p.title_pl} — ${p.category_pl || 'projekt'} | BarabashFlow`;
+const description = (tag.pl || '').slice(0, 158);
+const url = `${SITE}/projekty/${p.slug}/`;
+const workLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CreativeWork',
+  '@id': `${url}#work`,
+  name: p.title_pl,
+  headline: p.title_pl,
+  description,
+  url,
+  ...(cover ? { image: cover } : {}),
+  ...(p.year ? { dateCreated: String(p.year) } : {}),
+  creator: { '@id': PERSON_ID },
+  publisher: { '@id': ORG_ID },
+  inLanguage: 'pl',
+  keywords: [...p.services, ...p.stack].join(', '),
+  ...(p.url ? { sameAs: p.url } : {}),
+};
+const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+  { '@type': 'ListItem', position: 1, name: 'BarabashFlow', item: SITE + '/' },
+  { '@type': 'ListItem', position: 2, name: 'Projekty', item: SITE + '/projekty/' },
+  { '@type': 'ListItem', position: 3, name: p.title_pl, item: url },
+] };
+---
+<Base title={title} description={description} ogType="article" ogImage={cover || undefined} jsonLd={[workLd, crumbsLd]}>
+  <SiteHeader active="projects" />
+  <main class="container">
+    <section class="sec">
+      <div class="sec-inner">
+        <div class="proj-hero">
+          <div>
+            <nav class="crumbs" style="justify-content:flex-start" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><a href="/projekty/" data-i18n="nav.projects">Projekty</a><span>/</span><span {...lmRow(p, 'title')}>{p.title_pl}</span></nav>
+            <span class="kicker" {...categoryLm(p)}>{p.category_pl}</span>
+            <h1 style="margin-top:18px" {...lmRow(p, 'title')}>{p.title_pl}</h1>
+            <p class="lead" data-lm-pl={tag.pl} data-lm-en={tag.en} data-lm-ru={tag.ru}>{tag.pl}</p>
+          </div>
+          <dl class="proj-meta">
+            {p.client && <div><dt data-i18n="projects.client">Klient</dt><dd>{p.client}</dd></div>}
+            {p.year && <div><dt data-i18n="projects.year">Rok</dt><dd>{p.year}</dd></div>}
+            {p.services.length > 0 && <div class="full"><dt data-i18n="projects.services">Usługi</dt><dd>{p.services.map((slug, i) => { const sv = svcOf(slug); return sv ? <><a href={`/uslugi/${sv.slug}/`} {...lmRow(sv, 'title')}>{sv.title_pl}</a>{i < p.services.length - 1 ? ', ' : ''}</> : null; })}</dd></div>}
+            {p.stack.length > 0 && <div class="full"><dt data-i18n="projects.stack">Technologie</dt><dd>{p.stack.join(' · ')}</dd></div>}
+            {p.url && <div class="full"><dd><a class="btn btn-ghost" href={p.url} target="_blank" rel="noopener"><span data-i18n="projects.visit">Otwórz stronę projektu</span><svg class="btn-arrow" viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M11 3H5M11 3v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a></dd></div>}
+          </dl>
+        </div>
+        {cover && <div class="proj-cover"><img src={cover} alt={p.photos[0]?.alt_pl || p.title_pl} loading="eager" decoding="async" /></div>}
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-inner text-area">
+        <div class="lbl" data-i18n="projects.about">O projekcie</div>
+        <div>
+          <h2 data-lm-pl={tag.pl} data-lm-en={tag.en} data-lm-ru={tag.ru}>{tag.pl}</h2>
+          <div class="prose-body">
+            <div data-locale="pl" set:html={body.pl} />
+            {body.en && <div data-locale="en" hidden set:html={body.en} />}
+            {body.ru && <div data-locale="ru" hidden set:html={body.ru} />}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {p.results.length > 0 && (
+      <section class="sec">
+        <ul class="sec-inner results-row">
+          {p.results.map((r) => <li><b>{r.value}</b><span {...lmRow(r, 'label')}>{r.label_pl}</span></li>)}
+        </ul>
+      </section>
+    )}
+
+    {gallery.length > 0 && (
+      <section class="sec">
+        <div class={gallery.length === 1 ? 'gallery-1' : 'gallery-2'}>
+          {gallery.map((ph) => <div class="g"><img src={mediaUrl(ph.storage_path)} alt={ph.alt_pl || p.title_pl} loading="lazy" decoding="async" /></div>)}
+        </div>
+      </section>
+    )}
+
+    {next && (
+      <section class="sec">
+        <div class="sec-inner proj-next">
+          <div>
+            <span class="kicker" data-i18n="projects.next">Następny projekt</span>
+            <h3><a href={`/projekty/${next.slug}/`} {...lmRow(next, 'title')}>{next.title_pl}</a></h3>
+          </div>
+          <a class="arrow" href={`/projekty/${next.slug}/`} aria-label={next.title_pl}><svg viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+      </section>
+    )}
+
+    {similar.length > 0 && (
+      <>
+        <div class="divider" aria-hidden="true"></div>
+        <section class="sec">
+          <div class="sec-inner is-grey sec-pad">
+            <div class="sec-head is-split">
+              <h2 class="h-sec" data-i18n="projects.more">Podobne projekty</h2>
+              <a class="btn btn-white" href="/projekty/" data-i18n="projects.back">Wszystkie projekty</a>
+            </div>
+            <div class="projects-grid">{similar.map((sp) => <ProjectCard p={sp} />)}</div>
+          </div>
+        </section>
+      </>
+    )}
+  </main>
+  <SiteFooter services={services} settings={settings} />
+  <script>
+    import { mountShell } from '../../lib/shell';
+    mountShell();
+  </script>
+</Base>

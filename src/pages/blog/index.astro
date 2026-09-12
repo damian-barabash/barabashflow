@@ -2,89 +2,39 @@
 import Base from '../../layouts/Base.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
-import '../../styles/main.css';
-import { mediaUrl } from '../../lib/supabase';
-import { fetchPostList, formatDatePl, isoDate } from '../../lib/blog';
+import BlogCard from '../../components/BlogCard.astro';
+import { fetchPostList } from '../../lib/blog';
+import { fetchSettings, fetchServices } from '../../lib/content';
 import { SITE, PERSON_ID, ORG_ID } from '../../lib/site';
 
-const posts = await fetchPostList();
+const [posts, settings, services] = await Promise.all([fetchPostList(), fetchSettings(), fetchServices()]);
 const title = 'Blog — BarabashFlow | strony internetowe, platformy, SEO';
-const description =
-  'Blog studia BarabashFlow: praktycznie o stronach internetowych, platformach, sklepach online i SEO dla firm. Ceny, technologie, porady — bez żargonu.';
-
-const blogLd = {
-  '@context': 'https://schema.org',
-  '@type': 'Blog',
-  '@id': `${SITE}/blog/#blog`,
-  name: 'Blog BarabashFlow',
-  url: `${SITE}/blog/`,
-  description,
-  inLanguage: 'pl',
-  publisher: { '@id': ORG_ID },
-  author: { '@id': PERSON_ID },
-};
+const description = 'Blog studia BarabashFlow: praktycznie o stronach internetowych, platformach, sklepach online i SEO dla firm. Ceny, technologie, porady — bez żargonu.';
+const blogLd = { '@context': 'https://schema.org', '@type': 'Blog', '@id': `${SITE}/blog/#blog`, name: 'Blog BarabashFlow', url: `${SITE}/blog/`, description, inLanguage: 'pl', publisher: { '@id': ORG_ID }, author: { '@id': PERSON_ID } };
 ---
 <Base title={title} description={description} jsonLd={[blogLd]}>
-  <div class="app">
-    <SiteHeader active="blog" />
-
-    <section class="hero blog-hero">
-      <div class="hero-chips">
-        <span class="chip kicker">Blog</span>
-        <span class="chip" data-i18n="blog.chip">Strony · Platformy · SEO</span>
+  <SiteHeader active="blog" />
+  <main class="container">
+    <section class="sec">
+      <div class="sec-inner page-head">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span>Blog</span></nav>
+        <span class="kicker" data-i18n="blog.chip">Strony · Platformy · SEO</span>
+        <h1 data-i18n="blog.h1">Blog o stronach internetowych, platformach i SEO</h1>
+        <p class="lead" data-i18n="blog.sub">Praktycznie o stronach internetowych, platformach i widoczności w Google — ceny, technologie i porady dla firm, bez żargonu.</p>
+        <p class="post-byline"><span data-i18n="blog.by">Autor</span>: <a href="/o-mnie/" rel="author">Dmytrii Barabash</a> · {posts.length} wpisów</p>
       </div>
-      <h1 class="hero-title blog-h1" data-i18n="blog.h1">Blog o stronach internetowych, platformach i SEO</h1>
-      <p class="hero-sub" data-i18n="blog.sub">
-        Praktycznie o stronach internetowych, platformach i widoczności w Google —
-        ceny, technologie i porady dla firm, bez żargonu.
-      </p>
-      <p class="post-byline">
-        <span data-i18n="blog.by">Autor</span>: <a href="/o-mnie/" rel="author">Dmytrii Barabash</a>
-      </p>
     </section>
-
-    <section class="blog-list-section">
-      {posts.length === 0 && (
-        <div class="blog-empty">
-          <p data-i18n="blog.empty">Pierwsze wpisy są w drodze — zajrzyj tu wkrótce.</p>
+    <div class="divider" aria-hidden="true"></div>
+    <section class="sec">
+      <div class="sec-inner is-grey sec-pad">
+        {posts.length === 0 && <p class="lead" data-i18n="blog.empty">Pierwsze wpisy są w drodze — zajrzyj tu wkrótce.</p>}
+        <div class="blog-grid">
+          {posts.map((p, i) => <BlogCard p={p} eager={i < 3} />)}
         </div>
-      )}
-      <div class="blog-grid">
-        {posts.map((p) => (
-          <a class="blog-card" href={`/blog/${p.slug}/`}>
-            {p.cover_path
-              ? <img class="blog-card-cover" src={mediaUrl(p.cover_path)} alt={p.cover_alt || p.title_pl} loading="lazy" decoding="async" />
-              : <div class="blog-card-cover is-empty" aria-hidden="true"></div>}
-            <div class="blog-card-body">
-              <time class="blog-card-date" datetime={isoDate(p.published_at)}>{formatDatePl(p.published_at)}</time>
-              <h2
-                class="blog-card-title"
-                data-lm-pl={p.title_pl}
-                data-lm-en={p.title_en || p.title_pl}
-                data-lm-ru={p.title_ru || p.title_pl}
-              >{p.title_pl}</h2>
-              {p.excerpt_pl && (
-                <p
-                  class="blog-card-excerpt"
-                  data-lm-pl={p.excerpt_pl}
-                  data-lm-en={p.excerpt_en || p.excerpt_pl}
-                  data-lm-ru={p.excerpt_ru || p.excerpt_pl}
-                >{p.excerpt_pl}</p>
-              )}
-              {p.tags?.length > 0 && (
-                <div class="blog-card-tags">
-                  {p.tags.slice(0, 4).map((t: string) => <span class="chip chip-xs">{t}</span>)}
-                </div>
-              )}
-            </div>
-          </a>
-        ))}
       </div>
     </section>
-
-    <SiteFooter />
-  </div>
-
+  </main>
+  <SiteFooter services={services} settings={settings} />
   <script>
     import { mountShell } from '../../lib/shell';
     mountShell();

@@ -1,0 +1,48 @@
+---
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import { fetchSettings, fetchServices, fetchProjects, lmRow } from '../../lib/content';
+import { SITE } from '../../lib/site';
+
+const [settings, services, projects] = await Promise.all([fetchSettings(), fetchServices(), fetchProjects()]);
+const title = 'Projekty — strony, sklepy, portale i SaaS | BarabashFlow';
+const description = 'Portfolio BarabashFlow: strony internetowe, sklepy, portale klienta i systemy SaaS dla firm z Polski i zagranicy. Zakres, technologie i efekty każdego projektu.';
+const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+  { '@type': 'ListItem', position: 1, name: 'BarabashFlow', item: SITE + '/' },
+  { '@type': 'ListItem', position: 2, name: 'Projekty', item: SITE + '/projekty/' },
+] };
+const listLd = { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: projects.map((p, i) => ({ '@type': 'ListItem', position: i + 1, name: p.title_pl, url: `${SITE}/projekty/${p.slug}/` })) };
+const usedServices = services.filter((sv) => projects.some((p) => p.services.includes(sv.slug)));
+---
+<Base title={title} description={description} jsonLd={[crumbsLd, listLd]}>
+  <SiteHeader active="projects" />
+  <main class="container">
+    <section class="sec">
+      <div class="sec-inner page-head">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span data-i18n="nav.projects">Projekty</span></nav>
+        <span class="kicker" data-i18n="nav.projects">Projekty</span>
+        <h1 data-i18n="projects.h1">Projekty: strony, sklepy, portale i systemy SaaS</h1>
+        <p class="lead" data-i18n="projects.lead">Realizacje dla firm z Polski i zagranicy. Kliknij projekt, aby zobaczyć zakres, technologie i efekty.</p>
+      </div>
+    </section>
+    <div class="divider" aria-hidden="true"></div>
+    <section class="sec">
+      <div class="sec-inner is-grey sec-pad">
+        <div class="filter-bar" role="tablist" aria-label="Filtr usług">
+          <button type="button" class="is-active" data-filter="all" data-i18n="projects.filter.all">Wszystkie</button>
+          {usedServices.map((sv) => <button type="button" data-filter={sv.slug} {...lmRow(sv, 'title')}>{sv.title_pl}</button>)}
+        </div>
+        <div class="projects-grid">
+          {projects.map((p) => <ProjectCard p={p} />)}
+        </div>
+      </div>
+    </section>
+  </main>
+  <SiteFooter services={services} settings={settings} />
+  <script>
+    import { mountShell } from '../../lib/shell';
+    mountShell();
+  </script>
+</Base>

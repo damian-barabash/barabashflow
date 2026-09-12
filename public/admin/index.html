@@ -4,71 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
-  <title>BarabashFlow · Studio</title>
+  <title>BarabashFlow · Panel</title>
   <link rel="icon" type="image/png" href="/assets/img/logo.png" />
   <link rel="apple-touch-icon" href="/assets/img/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap"
-    rel="stylesheet"
-  />
-  <link rel="stylesheet" href="/assets/css/admin.css?v=2026-07-05a" />
-  <style>
-    /* Mejle button — wider than icon-btn to fit label, hides label on mobile */
-    .mejle-link { gap: 8px; padding: 0 12px; width: auto; min-width: 32px; position: relative; }
-    .mejle-link .mejle-label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-    }
-    .mejle-link .badge {
-      position: absolute; top: -4px; right: -4px;
-      background: var(--danger, #d83a3a);
-      color: #fff;
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0;
-      padding: 1px 5px;
-      border-radius: 8px;
-      line-height: 1.2;
-      min-width: 16px;
-      text-align: center;
-    }
-    @media (max-width: 760px) {
-      .mejle-link .mejle-label { display: none; }
-      .mejle-link { padding: 0; width: 32px; }
-    }
-    /* Brand logo in topbar — same image as main page */
-    a.brand, .brand { text-decoration: none; color: inherit; align-items: center; }
-    .brand-logo {
-      height: 28px;
-      width: auto;
-      display: inline-block;
-      vertical-align: middle;
-    }
-    :root[data-theme="dark"] .brand-logo {
-      filter: invert(0.94) hue-rotate(180deg);
-    }
-  </style>
-  <script type="module" src="/assets/js/theme.js?v=2026-07-05a"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/admin.css?v=2026-09-12a" />
+  <script type="module" src="/assets/js/theme.js?v=2026-09-12a"></script>
 </head>
 <body>
 
   <!-- ════════════ Auth ════════════ -->
   <div class="auth-wrap" id="auth-screen">
     <form class="auth-card" id="auth-form">
-      <h1>BarabashFlow · Studio</h1>
-      <p class="lead">Zaloguj się, aby zarządzać grafem projektów, treścią i wiadomościami.</p>
-      <div class="field">
-        <label class="field-label">E-mail</label>
-        <input type="email" name="email" required autocomplete="email" />
-      </div>
-      <div class="field">
-        <label class="field-label">Hasło</label>
-        <input type="password" name="password" required autocomplete="current-password" />
-      </div>
+      <h1>BarabashFlow · Panel</h1>
+      <p class="lead">Zaloguj się, aby zarządzać projektami, usługami, treścią, wiadomościami i klientami.</p>
+      <div class="field"><label class="field-label">E-mail</label><input type="email" name="email" required autocomplete="email" /></div>
+      <div class="field"><label class="field-label">Hasło</label><input type="password" name="password" required autocomplete="current-password" /></div>
       <button type="submit" class="btn primary">Zaloguj</button>
       <div class="banner" id="auth-status" style="position:static;transform:none;box-shadow:none;border:none;background:transparent;padding:0;opacity:1;text-align:center"></div>
       <p class="footnote">Konto: Supabase → Auth → Users</p>
@@ -77,232 +30,128 @@
 
   <!-- ════════════ Shell ════════════ -->
   <div class="shell" id="shell">
-
     <header class="top">
       <div class="top-inner">
         <a class="brand" href="/" title="Strona główna">
           <img class="brand-logo" src="/assets/img/logo.png" alt="BF" />
-          <span>BarabashFlow</span>
-          <span class="sep">·</span>
-          <span class="sep">Panel</span>
+          <span>BarabashFlow</span><span class="sep">·</span><span class="sep">Panel</span>
         </a>
-
         <div class="top-collapsible" id="top-collapsible">
           <nav class="tabs">
-            <button class="tab-btn is-active" data-tab="work">
-              <span>Projekty</span>
-              <span class="count" id="projects-count"></span>
-            </button>
-            <button class="tab-btn" data-tab="settings">
-              <span>Strona</span>
-            </button>
-            <button class="tab-btn" data-tab="blog">
-              <span>Blog</span>
-              <span class="count" id="blog-count"></span>
-            </button>
-            <button class="tab-btn" data-tab="stats">
-              <span>Statystyki</span>
-            </button>
+            <button class="tab-btn is-active" data-tab="work"><span>Projekty</span><span class="count" id="projects-count"></span></button>
+            <button class="tab-btn" data-tab="services"><span>Usługi</span><span class="count" id="services-count"></span></button>
+            <button class="tab-btn" data-tab="settings"><span>Strona</span></button>
+            <button class="tab-btn" data-tab="blog"><span>Blog</span><span class="count" id="blog-count"></span></button>
+            <button class="tab-btn" data-tab="inbox"><span>Wiadomości</span><span class="badge" id="inbox-badge" style="display:none">0</span></button>
+            <button class="tab-btn" data-tab="crm"><span>CRM</span><span class="count" id="crm-count"></span></button>
+            <button class="tab-btn" data-tab="stats"><span>Statystyki</span></button>
           </nav>
-
           <div class="top-spacer"></div>
-
-          <a class="icon-btn mejle-link" href="/mail" title="Mejle (CRM, rozsyłka, skrzynka)">
-            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <path d="M3 5h14v10H3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-              <path d="M3 5l7 5 7-5" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-            </svg>
-            <span class="mejle-label">Mejle</span>
-            <span class="badge" id="mejle-badge" style="display:none">0</span>
+          <a class="icon-btn" href="/" target="_blank" rel="noopener" title="Otwórz stronę">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 15 15 5M15 5H8M15 5v7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </a>
-
           <span class="session" id="session-email"></span>
         </div>
-
         <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme" title="Theme">
-          <svg viewBox="0 0 20 20" fill="none" id="theme-icon" aria-hidden="true">
-            <path d="M14.5 11.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <svg viewBox="0 0 20 20" fill="none" id="theme-icon" aria-hidden="true"><path d="M14.5 11.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-
         <button class="icon-btn" id="signout" type="button" aria-label="Wyloguj" title="Wyloguj">
-          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path d="M11 3.5H4.5v13H11M13 7l3 3-3 3M9 10h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M11 3.5H4.5v13H11M13 7l3 3-3 3M9 10h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-
         <button class="icon-btn nav-burger" id="nav-burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="top-collapsible">
-          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path class="burger-l1" d="M4 6.6h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path class="burger-l2" d="M4 10h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path class="burger-l3" d="M4 13.4h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path class="burger-l1" d="M4 6.6h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path class="burger-l2" d="M4 10h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path class="burger-l3" d="M4 13.4h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         </button>
       </div>
     </header>
 
-    <!-- ── PROJEKTY (graph + side editor) ───────────────────── -->
+    <!-- ── PROJEKTY ─────────────────────────────────────────────────── -->
     <section class="panel-page is-active" data-panel="work">
-      <div class="work">
-        <div class="graph-workspace" id="graph-workspace">
-          <div class="graph-inner" id="graph-inner">
-            <svg id="graph-edges" aria-hidden="true"></svg>
-            <div id="graph-center">BF</div>
+      <div class="list-editor">
+        <aside class="list-pane">
+          <div class="list-tools">
+            <input id="pr-search" type="search" placeholder="Szukaj projektu…" />
+            <button class="btn primary" id="pr-new">+ Nowy</button>
           </div>
-          <span class="graph-help">Klik — edytuj. Przeciągnij — przesuń. Scroll — zoom.</span>
-          <span class="zoom-indicator" id="zoom-indicator">100%</span>
-          <button class="fab-add" id="new-project" type="button" title="Dodaj projekt">
-            <svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-          </button>
-        </div>
-
-        <aside class="side-panel is-empty" id="side-panel">
-          <div class="placeholder-glyph">∅</div>
-          <div>
-            <div class="pitch">Wybierz węzeł, aby edytować</div>
-            <div class="pitch-sub">Albo naciśnij <strong>+</strong>, żeby dodać nowy projekt. Przeciągnij węzły w grafie — pozycje zapiszą się przy następnym zapisie.</div>
-          </div>
+          <div class="list-scroll" id="pr-list"></div>
+          <p class="coords">Kolejność na stronie = kolejność listy (strzałki). ★ = wyróżniony na stronie głównej.</p>
         </aside>
+        <div class="editor-pane is-empty" id="pr-editor">
+          <div class="placeholder-glyph">✦</div>
+          <div><div class="pitch">Wybierz projekt z listy</div><div class="pitch-sub">albo kliknij <strong>+ Nowy</strong>. Wpisuj tylko po polsku — wersje EN i RU uzupełnią się same przy zapisie.</div></div>
+        </div>
       </div>
     </section>
 
-    <!-- ── STRONA (site settings) ───────────────────────────── -->
+    <!-- ── USŁUGI + FAQ ─────────────────────────────────────────────── -->
+    <section class="panel-page" data-panel="services">
+      <div class="list-editor">
+        <aside class="list-pane">
+          <div class="list-tools"><span class="section-title">Usługi</span><span class="spread"></span><button class="btn primary" id="sv-new">+ Nowa</button></div>
+          <div class="list-scroll" id="sv-list"></div>
+          <p class="coords">Pokazują się na stronie głównej, w /uslugi/, jako filtr projektów i w formularzu kontaktowym.</p>
+        </aside>
+        <div class="editor-pane is-empty" id="sv-editor">
+          <div class="placeholder-glyph">✦</div>
+          <div><div class="pitch">Wybierz usługę</div><div class="pitch-sub">albo dodaj nową.</div></div>
+        </div>
+      </div>
+      <div class="settings-card" style="max-width:none;margin-top:22px">
+        <div class="section">
+          <div class="section-head"><span class="section-title">FAQ — częste pytania</span><span class="section-aside">strona główna + /uslugi/ · dane FAQPage dla Google</span></div>
+          <div id="faq-list" class="faq-ed-list"></div>
+          <div class="button-row"><button class="btn" id="faq-new">+ Dodaj pytanie</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── STRONA (site settings) ───────────────────────────────────── -->
     <section class="panel-page" data-panel="settings">
       <div class="settings-card">
         <div class="section">
-          <div class="section-head">
-            <span class="section-title">Twoja wizytówka</span>
-            <span class="section-aside">PL · EN · RU</span>
-          </div>
+          <div class="section-head"><span class="section-title">Hero — pierwszy ekran</span><span class="section-aside">PL · EN · RU</span></div>
           <div class="row-2">
-            <div class="field">
-              <label class="field-label">Imię i nazwisko</label>
-              <div class="lang-trio">
-                <div class="field-input" data-lang="PL"><input data-setting="owner_name" data-lang="pl" placeholder="Polski" /></div>
-                <div class="field-input" data-lang="EN"><input data-setting="owner_name" data-lang="en" placeholder="English" /></div>
-                <div class="field-input" data-lang="RU"><input data-setting="owner_name" data-lang="ru" placeholder="Русский" /></div>
-              </div>
-            </div>
-            <div class="field">
-              <label class="field-label">Zdjęcie portretowe</label>
+            <div class="field"><label class="field-label">Duże słowo po lewej (WIELKIMI)</label><div class="lang-trio"><div class="field-input" data-lang="PL"><input data-setting="hero_word_a" data-lang="pl" /></div><div class="field-input" data-lang="EN"><input data-setting="hero_word_a" data-lang="en" /></div><div class="field-input" data-lang="RU"><input data-setting="hero_word_a" data-lang="ru" /></div></div></div>
+            <div class="field"><label class="field-label">Duże słowo po prawej</label><div class="lang-trio"><div class="field-input" data-lang="PL"><input data-setting="hero_word_b" data-lang="pl" /></div><div class="field-input" data-lang="EN"><input data-setting="hero_word_b" data-lang="en" /></div><div class="field-input" data-lang="RU"><input data-setting="hero_word_b" data-lang="ru" /></div></div></div>
+          </div>
+          <div class="field"><label class="field-label">Etykieta nad słowami (np. Studio web-developmentu · Warszawa)</label><div class="lang-trio"><div class="field-input" data-lang="PL"><input data-setting="hero_kicker" data-lang="pl" /></div><div class="field-input" data-lang="EN"><input data-setting="hero_kicker" data-lang="en" /></div><div class="field-input" data-lang="RU"><input data-setting="hero_kicker" data-lang="ru" /></div></div></div>
+          <div class="field"><label class="field-label">Nagłówek H1 dla Google (niewidoczny, ale ważny dla SEO)</label><div class="lang-trio"><div class="field-input" data-lang="PL"><input data-setting="hero_title" data-lang="pl" /></div><div class="field-input" data-lang="EN"><input data-setting="hero_title" data-lang="en" /></div><div class="field-input" data-lang="RU"><input data-setting="hero_title" data-lang="ru" /></div></div></div>
+          <div class="field"><label class="field-label">Zdanie pod słowami — co robisz i dla kogo</label><div class="lang-trio"><div class="field-input" data-lang="PL"><textarea data-setting="hero_subtitle" data-lang="pl" rows="2"></textarea></div><div class="field-input" data-lang="EN"><textarea data-setting="hero_subtitle" data-lang="en" rows="2"></textarea></div><div class="field-input" data-lang="RU"><textarea data-setting="hero_subtitle" data-lang="ru" rows="2"></textarea></div></div></div>
+          <div class="row-3">
+            <div class="field"><label class="field-label">Przycisk główny (CTA)</label><div class="lang-trio"><div class="field-input" data-lang="PL"><input data-setting="cta_label" data-lang="pl" /></div><div class="field-input" data-lang="EN"><input data-setting="cta_label" data-lang="en" /></div><div class="field-input" data-lang="RU"><input data-setting="cta_label" data-lang="ru" /></div></div></div>
+            <div class="field"><label class="field-label">Przycisk drugi</label><div class="lang-trio"><div class="field-input" data-lang="PL"><input data-setting="cta_secondary" data-lang="pl" /></div><div class="field-input" data-lang="EN"><input data-setting="cta_secondary" data-lang="en" /></div><div class="field-input" data-lang="RU"><input data-setting="cta_secondary" data-lang="ru" /></div></div></div>
+            <div class="field"><label class="field-label">Pasek dostępności (pod CTA na dole)</label><div class="lang-trio"><div class="field-input" data-lang="PL"><input data-setting="availability" data-lang="pl" /></div><div class="field-input" data-lang="EN"><input data-setting="availability" data-lang="en" /></div><div class="field-input" data-lang="RU"><input data-setting="availability" data-lang="ru" /></div></div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><span class="section-title">O studiu</span><span class="section-aside">sekcja pod hero + strona O mnie</span></div>
+          <div class="row-2">
+            <div class="field"><label class="field-label">Imię i nazwisko</label><div class="lang-trio"><div class="field-input" data-lang="PL"><input data-setting="owner_name" data-lang="pl" /></div><div class="field-input" data-lang="EN"><input data-setting="owner_name" data-lang="en" /></div><div class="field-input" data-lang="RU"><input data-setting="owner_name" data-lang="ru" /></div></div></div>
+            <div class="field"><label class="field-label">Zdjęcie (pokazuje się na głównej i w O mnie)</label>
               <div style="display:flex; gap:14px; align-items:center;">
-                <div class="photo-slot portrait-slot" id="owner-photo-slot">
-                  <span>Dodaj</span>
-                  <button type="button" class="remove" data-remove-owner-photo>×</button>
-                </div>
-                <div class="coords">JPG / PNG / WebP — do 10 MB. Kwadrat wygląda najlepiej.</div>
+                <div class="photo-slot portrait-slot" id="owner-photo-slot"><span>Dodaj</span><button type="button" class="remove" data-remove-owner-photo>×</button></div>
+                <div class="coords">JPG / PNG / WebP — do 10 MB. Pion lub kwadrat.</div>
               </div>
             </div>
+          </div>
+          <div class="field"><label class="field-label">Nagłówek sekcji</label><div class="lang-trio"><div class="field-input" data-lang="PL"><input data-setting="about_title" data-lang="pl" /></div><div class="field-input" data-lang="EN"><input data-setting="about_title" data-lang="en" /></div><div class="field-input" data-lang="RU"><input data-setting="about_title" data-lang="ru" /></div></div></div>
+          <div class="field"><label class="field-label">Tekst o Tobie</label><div class="lang-trio"><div class="field-input" data-lang="PL"><textarea data-setting="about_text" data-lang="pl" rows="4"></textarea></div><div class="field-input" data-lang="EN"><textarea data-setting="about_text" data-lang="en" rows="4"></textarea></div><div class="field-input" data-lang="RU"><textarea data-setting="about_text" data-lang="ru" rows="4"></textarea></div></div></div>
+          <div class="field">
+            <label class="field-label">Liczby (statystyki) — wartość + podpis</label>
+            <div id="stats-editor" class="results-ed"></div>
+            <div class="button-row"><button type="button" class="btn small" id="stats-add">+ Dodaj</button><span class="coords">Pierwsza pozycja „AUTO” = liczba opublikowanych projektów.</span></div>
           </div>
         </div>
 
         <div class="section">
-          <div class="section-head"><span class="section-title">Główne motto</span></div>
-          <div class="field">
-            <label class="field-label">Tytuł — co robisz</label>
-            <div class="lang-trio">
-              <div class="field-input" data-lang="PL"><input data-setting="hero_title" data-lang="pl" /></div>
-              <div class="field-input" data-lang="EN"><input data-setting="hero_title" data-lang="en" /></div>
-              <div class="field-input" data-lang="RU"><input data-setting="hero_title" data-lang="ru" /></div>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">Podtytuł — jedna linia</label>
-            <div class="lang-trio">
-              <div class="field-input" data-lang="PL"><input data-setting="hero_subtitle" data-lang="pl" /></div>
-              <div class="field-input" data-lang="EN"><input data-setting="hero_subtitle" data-lang="en" /></div>
-              <div class="field-input" data-lang="RU"><input data-setting="hero_subtitle" data-lang="ru" /></div>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">Podpis nad grafem — już zrealizowane projekty</label>
-            <div class="lang-trio">
-              <div class="field-input" data-lang="PL"><input data-setting="graph_caption" data-lang="pl" /></div>
-              <div class="field-input" data-lang="EN"><input data-setting="graph_caption" data-lang="en" /></div>
-              <div class="field-input" data-lang="RU"><input data-setting="graph_caption" data-lang="ru" /></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-head"><span class="section-title">Zaproszenie do kontaktu</span></div>
-          <div class="field">
-            <label class="field-label">Etykieta przycisku (CTA)</label>
-            <div class="lang-trio">
-              <div class="field-input" data-lang="PL"><input data-setting="cta_label" data-lang="pl" /></div>
-              <div class="field-input" data-lang="EN"><input data-setting="cta_label" data-lang="en" /></div>
-              <div class="field-input" data-lang="RU"><input data-setting="cta_label" data-lang="ru" /></div>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">Tekst nad formularzem</label>
-            <div class="lang-trio">
-              <div class="field-input" data-lang="PL"><textarea data-setting="contact_intro" data-lang="pl" rows="2"></textarea></div>
-              <div class="field-input" data-lang="EN"><textarea data-setting="contact_intro" data-lang="en" rows="2"></textarea></div>
-              <div class="field-input" data-lang="RU"><textarea data-setting="contact_intro" data-lang="ru" rows="2"></textarea></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-head">
-            <span class="section-title">Bot maskotka</span>
-            <span class="section-aside">tekst w okienku — PL · EN · RU</span>
-          </div>
-          <div class="field">
-            <label class="field-label">Powitanie</label>
-            <div class="lang-trio">
-              <div class="field-input" data-lang="PL"><input data-setting="mascot_greeting" data-lang="pl" /></div>
-              <div class="field-input" data-lang="EN"><input data-setting="mascot_greeting" data-lang="en" /></div>
-              <div class="field-input" data-lang="RU"><input data-setting="mascot_greeting" data-lang="ru" /></div>
-            </div>
-          </div>
-          <div class="row-2">
-            <div class="field">
-              <label class="field-label">Placeholder pytania</label>
-              <div class="lang-trio">
-                <div class="field-input" data-lang="PL"><input data-setting="mascot_q_placeholder" data-lang="pl" /></div>
-                <div class="field-input" data-lang="EN"><input data-setting="mascot_q_placeholder" data-lang="en" /></div>
-                <div class="field-input" data-lang="RU"><input data-setting="mascot_q_placeholder" data-lang="ru" /></div>
-              </div>
-            </div>
-            <div class="field">
-              <label class="field-label">Placeholder e-mail</label>
-              <div class="lang-trio">
-                <div class="field-input" data-lang="PL"><input data-setting="mascot_email_placeholder" data-lang="pl" /></div>
-                <div class="field-input" data-lang="EN"><input data-setting="mascot_email_placeholder" data-lang="en" /></div>
-                <div class="field-input" data-lang="RU"><input data-setting="mascot_email_placeholder" data-lang="ru" /></div>
-              </div>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">Etykieta przycisku</label>
-            <div class="lang-trio">
-              <div class="field-input" data-lang="PL"><input data-setting="mascot_submit" data-lang="pl" /></div>
-              <div class="field-input" data-lang="EN"><input data-setting="mascot_submit" data-lang="en" /></div>
-              <div class="field-input" data-lang="RU"><input data-setting="mascot_submit" data-lang="ru" /></div>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">Tytuł po wysłaniu</label>
-            <div class="lang-trio">
-              <div class="field-input" data-lang="PL"><input data-setting="mascot_success_title" data-lang="pl" /></div>
-              <div class="field-input" data-lang="EN"><input data-setting="mascot_success_title" data-lang="en" /></div>
-              <div class="field-input" data-lang="RU"><input data-setting="mascot_success_title" data-lang="ru" /></div>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">Tekst po wysłaniu</label>
-            <div class="lang-trio">
-              <div class="field-input" data-lang="PL"><textarea data-setting="mascot_success_text" data-lang="pl" rows="2"></textarea></div>
-              <div class="field-input" data-lang="EN"><textarea data-setting="mascot_success_text" data-lang="en" rows="2"></textarea></div>
-              <div class="field-input" data-lang="RU"><textarea data-setting="mascot_success_text" data-lang="ru" rows="2"></textarea></div>
-            </div>
-          </div>
+          <div class="section-head"><span class="section-title">Podpisy sekcji</span></div>
+          <div class="field"><label class="field-label">Pod nagłówkiem „Usługi”</label><div class="lang-trio"><div class="field-input" data-lang="PL"><input data-setting="services_intro" data-lang="pl" /></div><div class="field-input" data-lang="EN"><input data-setting="services_intro" data-lang="en" /></div><div class="field-input" data-lang="RU"><input data-setting="services_intro" data-lang="ru" /></div></div></div>
+          <div class="field"><label class="field-label">Pod nagłówkiem „Projekty”</label><div class="lang-trio"><div class="field-input" data-lang="PL"><input data-setting="projects_intro" data-lang="pl" /></div><div class="field-input" data-lang="EN"><input data-setting="projects_intro" data-lang="en" /></div><div class="field-input" data-lang="RU"><input data-setting="projects_intro" data-lang="ru" /></div></div></div>
+          <div class="field"><label class="field-label">Zaproszenie do kontaktu</label><div class="lang-trio"><div class="field-input" data-lang="PL"><textarea data-setting="contact_intro" data-lang="pl" rows="2"></textarea></div><div class="field-input" data-lang="EN"><textarea data-setting="contact_intro" data-lang="en" rows="2"></textarea></div><div class="field-input" data-lang="RU"><textarea data-setting="contact_intro" data-lang="ru" rows="2"></textarea></div></div></div>
         </div>
 
         <div class="button-row">
-          <span class="coords">Wpisuj tylko po polsku — puste EN/RU przetłumaczą się same przy zapisie (Barabash AI).</span>
+          <span class="coords">Wpisuj tylko po polsku — puste EN/RU przetłumaczą się same przy zapisie (Barabash AI). Zmiany na stronie po najbliższej przebudowie (do ~15 min).</span>
           <span class="spread"></span>
           <button class="btn" id="translate-settings">Przetłumacz wszystko z PL</button>
           <button class="btn primary" id="save-settings">Zapisz zmiany</button>
@@ -310,88 +159,96 @@
       </div>
     </section>
 
-    <!-- ── BLOG (AI autopilot + posts) ──────────────────────── -->
+    <!-- ── BLOG ─────────────────────────────────────────────────────── -->
     <section class="panel-page" data-panel="blog">
       <div class="settings-card">
         <div class="section">
-          <div class="section-head">
-            <span class="section-title">Autopilot bloga</span>
-            <span class="section-aside">agent na Mac Studio · przebiegi 8:40 i 13:40</span>
-          </div>
+          <div class="section-head"><span class="section-title">Autopilot bloga</span><span class="section-aside">agent na Mac Studio · przebiegi 8:40 i 13:40</span></div>
           <div class="blog-agent-status" id="blog-agent-status"></div>
           <div class="row-2">
-            <div class="field">
-              <label class="field-label">Publikowanie</label>
-              <select id="blog-enabled">
-                <option value="true">Włączone</option>
-                <option value="false">Wstrzymane</option>
-              </select>
-            </div>
-            <div class="field">
-              <label class="field-label">Wpisów dziennie</label>
-              <select id="blog-count-sel">
-                <option value="1|1">1</option>
-                <option value="1|2">1–2</option>
-                <option value="2|2">2</option>
-                <option value="2|3">2–3</option>
-                <option value="3|3">3</option>
-              </select>
-            </div>
+            <div class="field"><label class="field-label">Publikowanie</label><select id="blog-enabled"><option value="true">Włączone</option><option value="false">Wstrzymane</option></select></div>
+            <div class="field"><label class="field-label">Wpisów dziennie</label><select id="blog-count-sel"><option value="1|1">1</option><option value="1|2">1–2</option><option value="2|2">2</option><option value="2|3">2–3</option><option value="3|3">3</option></select></div>
           </div>
-          <div class="field">
-            <label class="field-label">Własne tematy / słowa kluczowe (po jednym w linii — agent bierze je w pierwszej kolejności)</label>
-            <textarea id="blog-seeds" rows="3" placeholder="np. strona internetowa dla warsztatu samochodowego&#10;ile kosztuje sklep internetowy 2026"></textarea>
-          </div>
-          <div class="button-row">
-            <span class="coords">Nowe wpisy pojawiają się na stronie po najbliższej przebudowie (agent sam ją uruchamia po publikacji).</span>
-            <span class="spread"></span>
-            <button class="btn primary" id="blog-save-config">Zapisz ustawienia</button>
-          </div>
+          <div class="field"><label class="field-label">Własne tematy / słowa kluczowe (po jednym w linii — agent bierze je w pierwszej kolejności)</label><textarea id="blog-seeds" rows="3" placeholder="np. strona internetowa dla warsztatu samochodowego&#10;ile kosztuje sklep internetowy 2026"></textarea></div>
+          <div class="button-row"><span class="coords">Nowe wpisy pojawiają się na stronie po najbliższej przebudowie (agent sam ją uruchamia po publikacji).</span><span class="spread"></span><button class="btn primary" id="blog-save-config">Zapisz ustawienia</button></div>
         </div>
-
         <div class="section">
-          <div class="section-head">
-            <span class="section-title">Research słów kluczowych</span>
-            <span class="section-aside" id="blog-kw-aside">dziś</span>
-          </div>
-          <div id="blog-keywords" class="blog-kw-list"><span class="coords">Brak danych — agent loguje research przy każdym uruchomieniu.</span></div>
+          <div class="section-head"><span class="section-title">Research słów kluczowych</span><span class="section-aside" id="blog-kw-aside">dziś</span></div>
+          <div id="blog-keywords" class="blog-kw-list"></div>
         </div>
-
         <div class="section">
-          <div class="section-head">
-            <span class="section-title">Wpisy</span>
-            <span class="section-aside" id="blog-posts-aside"></span>
-          </div>
+          <div class="section-head"><span class="section-title">Wpisy</span><span class="section-aside" id="blog-posts-aside"></span></div>
           <div id="blog-posts" class="blog-admin-list"></div>
         </div>
       </div>
     </section>
 
-    <!-- ── STATYSTYKI (first-party analytics) ───────────────── -->
-    <section class="panel-page" data-panel="stats">
-      <div class="settings-card">
+    <!-- ── WIADOMOŚCI ───────────────────────────────────────────────── -->
+    <section class="panel-page" data-panel="inbox">
+      <div class="settings-card" style="max-width:960px">
         <div class="section">
           <div class="section-head">
-            <span class="section-title">Ruch na stronie</span>
-            <span class="section-aside" id="stats-aside">bez cookies · liczone po stronie bazy</span>
+            <span class="section-title">Zapytania ze strony</span>
+            <span class="section-aside" id="inbox-aside"></span>
           </div>
-          <div class="stats-cards" id="stats-cards"></div>
-        </div>
-        <div class="section">
-          <div class="section-head"><span class="section-title">Najczęściej odwiedzane (30 dni)</span></div>
-          <div class="stats-table" id="stats-pages"></div>
-        </div>
-        <div class="section">
-          <div class="section-head"><span class="section-title">Źródła ruchu (30 dni)</span></div>
-          <div class="stats-table" id="stats-refs"></div>
+          <div class="filter-chips" id="inbox-filters">
+            <button class="is-active" data-filter="inbox">Skrzynka</button>
+            <button data-filter="unread">Nieprzeczytane</button>
+            <button data-filter="replied">Odpowiedziane</button>
+            <button data-filter="archive">Archiwum</button>
+          </div>
+          <p class="coords">Zapytania z formularzy na stronie. „Odpowiedz” otwiera Gmail / program pocztowy z gotowym adresatem; „Dodaj do CRM” tworzy klienta z historią.</p>
+          <div class="inbox" id="inbox-list"></div>
         </div>
       </div>
     </section>
 
+    <!-- ── CRM ──────────────────────────────────────────────────────── -->
+    <section class="panel-page" data-panel="crm">
+      <div class="settings-card" style="max-width:none">
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">Klienci</span>
+            <span class="section-aside" id="crm-aside"></span>
+          </div>
+          <div class="crm-due" id="crm-due"></div>
+          <div class="crm-tools">
+            <input id="crm-search" type="search" placeholder="Szukaj: nazwa, e-mail, firma…" />
+            <select id="crm-tag"><option value="">Wszystkie tagi</option></select>
+            <div class="seg" id="crm-view"><button class="is-active" data-view="list">Lista</button><button data-view="board">Tablica</button></div>
+            <button class="btn" id="crm-export">CSV</button>
+            <button class="btn primary" id="crm-new">+ Klient</button>
+          </div>
+          <div class="filter-chips" id="crm-status">
+            <button class="is-active" data-status="all">Aktywni</button>
+            <button data-status="lead">Lead</button>
+            <button data-status="contact">Rozmowa</button>
+            <button data-status="offer">Oferta</button>
+            <button data-status="won">Wygrane</button>
+            <button data-status="active">W realizacji</button>
+            <button data-status="done">Zakończone</button>
+            <button data-status="lost">Przegrane</button>
+            <button data-status="archive">Archiwum</button>
+          </div>
+          <div id="crm-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── STATYSTYKI ───────────────────────────────────────────────── -->
+    <section class="panel-page" data-panel="stats">
+      <div class="settings-card">
+        <div class="section">
+          <div class="section-head"><span class="section-title">Ruch na stronie</span><span class="section-aside" id="stats-aside">bez cookies · liczone po stronie bazy</span></div>
+          <div class="stats-cards" id="stats-cards"></div>
+        </div>
+        <div class="section"><div class="section-head"><span class="section-title">Najczęściej odwiedzane (30 dni)</span></div><div class="stats-table" id="stats-pages"></div></div>
+        <div class="section"><div class="section-head"><span class="section-title">Źródła ruchu (30 dni)</span></div><div class="stats-table" id="stats-refs"></div></div>
+      </div>
+    </section>
   </div>
 
   <div class="banner" id="banner"></div>
-
-  <script type="module" src="/assets/js/admin.js?v=2026-07-05a"></script>
+  <script type="module" src="/assets/js/admin.js?v=2026-09-12a"></script>
 </body>
 </html>

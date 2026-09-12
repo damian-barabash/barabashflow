@@ -1,0 +1,18 @@
+---
+import { mediaUrl } from '../lib/supabase';
+import { formatDatePl, isoDate, type BlogPost } from '../lib/blog';
+export interface Props { p: Pick<BlogPost, 'slug' | 'title_pl' | 'title_en' | 'title_ru' | 'excerpt_pl' | 'excerpt_en' | 'excerpt_ru' | 'cover_path' | 'cover_alt' | 'published_at' | 'tags'>; eager?: boolean }
+const { p, eager = false } = Astro.props;
+---
+<a class="bcard" href={`/blog/${p.slug}/`}>
+  {p.cover_path
+    ? <img class="bcard-cover" src={mediaUrl(p.cover_path)} alt={p.cover_alt || p.title_pl} loading={eager ? 'eager' : 'lazy'} decoding="async" width="640" height="360" />
+    : <div class="bcard-cover is-empty" aria-hidden="true"></div>}
+  <div class="bcard-body">
+    <time datetime={isoDate(p.published_at)}>{formatDatePl(p.published_at)}</time>
+    <h3 data-lm-pl={p.title_pl} data-lm-en={p.title_en || p.title_pl} data-lm-ru={p.title_ru || p.title_pl}>{p.title_pl}</h3>
+    {p.excerpt_pl && <p class="desc" data-lm-pl={p.excerpt_pl} data-lm-en={p.excerpt_en || p.excerpt_pl} data-lm-ru={p.excerpt_ru || p.excerpt_pl}>{p.excerpt_pl}</p>}
+    {(p.tags?.length ?? 0) > 0 && <div class="bcard-tags">{p.tags!.slice(0, 3).map((t) => <span class="chip">{t}</span>)}</div>}
+    <span class="read"><span data-i18n="blog.read">Czytaj</span><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M11 3H5M11 3v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+  </div>
+</a>

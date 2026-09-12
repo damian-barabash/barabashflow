@@ -1,0 +1,21 @@
+---
+import { type Project, projectCover, categoryLm, lmRow, firstSentence } from '../lib/content';
+export interface Props { p: Project; }
+const { p } = Astro.props;
+const cover = projectCover(p);
+const tag = { pl: p.tagline_pl || firstSentence(p.description_pl), en: p.tagline_en || firstSentence(p.description_en) || p.tagline_pl || firstSentence(p.description_pl), ru: p.tagline_ru || firstSentence(p.description_ru) || p.tagline_pl || firstSentence(p.description_pl) };
+---
+<a class="pcard" href={`/projekty/${p.slug}/`} data-services={p.services.join(' ')}>
+  <div class="pcard-media">
+    {cover ? <img src={cover} alt={p.photos[0]?.alt_pl || p.title_pl} loading="lazy" decoding="async" /> : <div class="tile-pattern" style="position:absolute;inset:0"><span class="tp-label">{p.title_pl}</span></div>}
+  </div>
+  <div class="pcard-body">
+    <div class="pcard-meta">
+      <span {...categoryLm(p)}>{p.category_pl}</span>
+      <span>{p.client || ''}{p.year ? ` · ${p.year}` : ''}</span>
+    </div>
+    <h3 {...lmRow(p, 'title')}>{p.title_pl}</h3>
+    <p class="desc" data-lm-pl={tag.pl} data-lm-en={tag.en} data-lm-ru={tag.ru}>{tag.pl}</p>
+    {p.stack.length > 0 && <div class="pcard-tags">{p.stack.slice(0, 4).map((t) => <span class="chip">{t}</span>)}</div>}
+  </div>
+</a>

@@ -3,6 +3,7 @@
 // approved seo-plan: canonical, robots, Open Graph, hreflang, JSON-LD.
 // Identity (author / publisher / sameAs) comes from lib/site.ts.
 import { SITE, SITE_NAME, personLd, organizationLd } from '../lib/site';
+import '../styles/main.css';
 
 export interface Props {
   title?: string;
@@ -13,18 +14,15 @@ export interface Props {
   ogImage?: string;
   // Page-level JSON-LD objects (already carrying @context) rendered in <head>.
   jsonLd?: Record<string, unknown>[];
-  // Home page only: the FAQPage graph belongs to the page that shows the FAQ.
-  withFaq?: boolean;
 }
 const {
   title = 'BarabashFlow — tworzenie stron internetowych i platform',
-  description = 'Studio Dmytrija Barabasha z Warszawy: tworzenie stron internetowych, platform i aplikacji webowych dla firm. Kod na miarę, wycena projektu w 24 h.',
+  description = 'Studio Dmytrija Barabasha z Warszawy: tworzenie stron internetowych, sklepów, platform i aplikacji webowych dla firm. Kod na miarę, własny CMS, wycena w 24 h.',
   noindex = false,
   bodyClass = '',
   ogType = 'website',
   ogImage = `${SITE}/assets/img/og.png`,
   jsonLd = [],
-  withFaq = false,
 } = Astro.props;
 
 const site = SITE;
@@ -47,30 +45,9 @@ const siteGraphLd = {
     },
   ],
 };
-const faqLd = {
-  '@context': 'https://schema.org',
-  '@type': 'FAQPage',
-  mainEntity: [
-    {
-      '@type': 'Question',
-      name: 'Ile kosztuje strona internetowa?',
-      acceptedAnswer: { '@type': 'Answer', text: 'Koszt zależy od zakresu — od prostej strony-wizytówki po rozbudowaną platformę z panelem CMS. Napisz przez formularz, przygotuję wycenę dopasowaną do projektu.' },
-    },
-    {
-      '@type': 'Question',
-      name: 'Kto zrobi nowoczesną stronę dla małej firmy w Polsce?',
-      acceptedAnswer: { '@type': 'Answer', text: 'BarabashFlow (Dmytrii Barabash) — projektuję i wdrażam szybkie, nowoczesne strony i platformy internetowe dla firm w Polsce, w technologiach Astro, Next.js i Supabase.' },
-    },
-    {
-      '@type': 'Question',
-      name: 'W jakich technologiach pracujesz?',
-      acceptedAnswer: { '@type': 'Answer', text: 'Astro, React, Next.js, Supabase, Three.js. Strony są statyczne i wdrażane na GitHub Pages / Cloudflare — dzięki temu ładują się natychmiast.' },
-    },
-  ],
-};
 ---
 <!DOCTYPE html>
-<html lang="pl" data-theme="light">
+<html lang="pl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -84,8 +61,8 @@ const faqLd = {
         <meta name="googlebot" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
       </>}
 
-  <meta name="theme-color" content="#e9e8e4" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#121210" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f3f4f6" />
+  <meta name="color-scheme" content="light" />
 
   <link rel="icon" type="image/png" href="/assets/img/logo.png" />
   <link rel="apple-touch-icon" href="/assets/img/logo.png" />
@@ -114,26 +91,21 @@ const faqLd = {
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://yhtzxkhfqzuaafvappln.supabase.co" crossorigin />
+  <link rel="preload" href="/assets/fonts/Sunsive-Bold.woff2" as="font" type="font/woff2" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Doto:wght@700;900&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet"
   />
 
   {!noindex && <>
     <script type="application/ld+json" set:html={JSON.stringify(siteGraphLd)} />
-    {withFaq && <script type="application/ld+json" set:html={JSON.stringify(faqLd)} />}
     {jsonLd.map((ld) => <script type="application/ld+json" set:html={JSON.stringify(ld)} />)}
   </>}
 
-  <!-- Anti-FOUC: apply saved theme + locale before first paint. -->
+  <!-- Anti-FOUC: apply saved locale before first paint. -->
   <script is:inline>
     (function () {
       try {
-        var t = localStorage.getItem('bf:theme');
-        if (t === 'light' || t === 'dark') {
-          document.documentElement.setAttribute('data-theme', t);
-          document.documentElement.style.colorScheme = t;
-        }
         var l = localStorage.getItem('bf:locale');
         if (l === 'pl' || l === 'en' || l === 'ru') document.documentElement.lang = l;
       } catch (e) {}

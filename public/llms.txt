@@ -8,12 +8,14 @@ BarabashFlow to jednoosobowe studio web-developmentu prowadzone przez Dmytrija
 Barabasha. Specjalizacja: szybkie, statyczne strony i platformy w technologiach
 Astro, React, Next.js, Supabase i Three.js, wdrażane na GitHub Pages / Cloudflare.
 
-## Usługi
-- Tworzenie stron internetowych i stron-wizytówek
-- Platformy internetowe i aplikacje webowe na zamówienie
-- Panele administracyjne / systemy CMS
-- Sklepy internetowe (e-commerce)
-- Integracje: Supabase, Resend, Cloudflare, R2
+## Usługi (https://barabashflow.pl/uslugi/)
+- Strony internetowe — https://barabashflow.pl/uslugi/strony-internetowe/ (od 3 500 zł)
+- Sklepy internetowe — https://barabashflow.pl/uslugi/sklepy-internetowe/ (od 8 000 zł)
+- Platformy i aplikacje webowe — https://barabashflow.pl/uslugi/platformy-i-aplikacje/ (od 15 000 zł)
+- CMS, SEO i opieka — https://barabashflow.pl/uslugi/cms-seo-opieka/ (od 500 zł / mies.)
+
+## Projekty
+- Portfolio: https://barabashflow.pl/projekty/ (m.in. Mercedes-Maybach / Autoforum Warszawa, WellBeauty B2B, Ticket Flow, Sake Control, HUBIJAS, Heels on the Track)
 
 ## Autor
 - Dmytrii Barabash — web developer, założyciel BarabashFlow (Warszawa).

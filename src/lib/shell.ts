@@ -1,218 +1,223 @@
-// Minimal client chrome for non-graph pages (blog): theme toggle, language
-// switcher, localized content swap and the morphing topbar. The full graph
-// engine stays home-page-only.
-import { getTheme, toggleTheme, onThemeChange } from './theme';
-import { LOCALES, getLocale, setLocale, onLocaleChange, applyDom, type Locale } from './i18n';
+// Client chrome shared by every public page: language switcher + localized
+// content swap, sticky header, burger menu, scroll reveal, counters, FAQ
+// accordions, the contact form, cookie notice and first-party page views.
+// No framework — a few hundred lines of vanilla TS bundled by Astro.
+import { LOCALES, getLocale, setLocale, onLocaleChange, applyDom, t, type Locale } from './i18n';
 import { restInsert } from './supabase';
-import { t } from './i18n';
 
 export function mountShell() {
   applyDom();
-  bindTheme();
   bindLangSwitcher();
-  applyBlogLocale();
-  setupTopbarMorph();
+  setupStickyHeader();
   setupBurger();
-  setupSmoothScroll();
-  bindContactPageForm();
+  setupReveal();
+  setupCounters();
+  setupFaq();
+  setupProjectFilter();
+  bindContactForms();
+  setupCookieNotice();
+  setupScrollTop();
   trackPageView();
 }
 
-// Phone/tablet burger: collapses .nav into a dropdown under the topbar.
-// Pure class toggle (.topbar.menu-open) — layout and breakpoint live in CSS.
+// ── language ────────────────────────────────────────────────────────────────
+function bindLangSwitcher() {
+  const wraps = document.querySelectorAll<HTMLElement>('.lang-switch');
+  if (!wraps.length) return;
+  const paint = () => {
+    wraps.forEach((wrap) => {
+      wrap.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
+        b.classList.toggle('is-active', b.dataset.locale === getLocale());
+        b.setAttribute('aria-pressed', String(b.dataset.locale === getLocale()));
+      });
+    });
+  };
+  wraps.forEach((wrap) => {
+    wrap.innerHTML = LOCALES.map((l) => `<button type="button" data-locale="${l}">${l.toUpperCase()}</button>`).join('');
+    wrap.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-locale]');
+      if (b) setLocale(b.dataset.locale as Locale);
+    });
+  });
+  onLocaleChange(() => { paint(); applyDom(); });
+  paint();
+}
+
+// ── header ──────────────────────────────────────────────────────────────────
+function setupStickyHeader() {
+  const header = document.querySelector<HTMLElement>('.site-header');
+  if (!header) return;
+  let ticking = false;
+  const apply = () => {
+    header.classList.toggle('is-stuck', window.scrollY > 24);
+    ticking = false;
+  };
+  window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(apply); } }, { passive: true });
+  apply();
+}
+
 export function setupBurger() {
   const btn = document.getElementById('nav-burger');
-  const topbar = document.querySelector<HTMLElement>('.topbar');
-  if (!btn || !topbar) return;
-  const close = () => {
-    topbar.classList.remove('menu-open');
-    btn.setAttribute('aria-expanded', 'false');
-  };
+  const header = document.querySelector<HTMLElement>('.site-header');
+  if (!btn || !header) return;
+  const close = () => { header.classList.remove('menu-open'); btn.setAttribute('aria-expanded', 'false'); document.body.classList.remove('nav-locked'); };
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const open = topbar.classList.toggle('menu-open');
+    const open = header.classList.toggle('menu-open');
     btn.setAttribute('aria-expanded', String(open));
+    document.body.classList.toggle('nav-locked', open);
   });
-  // Tap outside, pick a menu item, or Escape — all close the menu.
   document.addEventListener('click', (e) => {
-    const t = e.target as HTMLElement;
-    if (topbar.classList.contains('menu-open') && !t.closest('.nav') && !t.closest('#nav-burger')) close();
+    const el = e.target as HTMLElement;
+    if (header.classList.contains('menu-open') && !el.closest('.site-nav') && !el.closest('#nav-burger')) close();
   });
-  topbar.querySelector('.nav')?.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement).closest('a, button')) close();
-  });
+  header.querySelector('.site-nav')?.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('a')) close(); });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+}
+
+// ── reveal on scroll ────────────────────────────────────────────────────────
+function setupReveal() {
+  const els = document.querySelectorAll<HTMLElement>('[data-reveal]');
+  if (!els.length) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) {
+    els.forEach((el) => el.classList.add('is-in'));
+    return;
+  }
+  document.documentElement.classList.add('js-reveal');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((en) => {
+      if (!en.isIntersecting) return;
+      const el = en.target as HTMLElement;
+      const delay = Number(el.dataset.revealDelay || 0);
+      setTimeout(() => el.classList.add('is-in'), delay);
+      io.unobserve(el);
+    });
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+  els.forEach((el) => io.observe(el));
+}
+
+// ── counters (stats) ────────────────────────────────────────────────────────
+function setupCounters() {
+  const els = document.querySelectorAll<HTMLElement>('[data-count]');
+  if (!els.length) return;
+  const run = (el: HTMLElement) => {
+    const target = parseFloat(el.dataset.count || '0');
+    const suffix = el.dataset.suffix || '';
+    const decimals = (el.dataset.count || '').includes('.') ? 1 : 0;
+    const start = performance.now(), dur = 1400;
+    const step = () => {
+      const k = Math.min(1, (performance.now() - start) / dur);
+      const e = 1 - Math.pow(1 - k, 3);
+      el.textContent = (target * e).toFixed(decimals) + suffix;
+      if (k < 1) requestAnimationFrame(step); else el.textContent = el.dataset.final || (target.toFixed(decimals) + suffix);
+    };
+    requestAnimationFrame(step);
+  };
+  if (!('IntersectionObserver' in window)) { els.forEach((el) => { el.textContent = el.dataset.final || el.textContent; }); return; }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((en) => { if (en.isIntersecting) { run(en.target as HTMLElement); io.unobserve(en.target); } });
+  }, { threshold: 0.4 });
+  els.forEach((el) => io.observe(el));
+}
+
+// ── FAQ: one open at a time (native <details>) ──────────────────────────────
+function setupFaq() {
+  document.querySelectorAll<HTMLElement>('.faq-list').forEach((list) => {
+    list.addEventListener('toggle', (e) => {
+      const d = e.target as HTMLDetailsElement;
+      if (!d.open) return;
+      list.querySelectorAll<HTMLDetailsElement>('details[open]').forEach((o) => { if (o !== d) o.open = false; });
+    }, true);
+  });
+}
+
+// ── project filter chips (/projekty/) ───────────────────────────────────────
+function setupProjectFilter() {
+  const bar = document.querySelector<HTMLElement>('.filter-bar');
+  const grid = document.querySelector<HTMLElement>('.projects-grid');
+  if (!bar || !grid) return;
+  bar.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-filter]');
+    if (!btn) return;
+    const f = btn.dataset.filter || 'all';
+    bar.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b === btn));
+    grid.querySelectorAll<HTMLElement>('[data-services]').forEach((card) => {
+      const list = (card.dataset.services || '').split(' ').filter(Boolean);
+      card.hidden = f !== 'all' && !list.includes(f);
+    });
+  });
+}
+
+// ── contact forms (home / contact page / footer) → contact_submissions ──────
+export function bindContactForms() {
+  document.querySelectorAll<HTMLFormElement>('form[data-contact-form]').forEach((form) => {
+    const status = form.querySelector<HTMLElement>('.form-status');
+    const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const get = (k: string) => String(fd.get(k) || '').trim();
+      const name = get('name'), email = get('email'), message = get('message');
+      // Honeypot: bots fill every field.
+      if (get('website_url')) { form.reset(); return; }
+      if (!name || !email || !message) { if (status) status.textContent = t('contact.required'); return; }
+      if (submit) submit.disabled = true;
+      if (status) status.textContent = t('contact.sending');
+      const { error } = await restInsert('contact_submissions', {
+        name, email, message,
+        phone: get('phone') || null,
+        company: get('company') || null,
+        service: get('service') || null,
+        budget: get('budget') || null,
+        source: form.dataset.contactForm || 'website',
+        page: location.pathname.slice(0, 200),
+        locale: getLocale(),
+      });
+      if (submit) submit.disabled = false;
+      if (error) { if (status) status.textContent = t('contact.error'); return; }
+      form.reset();
+      form.classList.add('is-sent');
+      if (status) status.textContent = t('contact.success');
+    });
+  });
+}
+
+// ── cookie / privacy notice (localStorage only) ─────────────────────────────
+function setupCookieNotice() {
+  const el = document.getElementById('cookie-notice');
+  if (!el) return;
+  const KEY = 'bf:cookies-accepted';
+  try { if (localStorage.getItem(KEY) === '1') { el.remove(); return; } } catch {}
+  setTimeout(() => el.classList.add('is-shown'), 1400);
+  el.querySelector('[data-cookie-ok]')?.addEventListener('click', () => {
+    try { localStorage.setItem(KEY, '1'); } catch {}
+    el.classList.remove('is-shown');
+    setTimeout(() => el.remove(), 400);
+  });
+}
+
+function setupScrollTop() {
+  document.querySelectorAll<HTMLElement>('[data-scroll-top]').forEach((b) => {
+    b.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  });
 }
 
 // First-party, cookie-less analytics: one anonymous row per page view.
 // is_session marks the first view in this browser session ("a visit").
-// No cookies, no fingerprinting, no external scripts — consistent with the
-// site's cookie policy. Bots running WebDriver are skipped.
 export function trackPageView() {
   try {
     if ((navigator as any).webdriver) return;
     const path = (location.pathname.replace(/\/+$/, '') || '/').slice(0, 200);
     let isSession = false;
     try {
-      if (!sessionStorage.getItem('bf:sess')) {
-        sessionStorage.setItem('bf:sess', '1');
-        isSession = true;
-      }
+      if (!sessionStorage.getItem('bf:sess')) { sessionStorage.setItem('bf:sess', '1'); isSession = true; }
     } catch {}
-    const ref = document.referrer && !document.referrer.includes(location.host)
-      ? document.referrer.slice(0, 300)
-      : null;
+    const ref = document.referrer && !document.referrer.includes(location.host) ? document.referrer.slice(0, 300) : null;
     void restInsert('page_views', {
-      path,
-      referrer: ref,
+      path, referrer: ref,
       locale: document.documentElement.lang || 'pl',
       is_session: isSession,
       is_mobile: window.matchMedia('(max-width: 760px)').matches,
     });
   } catch {}
-}
-
-// Inertial wheel scrolling — mouse-wheel steps get eased into a smooth glide
-// (Lenis-style, but ~30 lines). Native behavior is kept for touch devices,
-// reduced-motion users, inner scrollers (modal, editors) and Ctrl/Cmd+wheel
-// (browser zoom + graph zoom).
-export function setupSmoothScroll() {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
-
-  let target = window.scrollY;
-  let current = window.scrollY;
-  let raf = 0;
-
-  const maxScroll = () =>
-    Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-
-  const loop = () => {
-    current += (target - current) * 0.16;
-    if (Math.abs(target - current) < 0.6) {
-      current = target;
-      window.scrollTo({ top: current, behavior: 'instant' as ScrollBehavior });
-      raf = 0;
-      return;
-    }
-    window.scrollTo({ top: current, behavior: 'instant' as ScrollBehavior });
-    raf = requestAnimationFrame(loop);
-  };
-
-  window.addEventListener(
-    'wheel',
-    (e) => {
-      if (e.ctrlKey || e.metaKey) return; // zoom gestures stay native
-      const t = e.target as HTMLElement;
-      if (t.closest?.('.modal-scroll, textarea, select, [contenteditable]')) return;
-      e.preventDefault();
-      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * window.innerHeight : e.deltaY;
-      if (!raf) { target = current = window.scrollY; }
-      target = Math.max(0, Math.min(maxScroll(), target + dy));
-      if (!raf) raf = requestAnimationFrame(loop);
-    },
-    { passive: false },
-  );
-
-  // Keyboard / scrollbar / anchor jumps: resync so the next wheel starts fresh.
-  window.addEventListener(
-    'scroll',
-    () => { if (!raf) { target = current = window.scrollY; } },
-    { passive: true },
-  );
-}
-
-// Topbar morph: squared matte bar glued to the top → floating rounded pill
-// once the page scrolls. Pure class toggle; the animation lives in CSS.
-export function setupTopbarMorph() {
-  let ticking = false;
-  const apply = () => {
-    document.body.classList.toggle('is-scrolled', window.scrollY > 40);
-    ticking = false;
-  };
-  window.addEventListener(
-    'scroll',
-    () => {
-      if (!ticking) { ticking = true; requestAnimationFrame(apply); }
-    },
-    { passive: true },
-  );
-  apply();
-}
-
-function bindTheme() {
-  const btn = document.getElementById('theme-toggle');
-  const icon = document.getElementById('theme-icon');
-  if (!btn || !icon) return;
-  const moon = `<path d="M14.5 11.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`;
-  const sun = `<circle cx="10" cy="10" r="3.4" stroke="currentColor" stroke-width="1.4"/><g stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 2.5v2"/><path d="M10 15.5v2"/><path d="M2.5 10h2"/><path d="M15.5 10h2"/><path d="M4.7 4.7l1.4 1.4"/><path d="M13.9 13.9l1.4 1.4"/><path d="M4.7 15.3l1.4-1.4"/><path d="M13.9 6.1l1.4-1.4"/></g>`;
-  const paint = () => { icon.innerHTML = getTheme() === 'light' ? moon : sun; };
-  paint();
-  btn.addEventListener('click', toggleTheme);
-  onThemeChange(paint);
-}
-
-function bindLangSwitcher() {
-  const wrap = document.querySelector<HTMLElement>('.lang');
-  if (!wrap) return;
-  wrap.innerHTML = LOCALES.map((l) => `<button type="button" data-locale="${l}">${l}</button>`).join('');
-  const updateActive = () => {
-    wrap.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
-      b.classList.toggle('is-active', b.dataset.locale === getLocale());
-    });
-  };
-  wrap.addEventListener('click', (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-locale]');
-    if (b) setLocale(b.dataset.locale as Locale);
-  });
-  onLocaleChange(() => {
-    updateActive();
-    applyDom();
-    applyBlogLocale();
-  });
-  updateActive();
-}
-
-// Blog content is statically rendered in PL (that's what Google indexes).
-// EN/RU variants are embedded in the page (data-lm-* attributes + hidden
-// .post-body[data-locale] blocks) and swapped client-side.
-function applyBlogLocale() {
-  const loc = getLocale();
-  // data-lm-* text swaps live in i18n.applyDom (shared with the home page).
-  const bodies = document.querySelectorAll<HTMLElement>('.post-body[data-locale]');
-  if (bodies.length) {
-    const has = [...bodies].some((el) => el.dataset.locale === loc && el.innerHTML.trim());
-    const show = has ? loc : 'pl';
-    bodies.forEach((el) => { el.hidden = el.dataset.locale !== show; });
-  }
-}
-
-// Static /kontakt/ page form → contact_submissions (same table + RLS as the
-// home-page modal; source distinguishes the origin in the admin inbox).
-export function bindContactPageForm() {
-  const form = document.getElementById('contact-page-form') as HTMLFormElement | null;
-  if (!form) return;
-  const status = form.querySelector<HTMLElement>('.form-status');
-  const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const fd = new FormData(form);
-    const name = String(fd.get('name') || '').trim();
-    const email = String(fd.get('email') || '').trim();
-    const message = String(fd.get('message') || '').trim();
-    if (!name || !email || !message) {
-      if (status) status.textContent = t('contact.required');
-      return;
-    }
-    if (submit) submit.disabled = true;
-    if (status) status.textContent = t('contact.sending');
-    const { error } = await restInsert('contact_submissions', { name, email, message, source: 'kontakt-page' });
-    if (submit) submit.disabled = false;
-    if (error) {
-      if (status) status.textContent = t('contact.error');
-      return;
-    }
-    form.reset();
-    if (status) status.textContent = t('contact.success');
-  });
 }

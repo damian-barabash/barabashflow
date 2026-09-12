@@ -1,0 +1,116 @@
+---
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import { fetchSettings, fetchServices, fetchProjects, md, lmRow, type Service, type Project, type Settings } from '../../lib/content';
+import { SITE, ORG_ID } from '../../lib/site';
+
+export async function getStaticPaths() {
+  const [services, projects, settings] = await Promise.all([fetchServices(), fetchProjects(), fetchSettings()]);
+  return services.map((service) => ({
+    params: { slug: service.slug },
+    props: { service, services, settings, projects: projects.filter((p) => p.services.includes(service.slug)) },
+  }));
+}
+const { service: sv, services, settings, projects } = Astro.props as { service: Service; services: Service[]; settings: Settings; projects: Project[] };
+const title = `${sv.title_pl} — ${sv.price_from ? sv.price_from + ' | ' : ''}BarabashFlow`;
+const description = (sv.tagline_pl || '').slice(0, 158);
+const others = services.filter((x) => x.slug !== sv.slug);
+const serviceLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Service',
+  '@id': `${SITE}/uslugi/${sv.slug}/#service`,
+  name: sv.title_pl,
+  description,
+  serviceType: sv.title_pl,
+  provider: { '@id': ORG_ID },
+  areaServed: 'PL',
+  url: `${SITE}/uslugi/${sv.slug}/`,
+  ...(sv.price_from ? { offers: { '@type': 'Offer', priceCurrency: 'PLN', description: sv.price_from } } : {}),
+};
+const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+  { '@type': 'ListItem', position: 1, name: 'BarabashFlow', item: SITE + '/' },
+  { '@type': 'ListItem', position: 2, name: 'Usługi', item: SITE + '/uslugi/' },
+  { '@type': 'ListItem', position: 3, name: sv.title_pl, item: `${SITE}/uslugi/${sv.slug}/` },
+] };
+---
+<Base title={title} description={description} jsonLd={[serviceLd, crumbsLd]}>
+  <SiteHeader active="services" />
+  <main class="container">
+    <section class="sec">
+      <div class="sec-inner page-head">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><a href="/uslugi/" data-i18n="nav.services">Usługi</a><span>/</span><span {...lmRow(sv, 'title')}>{sv.title_pl}</span></nav>
+        <span class="kicker" data-i18n="nav.services">Usługi</span>
+        <h1 {...lmRow(sv, 'title')}>{sv.title_pl}</h1>
+        <p class="lead" {...lmRow(sv, 'tagline')}>{sv.tagline_pl}</p>
+      </div>
+    </section>
+    <div class="divider" aria-hidden="true"></div>
+    <section class="sec">
+      <div class="sec-inner sec-pad">
+        <div class="svc-detail">
+          <div class="svc-body">
+            <div data-locale="pl" set:html={md(sv.description_pl)} />
+            {sv.description_en && <div data-locale="en" hidden set:html={md(sv.description_en)} />}
+            {sv.description_ru && <div data-locale="ru" hidden set:html={md(sv.description_ru)} />}
+          </div>
+          <aside class="svc-aside">
+            <div class="aside-card">
+              <h3 data-i18n="services.scope">Zakres</h3>
+              <ul>{sv.bullets_pl.map((b, j) => <li data-lm-pl={b} data-lm-en={sv.bullets_en[j] || b} data-lm-ru={sv.bullets_ru[j] || b}>{b}</li>)}</ul>
+            </div>
+            <div class="aside-card">
+              <h3 data-i18n="services.price">Cena</h3>
+              <div class="price">{sv.price_from || '—'}<small data-i18n="contact.hours">Odpowiadam w ciągu 24 godzin w dni robocze</small></div>
+              <a class="btn btn-dark is-block" href="#contact" data-i18n="services.cta">Zapytaj o wycenę</a>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+    {projects.length > 0 && (
+      <>
+        <div class="divider" aria-hidden="true"></div>
+        <section class="sec">
+          <div class="sec-inner is-grey sec-pad">
+            <div class="sec-head is-split">
+              <div>
+                <span class="kicker is-white" data-i18n="nav.projects">Projekty</span>
+                <h2 class="h-sec" style="margin-top:18px" data-i18n="services.projects">Projekty z tej usługi</h2>
+              </div>
+              <a class="btn btn-white" href="/projekty/" data-i18n="home.projects.all">Wszystkie projekty</a>
+            </div>
+            <div class="projects-grid">{projects.map((p) => <ProjectCard p={p} />)}</div>
+          </div>
+        </section>
+      </>
+    )}
+    <div class="divider" aria-hidden="true"></div>
+    <section class="sec">
+      <div class="sec-inner">
+        <div class="sec-head is-center" style="padding: clamp(32px,5vw,64px) 18px 0; margin-bottom: 32px;">
+          <h2 class="h-sub" data-i18n="services.other">Pozostałe usługi</h2>
+        </div>
+        <div class="services-grid">
+          {others.map((o, i) => (
+            <article class="svc" style="min-height:auto">
+              <a class="over-link" href={`/uslugi/${o.slug}/`} aria-label={o.title_pl}></a>
+              <span class="kicker is-dark svc-tag" {...lmRow(o, 'title')}>{o.title_pl}</span>
+              <p class="tagline" {...lmRow(o, 'tagline')}>{o.tagline_pl}</p>
+              <div class="svc-foot">
+                {o.price_from && <span class="svc-price"><b>{o.price_from}</b></span>}
+                <a class="svc-link" href={`/uslugi/${o.slug}/`} aria-label={o.title_pl}><svg viewBox="0 0 16 16" fill="none"><path d="M5 2l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  </main>
+  <SiteFooter services={services} settings={settings} />
+  <script>
+    import { mountShell } from '../../lib/shell';
+    mountShell();
+  </script>
+</Base>

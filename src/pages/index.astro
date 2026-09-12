@@ -1,510 +1,359 @@
 ---
+// Home — hero with the 3D mark, trusted strip, studio + stats, services,
+// approach, featured projects, process, marquee, why-us, blog, FAQ; the CTA
+// band + contact + footer come from SiteFooter. All CMS content is baked in
+// at build (PL in markup, EN/RU in data-lm-* attributes).
 import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
-import '../styles/main.css';
-import { restGet, mediaUrl } from '../lib/supabase';
-import { formatDatePl, isoDate, pickExistingSlug, type BlogPost } from '../lib/blog';
+import FaqList from '../components/FaqList.astro';
+import BlogCard from '../components/BlogCard.astro';
+import { mediaUrl } from '../lib/supabase';
+import { fetchSettings, fetchServices, fetchProjects, fetchFaq, s, lm, lmRow, projectCover, categoryLm, firstSentence, type Project } from '../lib/content';
+import { restGet } from '../lib/supabase';
+import { SITE } from '../lib/site';
+import type { BlogPost } from '../lib/blog';
 
-// Build-time fetch so crawlers and social/LLM bots see real project names in
-// the static HTML (the interactive graph hydrates on top at runtime). Falls
-// back to an empty list if Supabase is unreachable at build — the page still
-// renders and the client refetches live data anyway.
-const seoProjects = await restGet<{ title_pl: string; category_key: string }>(
-  'projects?select=title_pl,category_key&is_published=eq.true&order=sort_order.asc',
-);
+const [settings, services, projects, faq, posts] = await Promise.all([
+  fetchSettings(), fetchServices(), fetchProjects(), fetchFaq('home'),
+  restGet<BlogPost>('blog_posts?select=slug,title_pl,title_en,title_ru,excerpt_pl,excerpt_en,excerpt_ru,cover_path,cover_alt,published_at,tags&status=eq.published&order=published_at.desc&limit=3'),
+]);
+const featured = (projects.filter((p) => p.is_featured).length ? projects.filter((p) => p.is_featured) : projects).slice(0, 4);
+const trusted = projects.map((p) => ({ name: p.client || p.title_pl, slug: p.slug })).filter((x, i, a) => a.findIndex((y) => y.name === x.name) === i && !/barabash/i.test(x.name)).slice(0, 6);
+const stats: any[] = settings.home_stats?.value_meta?.items || [];
+const ownerPhoto = mediaUrl(settings.owner_photo_path?.value_meta?.path);
+const visionImg = projectCover(featured[0]);
 
-// Blog → home internal links (topic cluster). Latest posts for the "from the
-// blog" section + the full slug/title map so services and FAQ can link to a
-// specific article with a descriptive anchor — only when the post exists.
-type PostLink = Pick<BlogPost, 'slug' | 'title_pl' | 'title_en' | 'title_ru' | 'excerpt_pl' | 'excerpt_en' | 'excerpt_ru' | 'cover_path' | 'cover_alt' | 'published_at'>;
-const blogIndex = await restGet<PostLink>(
-  'blog_posts?select=slug,title_pl,title_en,title_ru,excerpt_pl,excerpt_en,excerpt_ru,cover_path,cover_alt,published_at&status=eq.published&order=published_at.desc&limit=500',
-);
-const latestPosts = blogIndex.slice(0, 3);
-const bySlug = new Map(blogIndex.map((p) => [p.slug, p]));
-const slugSet = new Set(bySlug.keys());
-const link = (preferred: string[]): PostLink | null => {
-  const slug = pickExistingSlug(preferred, slugSet);
-  return slug ? bySlug.get(slug) ?? null : null;
+const title = 'BarabashFlow — tworzenie stron internetowych, sklepów i platform';
+const description = s(settings, 'hero_subtitle', 'pl', 'Projektuję i buduję szybkie strony internetowe, sklepy i aplikacje webowe dla firm — z własnym panelem do edycji i wyceną w 24 godziny.');
+
+const faqLd = faq.length ? {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.question_pl, acceptedAnswer: { '@type': 'Answer', text: f.answer_pl } })),
+} : null;
+const servicesLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'Usługi BarabashFlow',
+  itemListElement: services.map((sv, i) => ({ '@type': 'ListItem', position: i + 1, name: sv.title_pl, url: `${SITE}/uslugi/${sv.slug}/` })),
 };
-const LINKS = {
-  site: link(['tworzenie-stron-internetowych', 'tworzenie-stron-internetowych-etapy-i-proces', 'strona-internetowa-dla-firmy']),
-  platform: link(['tworzenie-stron-internetowych-od-zero-do-wdrozenia', 'panel-administracyjny-strony-internetowej-co-to-i-jak-dziala']),
-  cms: link(['panel-administracyjny-strony-internetowej-co-to-i-jak-dziala', 'panel-administracyjny-strony-internetowej-co-to-i-jak-z-nim-pracowac']),
-  shop: link(['ile-kosztuje-strona-internetowa-ze-sklepem-rozbicie-kosztow', 'ile-kosztuje-strona-internetowa-sklepu-internetowego-w-2026']),
-  faqPrice: link(['ile-kosztuje-strona-internetowa', 'ile-kosztuje-strona-internetowa-w-2026', 'strona-internetowa-cennik']),
-  faqTime: link(['jak-dlugo-trwa-stworzenie-strony-internetowej', 'tworzenie-stron-internetowych-etapy-i-proces']),
-  faqTech: link(['strona-wizytowka-wordpress-czy-warto-wybrac-cms', 'tworzenie-stron-internetowych-ai-vs-zlecenie-programiscie']),
+const ICONS: Record<string, string> = {
+  site: '<path d="M3 5h18v14H3z"/><path d="M3 9h18M7 7h.01M10 7h.01"/>',
+  shop: '<path d="M4 7h16l-1 13H5z"/><path d="M9 10V6a3 3 0 0 1 6 0v4"/>',
+  platform: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  care: '<path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/>',
 };
-
-// Decorative data-viz garnish (deterministic, generated at build):
-// dot-meter columns for the mesh stat tiles + the colored "pulse" dot strip.
-let seed = 7;
-const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
-const METER_A = [3, 5, 2, 6, 4, 7, 3, 5, 8, 4, 6, 3, 7, 5, 2, 6];
-const METER_B = [2, 4, 6, 3, 7, 5, 8, 4, 3, 6, 2, 5, 7, 4, 6, 3];
-const PULSE_COLORS = ['#7fb44c', '#f0a24a', '#e2447f', '#c9c9c1', '#c9c9c1', '#c9c9c1', '#c9c9c1'];
-const pulseDots = Array.from({ length: 52 }, () => ({
-  size: (1.4 + rnd() * 2.4) * 2,
-  y: (rnd() - 0.5) * 14,
-  color: PULSE_COLORS[Math.floor(rnd() * PULSE_COLORS.length)],
-  dim: rnd() < 0.45,
-}));
+const tagOf = (p: Project) => ({
+  pl: p.tagline_pl || firstSentence(p.description_pl),
+  en: p.tagline_en || firstSentence(p.description_en) || p.tagline_pl || firstSentence(p.description_pl),
+  ru: p.tagline_ru || firstSentence(p.description_ru) || p.tagline_pl || firstSentence(p.description_pl),
+});
 ---
-<Base bodyClass="is-loading" withFaq={true}>
-  <!-- ── Static semantic layer (SEO/GEO) — visually hidden, always in the DOM ── -->
-  <section class="sr-only" aria-hidden="false">
-    <h2>BarabashFlow — tworzenie stron internetowych i platform</h2>
-    <p>
-      BarabashFlow to studio Dmytrija Barabasha z Warszawy. Projektuję i wdrażam
-      nowoczesne, szybkie strony internetowe, platformy i aplikacje webowe dla
-      firm w Polsce i za granicą. Websites and internet platforms. Разработка
-      сайтов, платформ и веб-приложений под ключ.
-    </p>
-    <h3>Usługi</h3>
-    <ul>
-      <li>Tworzenie stron internetowych i stron-wizytówek</li>
-      <li>Platformy internetowe i aplikacje webowe na zamówienie</li>
-      <li>Panele administracyjne i systemy CMS</li>
-      <li>Sklepy internetowe / e-commerce</li>
-      <li>Wdrożenia Astro, Next.js, React, Supabase</li>
-    </ul>
-    {seoProjects.length > 0 && (
-      <>
-        <h3>Zrealizowane projekty</h3>
-        <ul>
-          {seoProjects.map((p) => <li>{p.title_pl}</li>)}
-        </ul>
-      </>
-    )}
-  </section>
+<Base title={title} description={description} jsonLd={[servicesLd, ...(faqLd ? [faqLd] : [])]} bodyClass="is-home">
+  <SiteHeader active="home" />
 
-  <div class="app">
-    <!-- ── Top bar ── -->
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="BarabashFlow — strona główna">
-        <img class="brand-logo" src="/assets/img/logo.png" alt="Logo BarabashFlow" width="28" height="35" draggable="false" />
-        <span class="brand-name">Barabashflow</span>
-      </a>
+  <main>
+    <div class="container">
+      <!-- ── HERO ─────────────────────────────────────────────────────── -->
+      <section class="sec">
+        <div class="hero">
+          <div class="hero-inner">
+            <div class="px is-tl" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            <div class="px is-br" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="arrow-track is-left" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 4h3l6 8-6 8H6l6-8z"/></svg><svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 4h3l6 8-6 8H6l6-8z"/></svg><svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 4h3l6 8-6 8H6l6-8z"/></svg>
+            </div>
+            <div class="arrow-track is-right" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M18 4h-3l-6 8 6 8h3l-6-8z"/></svg><svg viewBox="0 0 24 24"><path fill="currentColor" d="M18 4h-3l-6 8 6 8h3l-6-8z"/></svg><svg viewBox="0 0 24 24"><path fill="currentColor" d="M18 4h-3l-6 8 6 8h3l-6-8z"/></svg>
+            </div>
 
-      <nav class="nav" aria-label="Site navigation">
-        <span class="status pill" aria-label="Availability">
-          <span class="status-dot" aria-hidden="true"></span>
-          <span class="status-text" data-i18n="meta.available">Dostępny</span>
-        </span>
-        <a class="chip" href="/blog/" data-i18n="nav.blog">Blog</a>
-        <a class="chip" href="/o-mnie/" data-i18n="nav.about">O mnie</a>
-        <a class="chip" href="/kontakt/" data-i18n="nav.contact">Kontakt</a>
-        <div class="nav-group lang pill" aria-label="Language switcher"></div>
-      </nav>
+            <div class="hero-kicker">
+              <span class="kicker is-white"><span class="status-dot" aria-hidden="true"></span><span data-i18n="meta.available">Dostępny</span></span>
+              <span class="kicker is-white" {...lm(settings, 'hero_kicker')}>{s(settings, 'hero_kicker')}</span>
+            </div>
 
-      <div class="nav-tools">
-        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme" title="Theme">
-          <svg viewBox="0 0 20 20" fill="none" id="theme-icon" aria-hidden="true">
-            <path d="M14.5 11.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <button class="icon-btn" id="contact-link" type="button" aria-label="Kontakt" title="Kontakt">
-          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path d="M3.5 5.5h13v9h-13zM3.5 5.5l6.5 5 6.5-5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <button class="icon-btn nav-burger" id="nav-burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-menu">
-          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path class="burger-l1" d="M4 6.6h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path class="burger-l2" d="M4 10h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path class="burger-l3" d="M4 13.4h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </div>
-    </header>
+            <h1 class="sr-only" {...lm(settings, 'hero_title')}>{s(settings, 'hero_title', 'pl', 'Strony, sklepy i platformy internetowe, które sprzedają')}</h1>
+            <div class="hero-words" aria-hidden="true">
+              <span class="hero-word is-a" {...lm(settings, 'hero_word_a')}>{s(settings, 'hero_word_a', 'pl', 'TWORZYMY')}</span>
+              <div class="hero-logo-card">
+                <div id="hero-logo" aria-label="Logo 3D BarabashFlow — przeciągnij, aby obrócić">
+                  <div class="hero-logo-fallback"><img src="/assets/img/logo.png" alt="" width="326" height="402" /></div>
+                </div>
+              </div>
+              <span class="hero-word is-b" {...lm(settings, 'hero_word_b')}>{s(settings, 'hero_word_b', 'pl', 'STRONY')}</span>
+            </div>
 
-    <!-- ── Hero ── -->
-    <section class="hero">
-      <div class="hero-chips">
-        <span class="portrait" id="owner-portrait" data-empty="true" aria-hidden="true"></span>
-        <span class="chip" data-i18n="hero.eyebrow">Studio Indywidualne</span>
-        <span class="chip" data-i18n="meta.location">Warszawa → Świat</span>
-        <span class="chip chip-lime">PL · EN · RU</span>
-      </div>
-      <h1 class="hero-title" id="hero-title">Strony internetowe <em>i</em> platformy</h1>
-      <p class="hero-sub" id="hero-sub"></p>
-      <div class="hero-actions">
-        <button type="button" class="cta" id="cta" data-open-contact>
-          <span class="cta-label">Zlecić projekt</span>
-          <svg class="cta-arrow" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <a class="ghost-cta" href="#works" data-i18n="hero.see-work">Zobacz projekty</a>
-      </div>
-
-      <!-- Colored pulse strip (decorative, reference-style dot timeline) -->
-      <div class="pulse-strip" aria-hidden="true">
-        {pulseDots.map((d) => (
-          <span
-            class="pulse-dot"
-            style={`width:${d.size.toFixed(1)}px;height:${d.size.toFixed(1)}px;transform:translateY(${d.y.toFixed(1)}px);background:${d.color};opacity:${d.dim ? 0.45 : 0.95}`}
-          ></span>
-        ))}
-      </div>
-
-      <!-- Dot-matrix stat strip -->
-      <div class="stats-strip" aria-label="Statystyki">
-        <div class="stat stat-mesh mesh-green">
-          <span class="stat-num" id="stat-projects">—</span>
-          <span class="dot-meter">
-            {METER_A.map((n) => <span class="meter-col" style={`height:${n * 6}px`}></span>)}
-          </span>
-          <span class="stat-label"><span data-i18n="stats.projects">Projekty w grafie</span> <span class="chip chip-glass chip-xs">live</span></span>
-        </div>
-        <div class="stat">
-          <span class="stat-num">3</span>
-          <span class="stat-label" data-i18n="stats.langs">Języki obsługi</span>
-        </div>
-        <div class="stat">
-          <span class="stat-num">24h</span>
-          <span class="stat-label" data-i18n="stats.reply">Odpowiedź na brief</span>
-        </div>
-        <div class="stat stat-mesh mesh-orange">
-          <span class="stat-num">100%</span>
-          <span class="dot-meter">
-            {METER_B.map((n) => <span class="meter-col" style={`height:${n * 6}px`}></span>)}
-          </span>
-          <span class="stat-label" data-i18n="stats.custom">Kod na miarę, zero szablonów</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Graph section ── -->
-    <section class="graph-section" id="works">
-      <div class="section-head">
-        <span class="chip kicker" data-i18n="sec.works.kicker">Portfolio</span>
-        <h2 class="section-title" data-i18n="sec.works.title">Mapa zrealizowanych projektów</h2>
-        <p class="section-sub graph-caption" id="graph-caption"></p>
-      </div>
-
-      <div class="graph-card">
-        <main class="stage" id="graph-canvas">
-          <div class="stage-inner" id="stage-inner">
-            <svg id="graph-edges" aria-hidden="true"></svg>
-            <div id="logo-stage" aria-hidden="true">
-              <span id="logo-fallback">BF</span>
-              <span id="logo-status"></span>
+            <p class="hero-sub" {...lm(settings, 'hero_subtitle')}>{description}</p>
+            <div class="hero-actions">
+              <a class="btn btn-white" href="/projekty/" {...lm(settings, 'cta_secondary', 'Zobacz projekty')}>{s(settings, 'cta_secondary', 'pl', 'Zobacz projekty')}</a>
+              <a class="btn btn-dark with-icon" href="#contact">
+                <span class="btn-ico"><svg viewBox="0 0 16 16" fill="none"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span {...lm(settings, 'cta_label', 'Wycena w 24 h')}>{s(settings, 'cta_label', 'pl', 'Wycena w 24 h')}</span>
+              </a>
             </div>
           </div>
-          <span class="zoom-indicator" id="zoom-indicator">100%</span>
-          <div class="graph-tools" aria-hidden="false">
-            <button type="button" class="tool-btn" id="zoom-out" aria-label="Oddal">−</button>
-            <button type="button" class="tool-btn" id="zoom-in" aria-label="Przybliż">+</button>
-            <button type="button" class="tool-btn" id="zoom-reset" aria-label="Dopasuj widok">
-              <svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 5V1h4M13 9v4H9M13 5V1H9M1 9v4h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-          </div>
-          <div class="graph-pan-hint" id="graph-pan-hint" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span data-i18n="graph.pan-hint">To graf — przeciągnij, by przesunąć</span>
-          </div>
-        </main>
-      </div>
-    </section>
-
-    <!-- ── Services ── -->
-    <section class="services" id="services" data-reveal>
-      <div class="section-head">
-        <span class="chip kicker" data-i18n="sec.services.kicker">Usługi</span>
-        <h2 class="section-title" data-i18n="sec.services.title">Co mogę dla Ciebie zbudować</h2>
-        <p class="section-sub" data-i18n="sec.services.sub">Od strony-wizytówki po platformę z własnym panelem — projekt, kod i wdrożenie w jednych rękach.</p>
-      </div>
-      <div class="services-grid">
-        <article class="svc-card">
-          <span class="svc-icon" aria-hidden="true">
-            <svg viewBox="0 0 22 22" fill="none"><rect x="2" y="3.5" width="18" height="14" rx="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M2 8h18" stroke="currentColor" stroke-width="1.5"/><circle cx="5" cy="5.8" r="0.9" fill="currentColor"/><circle cx="7.6" cy="5.8" r="0.9" fill="currentColor"/></svg>
-          </span>
-          <h3 class="svc-title" data-i18n="svc.site.t">Strony internetowe</h3>
-          <p class="svc-desc" data-i18n="svc.site.d">Szybkie, dopracowane strony firmowe i wizytówki, które ładują się natychmiast i dobrze pozycjonują.</p>
-          {LINKS.site && <span class="svc-link"><span data-i18n="svc.more">Czytaj na blogu:</span> <a href={`/blog/${LINKS.site.slug}/`} data-lm-pl={LINKS.site.title_pl} data-lm-en={LINKS.site.title_en || LINKS.site.title_pl} data-lm-ru={LINKS.site.title_ru || LINKS.site.title_pl}>{LINKS.site.title_pl}</a></span>}
-        </article>
-        <article class="svc-card">
-          <span class="svc-icon" aria-hidden="true">
-            <svg viewBox="0 0 22 22" fill="none"><rect x="2.5" y="2.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="2.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="12" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="12" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>
-          </span>
-          <h3 class="svc-title" data-i18n="svc.platform.t">Platformy i aplikacje</h3>
-          <p class="svc-desc" data-i18n="svc.platform.d">Aplikacje webowe na zamówienie: rezerwacje, kalendarze, portale klienta, integracje z API.</p>
-          {LINKS.platform && <span class="svc-link"><span data-i18n="svc.more">Czytaj na blogu:</span> <a href={`/blog/${LINKS.platform.slug}/`} data-lm-pl={LINKS.platform.title_pl} data-lm-en={LINKS.platform.title_en || LINKS.platform.title_pl} data-lm-ru={LINKS.platform.title_ru || LINKS.platform.title_pl}>{LINKS.platform.title_pl}</a></span>}
-        </article>
-        <article class="svc-card">
-          <span class="svc-icon" aria-hidden="true">
-            <svg viewBox="0 0 22 22" fill="none"><path d="M11 3l7 3.5v4.8c0 4-2.8 6.6-7 7.7-4.2-1.1-7-3.7-7-7.7V6.5L11 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.2 11l2 2 3.6-3.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </span>
-          <h3 class="svc-title" data-i18n="svc.cms.t">Panele CMS i admin</h3>
-          <p class="svc-desc" data-i18n="svc.cms.d">Własny panel do edycji treści, zdjęć i zamówień — bez abonamentów i bez WordPressa.</p>
-          {LINKS.cms && <span class="svc-link"><span data-i18n="svc.more">Czytaj na blogu:</span> <a href={`/blog/${LINKS.cms.slug}/`} data-lm-pl={LINKS.cms.title_pl} data-lm-en={LINKS.cms.title_en || LINKS.cms.title_pl} data-lm-ru={LINKS.cms.title_ru || LINKS.cms.title_pl}>{LINKS.cms.title_pl}</a></span>}
-        </article>
-        <article class="svc-card">
-          <span class="svc-icon" aria-hidden="true">
-            <svg viewBox="0 0 22 22" fill="none"><path d="M3 4h2.2l1.6 10.2c.1.7.7 1.3 1.5 1.3h8.2c.7 0 1.3-.5 1.5-1.2L19.5 8H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.4" cy="18.6" r="1.3" fill="currentColor"/><circle cx="15.6" cy="18.6" r="1.3" fill="currentColor"/></svg>
-          </span>
-          <h3 class="svc-title" data-i18n="svc.shop.t">Sklepy internetowe</h3>
-          <p class="svc-desc" data-i18n="svc.shop.d">E-commerce z płatnościami, katalogiem i panelem sprzedaży — dopasowany do Twojego produktu.</p>
-          {LINKS.shop && <span class="svc-link"><span data-i18n="svc.more">Czytaj na blogu:</span> <a href={`/blog/${LINKS.shop.slug}/`} data-lm-pl={LINKS.shop.title_pl} data-lm-en={LINKS.shop.title_en || LINKS.shop.title_pl} data-lm-ru={LINKS.shop.title_ru || LINKS.shop.title_pl}>{LINKS.shop.title_pl}</a></span>}
-        </article>
-      </div>
-    </section>
-
-    <!-- ── Process ── -->
-    <section class="process" data-reveal>
-      <div class="section-head">
-        <span class="chip kicker" data-i18n="sec.process.kicker">Proces</span>
-        <h2 class="section-title" data-i18n="sec.process.title">Jak wygląda współpraca</h2>
-      </div>
-      <div class="process-grid">
-        <article class="proc-card mesh-green">
-          <span class="proc-num">01</span>
-          <div class="proc-body">
-            <h3 class="proc-title" data-i18n="proc.1.t">Brief i wycena</h3>
-            <p class="proc-desc" data-i18n="proc.1.d">Opisujesz pomysł — w 24 h dostajesz plan, zakres i konkretną wycenę.</p>
-          </div>
-        </article>
-        <article class="proc-card mesh-orange">
-          <span class="proc-num">02</span>
-          <div class="proc-body">
-            <h3 class="proc-title" data-i18n="proc.2.t">Projekt i budowa</h3>
-            <p class="proc-desc" data-i18n="proc.2.d">Design i kod powstają razem — widzisz postęp na żywo i zgłaszasz uwagi.</p>
-          </div>
-        </article>
-        <article class="proc-card mesh-pink">
-          <span class="proc-num">03</span>
-          <div class="proc-body">
-            <h3 class="proc-title" data-i18n="proc.3.t">Wdrożenie i opieka</h3>
-            <p class="proc-desc" data-i18n="proc.3.d">Domena, hosting, panel — wszystko działa. Zostaję do pomocy po starcie.</p>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <!-- ── FAQ ── -->
-    <section class="faq" data-reveal>
-      <div class="section-head">
-        <span class="chip kicker">FAQ</span>
-        <h2 class="section-title" data-i18n="sec.faq.title">Częste pytania</h2>
-      </div>
-      <div class="faq-list">
-        <details class="faq-item">
-          <summary>
-            <span data-i18n="faq.1.q">Ile kosztuje strona internetowa?</span>
-            <span class="faq-plus" aria-hidden="true"></span>
-          </summary>
-          <p data-i18n="faq.1.a">Koszt zależy od zakresu — od prostej strony-wizytówki po rozbudowaną platformę z panelem CMS. Napisz przez formularz, przygotuję wycenę dopasowaną do projektu.</p>
-          {LINKS.faqPrice && <p class="faq-more"><span data-i18n="faq.more">Więcej w artykule:</span> <a href={`/blog/${LINKS.faqPrice.slug}/`} data-lm-pl={LINKS.faqPrice.title_pl} data-lm-en={LINKS.faqPrice.title_en || LINKS.faqPrice.title_pl} data-lm-ru={LINKS.faqPrice.title_ru || LINKS.faqPrice.title_pl}>{LINKS.faqPrice.title_pl}</a></p>}
-        </details>
-        <details class="faq-item">
-          <summary>
-            <span data-i18n="faq.2.q">Jak długo trwa realizacja?</span>
-            <span class="faq-plus" aria-hidden="true"></span>
-          </summary>
-          <p data-i18n="faq.2.a">Strona-wizytówka to zwykle 1–2 tygodnie, platforma z panelem — od kilku tygodni. Dokładny harmonogram dostajesz razem z wyceną.</p>
-          {LINKS.faqTime && <p class="faq-more"><span data-i18n="faq.more">Więcej w artykule:</span> <a href={`/blog/${LINKS.faqTime.slug}/`} data-lm-pl={LINKS.faqTime.title_pl} data-lm-en={LINKS.faqTime.title_en || LINKS.faqTime.title_pl} data-lm-ru={LINKS.faqTime.title_ru || LINKS.faqTime.title_pl}>{LINKS.faqTime.title_pl}</a></p>}
-        </details>
-        <details class="faq-item">
-          <summary>
-            <span data-i18n="faq.3.q">W jakich technologiach pracujesz?</span>
-            <span class="faq-plus" aria-hidden="true"></span>
-          </summary>
-          <p data-i18n="faq.3.a">Astro, React, Next.js, Supabase, Three.js. Strony są statyczne i wdrażane na GitHub Pages / Cloudflare — dzięki temu ładują się natychmiast.</p>
-          {LINKS.faqTech && <p class="faq-more"><span data-i18n="faq.more">Więcej w artykule:</span> <a href={`/blog/${LINKS.faqTech.slug}/`} data-lm-pl={LINKS.faqTech.title_pl} data-lm-en={LINKS.faqTech.title_en || LINKS.faqTech.title_pl} data-lm-ru={LINKS.faqTech.title_ru || LINKS.faqTech.title_pl}>{LINKS.faqTech.title_pl}</a></p>}
-        </details>
-      </div>
-    </section>
-
-    <!-- ── From the blog (internal links / topic cluster) ── -->
-    {latestPosts.length > 0 && (
-      <section class="home-blog" data-reveal aria-labelledby="home-blog-title">
-        <div class="section-head">
-          <div>
-            <span class="chip kicker" data-i18n="nav.blog">Blog</span>
-            <h2 class="section-title" id="home-blog-title" data-i18n="home.blog.title">Ostatnio na blogu</h2>
-            <p class="section-sub" data-i18n="home.blog.sub">Praktyczne odpowiedzi na pytania, które klienci zadają przed zleceniem strony lub platformy.</p>
-          </div>
-          <a class="ghost-cta" href="/blog/" data-i18n="home.blog.all">Wszystkie wpisy</a>
-        </div>
-        <div class="blog-grid">
-          {latestPosts.map((p) => (
-            <a class="blog-card" href={`/blog/${p.slug}/`}>
-              {p.cover_path
-                ? <img class="blog-card-cover" src={mediaUrl(p.cover_path)} alt={p.cover_alt || p.title_pl} loading="lazy" decoding="async" />
-                : <div class="blog-card-cover is-empty" aria-hidden="true"></div>}
-              <div class="blog-card-body">
-                <time class="blog-card-date" datetime={isoDate(p.published_at)}>{formatDatePl(p.published_at)}</time>
-                <h3 class="blog-card-title" data-lm-pl={p.title_pl} data-lm-en={p.title_en || p.title_pl} data-lm-ru={p.title_ru || p.title_pl}>{p.title_pl}</h3>
-                {p.excerpt_pl && <p class="blog-card-excerpt" data-lm-pl={p.excerpt_pl} data-lm-en={p.excerpt_en || p.excerpt_pl} data-lm-ru={p.excerpt_ru || p.excerpt_pl}>{p.excerpt_pl}</p>}
-              </div>
-            </a>
-          ))}
         </div>
       </section>
-    )}
 
-    <!-- ── Contact band ── -->
-    <section class="contact-band" data-reveal>
-      <div class="contact-card">
-        <span class="chip kicker" data-i18n="contact.eyebrow">Współpraca</span>
-        <h2 class="contact-title" data-i18n="cta.title">Masz pomysł na projekt?</h2>
-        <p class="contact-sub" data-i18n="cta.sub">Opowiedz o nim w dwóch zdaniach — odpiszę w ciągu 24 godzin z planem i wyceną.</p>
-        <div class="contact-actions">
-          <button type="button" class="cta cta-lime" data-open-contact>
-            <span class="cta-label">Zlecić projekt</span>
-            <svg class="cta-arrow" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path d="M3 11L11 3M11 3H5M11 3V9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <a class="ghost-cta" href="mailto:office@barabashflow.pl">office@barabashflow.pl</a>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Footer ── -->
-    <SiteFooter />
-  </div>
-
-  <!-- ── Project modal ── -->
-  <div class="modal-root" id="modal-project" role="dialog" aria-modal="true" aria-hidden="true">
-    <div class="modal-backdrop" data-close-modal></div>
-    <div class="modal">
-      <button class="modal-close" data-close-modal aria-label="Zamknij" type="button">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-      </button>
-      <div class="modal-scroll">
-        <div class="modal-media" aria-hidden="true"></div>
-        <div class="modal-body">
-          <div class="modal-cat"></div>
-          <h2 class="modal-title"></h2>
-          <p class="modal-desc"></p>
-          <div class="modal-actions">
-            <a class="btn primary modal-visit" target="_blank" rel="noopener noreferrer" data-i18n="modal.visit">Otwórz projekt</a>
-            <button type="button" class="btn" data-close-modal data-i18n="modal.close">Zamknij</button>
+      <!-- trusted strip -->
+      {trusted.length > 0 && (
+        <section class="sec">
+          <div class="sec-inner trusted">
+            <span class="label"><span data-i18n="home.trusted">Zaufali mi</span></span>
+            {trusted.map((t) => <a class="name" href={`/projekty/${t.slug}/`}>{t.name}</a>)}
           </div>
-        </div>
-      </div>
-    </div>
-  </div>
+        </section>
+      )}
+      <div class="divider" aria-hidden="true"></div>
 
-  <!-- ── Contact modal ── -->
-  <div class="modal-root contact-modal" id="modal-contact" role="dialog" aria-modal="true" aria-hidden="true">
-    <div class="modal-backdrop" data-close-modal></div>
-    <div class="modal">
-      <button class="modal-close" data-close-modal aria-label="Zamknij" type="button">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-      </button>
-      <div class="modal-scroll">
-        <div class="modal-body">
-          <div class="modal-cat" data-i18n="contact.eyebrow">Współpraca</div>
-          <h2 class="modal-title" data-i18n="contact.title">Porozmawiajmy</h2>
-          <p class="contact-intro"></p>
-          <form class="form" id="contact-form" autocomplete="on" novalidate>
-            <div class="field">
-              <label for="cf-name" data-i18n="contact.name">Imię</label>
-              <input id="cf-name" name="name" type="text" required maxlength="120" autocomplete="name" />
-            </div>
-            <div class="field">
-              <label for="cf-email" data-i18n="contact.email">E-mail</label>
-              <input id="cf-email" name="email" type="email" required maxlength="160" autocomplete="email" />
-            </div>
-            <div class="field">
-              <label for="cf-msg" data-i18n="contact.message">Wiadomość</label>
-              <textarea id="cf-msg" name="message" required maxlength="4000" rows="4"></textarea>
-            </div>
-            <div class="form-status"></div>
-            <div class="modal-actions">
-              <button type="button" class="btn" data-close-modal data-i18n="modal.close">Zamknij</button>
-              <button type="submit" class="btn primary" data-i18n="contact.submit">Wyślij</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Cookie consent ── -->
-  <aside class="cookie-bot" id="cookie-bot" aria-hidden="true" aria-live="polite">
-    <div class="cookie-card">
-      <button class="cookie-close" type="button" aria-label="Zamknij" data-cookie-close>×</button>
-      <p class="cookie-text">Używamy kukisów, żeby zapamiętać motyw i język. Bez śledzenia, bez zewnętrznych skryptów.</p>
-      <div class="cookie-actions">
-        <button class="cookie-accept" id="cookie-accept" type="button">Akceptuję</button>
-        <button class="cookie-policy" id="cookie-policy-open" type="button">Polityka</button>
-      </div>
-    </div>
-  </aside>
-
-  <!-- ── Cookie policy modal ── -->
-  <div class="modal-root" id="modal-cookies" role="dialog" aria-modal="true" aria-hidden="true">
-    <div class="modal-backdrop" data-close-modal></div>
-    <div class="modal cookie-policy-modal">
-      <button class="modal-close" data-close-modal aria-label="Zamknij" type="button">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-      </button>
-      <div class="modal-scroll">
-        <div class="modal-body">
-          <div class="modal-cat">Polityka cookies</div>
-          <h2 class="modal-title">Pliki cookie i dane lokalne</h2>
-          <div class="cookie-policy-body">
-            <p>BarabashFlow szanuje Twoją prywatność. Strona używa wyłącznie <strong>pamięci lokalnej przeglądarki</strong> — żadnych ciasteczek śledzących, żadnych zewnętrznych skryptów analitycznych, żadnych third-party.</p>
-            <h4>Co zapamiętujemy</h4>
-            <ul>
-              <li>motyw (jasny / ciemny) — <code>bf:theme</code></li>
-              <li>język interfejsu (PL / EN / RU) — <code>bf:locale</code></li>
-              <li>Twoją zgodę na ten dialog — <code>bf:cookies-accepted</code></li>
-              <li>zamknięcie okienka maskotki w bieżącej sesji — <code>bf:mascot-dismissed</code></li>
-              <li>anonimowy licznik odwiedzin (bez identyfikacji) — <code>bf:sess</code></li>
-            </ul>
-            <p>Bez Google Analytics, pikseli reklamowych i śledzenia między stronami. Wiadomości z formularza trafiają wyłącznie do właściciela strony. Pełna treść: <a href="/polityka-prywatnosci/">Polityka prywatności</a>.</p>
+      <!-- ── STUDIO + STATS ───────────────────────────────────────────── -->
+      <section class="sec" id="o-studiu">
+        <div class="sec-inner sec-pad">
+          <div class="sec-head">
+            <span class="kicker" data-i18n="home.about.kicker">O studiu</span>
+            <h2 class="h-sec" {...lm(settings, 'about_title')}>{s(settings, 'about_title')}</h2>
           </div>
-          <div class="modal-actions">
-            <button type="button" class="btn primary" data-close-modal>Rozumiem</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Mascot bot ── -->
-  <aside class="mascot-bot" id="mascot-bot" aria-hidden="true" aria-live="polite">
-    <div class="mascot-card">
-      <button class="mascot-close" type="button" aria-label="Zamknij" data-mascot-close>
-        <svg viewBox="0 0 14 14" fill="none" width="11" height="11"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-      </button>
-      <div class="mascot-row">
-        <div class="mascot-avatar">
-          <img src="/assets/img/maskot.png" alt="Maskotka BarabashFlow" width="266" height="266" draggable="false" />
-        </div>
-        <div class="mascot-body">
-          <div class="mascot-stage" data-stage="ask">
-            <p class="mascot-bubble" id="mascot-greeting" aria-live="polite"></p>
-            <form class="mascot-form" id="mascot-form" novalidate>
-              <label class="sr-only" for="mascot-q">Pytanie</label>
-              <input id="mascot-q" name="question" type="text" autocomplete="off" maxlength="600" required />
-              <label class="sr-only" for="mascot-email">E-mail</label>
-              <input id="mascot-email" name="email" type="email" autocomplete="email" maxlength="160" required />
-              <div class="mascot-foot">
-                <button type="submit" class="mascot-send" id="mascot-send"></button>
-                <span class="mascot-status" id="mascot-status"></span>
+          <div class="about-grid">
+            <div>
+              <ul class="stats">
+                <li class="note" data-i18n="home.about.note">Liczby, które mówią same za siebie.</li>
+                {stats.map((st, i) => {
+                  const isAuto = st.auto === 'projects';
+                  const num = isAuto ? String(projects.length) : String(st.value);
+                  const numeric = /^\d+(\.\d+)?$/.test(num);
+                  const suffix = st.suffix || '';
+                  return (
+                    <li class="stat">
+                      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" set:html={[ICONS.site, ICONS.platform, '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', ICONS.care][i % 4]} /></span>
+                      <div>
+                        <div class="num">{numeric ? <span data-count={num} data-suffix={suffix} data-final={num + suffix}>{num + suffix}</span> : num + suffix}</div>
+                        <div class="lbl" {...lmRow(st, 'label')}>{st.label_pl}</div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p class="about-text" {...lm(settings, 'about_text')}>{s(settings, 'about_text')}</p>
+              <div class="about-cta">
+                <a class="btn btn-ghost" href="/o-mnie/"><span data-i18n="about.kicker">O mnie</span><svg class="btn-arrow" viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M11 3H5M11 3v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
               </div>
-            </form>
-          </div>
-          <div class="mascot-stage" data-stage="done" hidden>
-            <h4 class="mascot-success-title" id="mascot-success-title"></h4>
-            <p class="mascot-success-text" id="mascot-success-text"></p>
+            </div>
+            <div class="about-media tile-pattern" data-reveal>
+              {ownerPhoto ? <img src={ownerPhoto} alt={s(settings, 'owner_name', 'pl', 'Dmytrii Barabash')} loading="lazy" /> : <><span class="tp-label">BarabashFlow</span><span class="tp-num">BF</span></>}
+            </div>
           </div>
         </div>
-      </div>
+      </section>
+      <div class="divider" aria-hidden="true"></div>
+
+      <!-- ── SERVICES ─────────────────────────────────────────────────── -->
+      <section class="sec" id="uslugi">
+        <div class="sec-inner">
+          <div class="sec-head is-center" style="padding: clamp(40px,6vw,80px) 18px 0; margin-bottom: clamp(28px,4vw,56px);">
+            <span class="kicker" data-i18n="home.services.kicker">Usługi</span>
+            <h2 class="h-sec is-center" data-i18n="home.services.title">Co dla Ciebie zbuduję</h2>
+            <p class="lead" {...lm(settings, 'services_intro')}>{s(settings, 'services_intro')}</p>
+          </div>
+          <div class="services-grid">
+            {services.map((sv, i) => (
+              <article class="svc" data-reveal data-reveal-delay={i * 80}>
+                <a class="over-link" href={`/uslugi/${sv.slug}/`} aria-label={sv.title_pl}></a>
+                <span class="kicker is-dark svc-tag" {...lmRow(sv, 'title')}>{sv.title_pl}</span>
+                <p class="tagline" {...lmRow(sv, 'tagline')}>{sv.tagline_pl}</p>
+                <div class="svc-num">0{i + 1}</div>
+                <ul>
+                  {sv.bullets_pl.map((b, j) => <li data-lm-pl={b} data-lm-en={sv.bullets_en[j] || b} data-lm-ru={sv.bullets_ru[j] || b}>{b}</li>)}
+                </ul>
+                <div class="svc-foot">
+                  {sv.price_from && <span class="svc-price"><b>{sv.price_from}</b></span>}
+                  <a class="svc-link" href={`/uslugi/${sv.slug}/`} aria-label={`${sv.title_pl} — szczegóły`}><svg viewBox="0 0 16 16" fill="none"><path d="M5 2l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+      <div class="divider" aria-hidden="true"></div>
+
+      <!-- ── APPROACH ─────────────────────────────────────────────────── -->
+      <section class="sec">
+        <div class="sec-inner is-grey vision tick">
+          <span class="tick-tr"></span><span class="tick-br"></span>
+          <span class="kicker is-white" data-i18n="home.vision.kicker">Podejście</span>
+          <h2 class="h-sec" style="margin-top:18px">
+            <span data-i18n="home.vision.a">Każdy projekt zaczynam</span><br />
+            <span data-i18n="home.vision.b">od</span>
+            <span class="inline-img" aria-hidden="true">{visionImg && <img src={visionImg} alt="" loading="lazy" />}</span>
+            <span data-i18n="home.vision.c">zrozumienia</span><br />
+            <span data-i18n="home.vision.d">celu Twojej firmy</span>
+          </h2>
+          <p class="lead" data-i18n="home.vision.p">Nie sprzedaję „ładnych stron”. Najpierw pytam, skąd mają przyjść klienci i co mają zrobić na stronie — a potem projektuję i koduję dokładnie pod ten cel.</p>
+        </div>
+      </section>
+      <div class="divider" aria-hidden="true"></div>
+
+      <!-- ── FEATURED PROJECTS ────────────────────────────────────────── -->
+      <section class="sec" id="projekty">
+        <div class="sec-inner is-grey sec-pad">
+          <div class="sec-head is-split">
+            <div>
+              <span class="kicker is-white" data-i18n="home.projects.kicker">Projekty</span>
+              <h2 class="h-sec" style="margin-top:18px" data-i18n="home.projects.title">Wybrane realizacje</h2>
+              <p class="lead" style="margin-top:14px" {...lm(settings, 'projects_intro')}>{s(settings, 'projects_intro')}</p>
+            </div>
+            <a class="btn btn-white" href="/projekty/" data-i18n="home.projects.all">Wszystkie projekty</a>
+          </div>
+          <div class="feat-list">
+            {featured.map((p) => { const cover = projectCover(p); const tg = tagOf(p); return (
+              <article class="feat" data-reveal>
+                <a class="feat-media" href={`/projekty/${p.slug}/`}>
+                  {cover ? <img src={cover} alt={p.title_pl} loading="lazy" decoding="async" /> : <div class="tile-pattern" style="position:absolute;inset:0"><span class="tp-label">{p.title_pl}</span></div>}
+                  <span class="corner" aria-hidden="true"></span>
+                </a>
+                <div class="feat-body">
+                  <div>
+                    <span class="cat" {...categoryLm(p)}>{p.category_pl}</span>
+                    <h3><a href={`/projekty/${p.slug}/`} {...lmRow(p, 'title')}>{p.title_pl}</a></h3>
+                    <p class="desc" data-lm-pl={tg.pl} data-lm-en={tg.en} data-lm-ru={tg.ru}>{tg.pl}</p>
+                    <a class="feat-view" href={`/projekty/${p.slug}/`}><span data-i18n="home.projects.view">Zobacz projekt</span><svg viewBox="0 0 18 18" fill="none"><path d="M18 0v13.5h-1.5V2.5L1 18l-1-1L15.4 1.5H4.5V0z" fill="currentColor"/></svg></a>
+                  </div>
+                  {p.results.length > 0 && (
+                    <ul class="feat-results">
+                      {p.results.slice(0, 3).map((r) => <li><b>{r.value}</b><span {...lmRow(r, 'label')}>{r.label_pl}</span></li>)}
+                    </ul>
+                  )}
+                </div>
+              </article>
+            ); })}
+          </div>
+        </div>
+      </section>
+      <div class="divider" aria-hidden="true"></div>
+
+      <!-- ── PROCESS ──────────────────────────────────────────────────── -->
+      <section class="sec" id="proces">
+        <div class="sec-inner sec-pad">
+          <div class="process">
+            <div class="process-left">
+              <span class="kicker" data-i18n="home.process.kicker">Proces</span>
+              <h2 class="h-sec" data-i18n="home.process.title">Jasny plan od briefu do startu</h2>
+              <p class="lead" data-i18n="home.process.p">Każdy etap ma konkretny efekt, który widzisz i akceptujesz.</p>
+              <div>
+                <a class="btn btn-dark with-icon" href="#contact">
+                  <span class="btn-ico"><svg viewBox="0 0 16 16" fill="none"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                  <span data-i18n="home.process.cta">Zacznij projekt</span>
+                </a>
+              </div>
+            </div>
+            <div class="steps">
+              {[1, 2, 3, 4].map((n) => (
+                <div class="step" data-reveal>
+                  <div class="step-media tile-pattern"><span class="tp-label">BarabashFlow</span><span class="tp-num">0{n}</span></div>
+                  <div class="step-row">
+                    <span class="step-num">//0{n}</span>
+                    <div>
+                      <h3 data-i18n={`process.${n}.t`}>{['Brief i wycena', 'Struktura i treści', 'Projekt i kod', 'Start i opieka'][n - 1]}</h3>
+                      <p data-i18n={`process.${n}.p`}>{[
+                        'Krótka rozmowa lub formularz. W 24 godziny dostajesz plan, zakres, harmonogram i cenę — bez zobowiązań.',
+                        'Układamy strony i sekcje pod cel biznesowy, piszemy prawdziwe teksty i dobieramy zdjęcia. Tu decydujemy, co ma sprzedawać.',
+                        'Projekt graficzny pod Twoją markę, potem szybki, statyczny kod. Postęp oglądasz na żywo na adresie testowym.',
+                        'Wdrożenie na domenie, panel CMS, Search Console. Po starcie — monitoring, kopie i rozwój w abonamencie.',
+                      ][n - 1]}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+      <div class="divider" aria-hidden="true"></div>
+
+      <!-- ── MARQUEE ──────────────────────────────────────────────────── -->
+      <section class="sec">
+        <div class="sec-inner is-grey marquee" aria-hidden="true">
+          <div class="marquee-row">
+            {[1, 2].map(() => ['marquee.1', 'marquee.2', 'marquee.3'].map((k) => <span data-i18n={k}>{k}</span>))}
+          </div>
+          <div class="marquee-row is-rev">
+            {[1, 2].map(() => ['marquee.4', 'marquee.5', 'marquee.6'].map((k) => <span data-i18n={k}>{k}</span>))}
+          </div>
+        </div>
+      </section>
+      <div class="divider" aria-hidden="true"></div>
+
+      <!-- ── WHY ──────────────────────────────────────────────────────── -->
+      <section class="sec">
+        <div class="sec-inner sec-pad">
+          <div class="sec-head is-center">
+            <span class="kicker" data-i18n="home.why.kicker">Różnica</span>
+            <h2 class="h-sec is-center" data-i18n="home.why.title">Dlaczego nie agencja i nie szablon</h2>
+          </div>
+          <div class="why-grid">
+            <div class="why-card" data-reveal>
+              <div class="head"><span data-i18n="why.left.h">Agencja lub szablon</span></div>
+              <ul>
+                {[1, 2, 3, 4, 5, 6].map((n) => <li><i><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5 5 9l4.5-6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span data-i18n={`why.l.${n}`}>…</span></li>)}
+              </ul>
+            </div>
+            <div class="why-card is-us" data-reveal data-reveal-delay="120">
+              <div class="head"><img src="/assets/img/logo.png" alt="" width="22" height="27" style="display:inline-block;vertical-align:-6px;margin-right:8px" /><span style="color:var(--ink);font-weight:600" data-i18n="why.right.h">BarabashFlow</span><sup style="font-size:9px;color:var(--muted)">™</sup></div>
+              <ul>
+                {[1, 2, 3, 4, 5, 6].map((n) => <li><i><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5 5 9l4.5-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span data-i18n={`why.r.${n}`}>…</span></li>)}
+              </ul>
+            </div>
+          </div>
+          <div class="why-cta"><a class="btn btn-dark" href="#contact" data-i18n="home.why.cta">Porozmawiajmy</a></div>
+        </div>
+      </section>
+      <div class="divider" aria-hidden="true"></div>
+
+      <!-- ── BLOG ─────────────────────────────────────────────────────── -->
+      {posts.length > 0 && (
+        <>
+          <section class="sec" id="blog">
+            <div class="sec-inner is-grey sec-pad">
+              <div class="sec-head is-split">
+                <div>
+                  <span class="kicker is-white" data-i18n="home.blog.kicker">Blog</span>
+                  <h2 class="h-sec" style="margin-top:18px" data-i18n="home.blog.title">Ostatnio na blogu</h2>
+                  <p class="lead" style="margin-top:14px" data-i18n="home.blog.sub">Praktyczne odpowiedzi na pytania, które klienci zadają przed zleceniem strony lub platformy.</p>
+                </div>
+                <a class="btn btn-white" href="/blog/" data-i18n="home.blog.all">Wszystkie wpisy</a>
+              </div>
+              <div class="blog-grid">
+                {posts.map((p) => <BlogCard p={p} />)}
+              </div>
+            </div>
+          </section>
+          <div class="divider" aria-hidden="true"></div>
+        </>
+      )}
+
+      <!-- ── FAQ ──────────────────────────────────────────────────────── -->
+      {faq.length > 0 && (
+        <section class="sec" id="faq">
+          <div class="sec-inner sec-pad">
+            <div class="sec-head is-center">
+              <span class="kicker" data-i18n="home.faq.kicker">FAQ</span>
+              <h2 class="h-sec is-center" data-i18n="home.faq.title">Częste pytania</h2>
+            </div>
+            <FaqList items={faq} />
+          </div>
+        </section>
+      )}
     </div>
-  </aside>
+  </main>
+
+  <SiteFooter services={services} settings={settings} />
 
   <script>
-    import { mountApp } from '../graph/app';
-    mountApp();
+    import { mountShell } from '../lib/shell';
+    import { mountLogo3D } from '../lib/logo3d';
+    mountShell();
+    // 3D mark after first paint — three.js is a separate lazy chunk.
+    if ('requestIdleCallback' in window) (window as any).requestIdleCallback(() => mountLogo3D(), { timeout: 1200 });
+    else setTimeout(() => mountLogo3D(), 300);
   </script>
 </Base>

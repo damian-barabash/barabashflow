@@ -1,0 +1,28 @@
+---
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { fetchSettings, fetchServices } from '../lib/content';
+const [settings, services] = await Promise.all([fetchSettings(), fetchServices()]);
+---
+<Base title="404 — nie ma takiej strony | BarabashFlow" description="Strona nie istnieje." noindex={true}>
+  <SiteHeader />
+  <main class="container">
+    <section class="sec">
+      <div class="sec-inner nf">
+        <div class="display">404</div>
+        <h1 class="h-sec is-center" style="margin-top:24px" data-i18n="nf.title">Tej strony nie ma</h1>
+        <p class="lead" style="margin:16px auto 28px;max-width:44ch" data-i18n="nf.p">Adres mógł się zmienić. Wróć na stronę główną albo zajrzyj do projektów.</p>
+        <div class="hero-actions" style="margin-top:0">
+          <a class="btn btn-dark" href="/" data-i18n="nf.home">Strona główna</a>
+          <a class="btn btn-white" href="/projekty/" data-i18n="nav.projects">Projekty</a>
+        </div>
+      </div>
+    </section>
+  </main>
+  <SiteFooter services={services} settings={settings} cta={false} contact={false} />
+  <script>
+    import { mountShell } from '../lib/shell';
+    mountShell();
+  </script>
+</Base>

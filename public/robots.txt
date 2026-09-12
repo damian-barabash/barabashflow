@@ -2,8 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /admin/
-Disallow: /mail
-Disallow: /mail/
 
 # AI assistants / crawlers — explicitly welcome (GEO/AEO).
 User-agent: GPTBot
