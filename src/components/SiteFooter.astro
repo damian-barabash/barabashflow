@@ -103,6 +103,38 @@ const availability = s(settings, 'availability', 'pl', '');
     </div>
   </div>
 
+  <aside class="mascot" id="mascot" aria-live="polite" hidden>
+    <button class="mascot-fab" type="button" data-mascot-open aria-label="Zapytaj maskotkę">
+      <img src="/assets/img/maskot.png" alt="" width="44" height="44" />
+      <span class="mascot-fab-dot" aria-hidden="true"></span>
+    </button>
+    <div class="mascot-card" role="dialog" aria-label="Maskotka BarabashFlow">
+      <header class="mascot-head">
+        <img class="mascot-avatar" src="/assets/img/maskot.png" alt="" width="40" height="40" />
+        <span class="kicker">barabashflow ✦ bot</span>
+        <button class="mascot-x" type="button" data-mascot-close aria-label="Zamknij">×</button>
+      </header>
+      <div class="mascot-stage" data-stage="ask">
+        <p class="mascot-bubble" data-typewrite {...lm(settings, 'mascot_greeting')}>{s(settings, 'mascot_greeting', 'pl', 'Cześć! Masz pytanie o stronę, sklep albo platformę? Napisz — odpowiem w 24 h.')}</p>
+        <form class="mascot-form" data-mascot-form>
+          <textarea name="message" rows="3" maxlength="2000" required {...lm(settings, 'mascot_q_placeholder')} data-lm-attr="placeholder" placeholder={s(settings, 'mascot_q_placeholder', 'pl', 'Twoje pytanie…')}></textarea>
+          <input name="email" type="email" maxlength="160" required {...lm(settings, 'mascot_email_placeholder')} data-lm-attr="placeholder" placeholder={s(settings, 'mascot_email_placeholder', 'pl', 'Twój e-mail')} />
+          <label class="f-hp" aria-hidden="true">www<input type="text" name="website_url" tabindex="-1" autocomplete="off" /></label>
+          <div class="mascot-row">
+            <span class="form-status"></span>
+            <button class="btn btn-dark" type="submit" {...lm(settings, 'mascot_submit')}>{s(settings, 'mascot_submit', 'pl', 'Wyślij')}</button>
+          </div>
+        </form>
+      </div>
+      <div class="mascot-stage" data-stage="done" hidden>
+        <div class="fs-mark" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><circle class="fs-ring" cx="32" cy="32" r="28" stroke="currentColor" stroke-width="2.5"/><path class="fs-tick" d="M20 33.5l8 8 16-17" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <p class="mascot-bubble is-strong" {...lm(settings, 'mascot_success_title')}>{s(settings, 'mascot_success_title', 'pl', 'Pytanie wysłane ✦')}</p>
+        <p class="mascot-sub" {...lm(settings, 'mascot_success_text')}>{s(settings, 'mascot_success_text', 'pl', 'Odpowiem w ciągu 24 godzin.')}</p>
+        <p class="mascot-ref"><span data-i18n="success.ref">Numer zgłoszenia</span> <b data-mascot-ref>—</b></p>
+      </div>
+    </div>
+  </aside>
+
   <aside class="cookie-notice" id="cookie-notice" aria-live="polite">
     <p data-i18n="cookie.text">Ta strona nie śledzi. W pamięci przeglądarki zapisuje tylko język i to, że zamknąłeś ten komunikat.</p>
     <div class="row">

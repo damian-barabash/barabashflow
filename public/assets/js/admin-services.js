@@ -1,7 +1,7 @@
 // Usługi (services collection) + FAQ editor. Same list/editor pattern as
 // projects. Services drive the home grid, /uslugi/, the project filter and
 // the "Czego potrzebujesz?" select in every contact form.
-import { sb, $, $$, state, banner, escapeHtml, attr, autoTranslateRow, autoTranslateList, trio, readForm, ask, slugify } from './admin-core.js?v=2026-09-12a';
+import { sb, $, $$, state, banner, escapeHtml, attr, autoTranslateRow, autoTranslateList, trio, readForm, ask, slugify } from './admin-core.js?v=2026-09-12b';
 
 const ICONS = [['site', 'Strona'], ['shop', 'Sklep'], ['platform', 'Platforma'], ['care', 'Opieka'], ['seo', 'SEO'], ['design', 'Design'], ['other', 'Inne']];
 const S = { selectedId: null, draft: null, faq: [] };

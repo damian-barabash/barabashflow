@@ -1,19 +1,17 @@
 // BarabashFlow admin — entry point. Auth, tabs, Strona (site settings +
 // stats + FAQ), Blog (AI autopilot), Statystyki; the collection editors live
 // in admin-projects / admin-services / admin-inbox / admin-crm.
-import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, MEDIA_BUCKET, uploadImage, removeMedia, pickFile, translateItems, readForm } from './admin-core.js?v=2026-09-12a';
-import { getTheme, toggleTheme, onThemeChange } from './theme.js?v=2026-09-12a';
-import { loadProjects, bindProjectsUI, renderProjectList } from './admin-projects.js?v=2026-09-12a';
-import { loadServices, loadFaq, bindServicesUI, renderServiceList, renderFaq } from './admin-services.js?v=2026-09-12a';
-import { loadInbox, bindInboxUI, renderInbox } from './admin-inbox.js?v=2026-09-12a';
-import { loadCrm, bindCrmUI, renderCrm, openClient } from './admin-crm.js?v=2026-09-12a';
+import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, MEDIA_BUCKET, uploadImage, removeMedia, pickFile, translateItems, readForm } from './admin-core.js?v=2026-09-12b';
+import { loadProjects, bindProjectsUI, renderProjectList } from './admin-projects.js?v=2026-09-12b';
+import { loadServices, loadFaq, bindServicesUI, renderServiceList, renderFaq } from './admin-services.js?v=2026-09-12b';
+import { loadInbox, bindInboxUI, renderInbox } from './admin-inbox.js?v=2026-09-12b';
+import { loadCrm, bindCrmUI, renderCrm, openClient } from './admin-crm.js?v=2026-09-12b';
 
 init().catch((err) => console.error('[admin] init failed', err));
 
 async function init() {
   bindAuthUI();
   bindShellUI();
-  bindThemeToggle();
   setupTabAway();
   const { data: { session } } = await sb.auth.getSession();
   if (session) await onSignedIn(session.user); else showAuth();
@@ -87,14 +85,6 @@ function bindShellUI() {
   $('#stats-add')?.addEventListener('click', () => { statsDraft().push({ value: '', label_pl: '' }); renderStatsEditor(); });
   $('#stats-editor')?.addEventListener('click', (e) => { const rm = e.target.closest('[data-rm-stat]'); if (!rm) return; syncStats(); statsDraft().splice(Number(rm.dataset.rmStat), 1); renderStatsEditor(); });
   bindProjectsUI(); bindServicesUI(); bindInboxUI(); bindCrmUI(); bindBlogUI();
-}
-
-function bindThemeToggle() {
-  const btn = $('#theme-toggle'), icon = $('#theme-icon');
-  const moon = `<path d="M14.5 11.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`;
-  const sun = `<circle cx="10" cy="10" r="3.4" stroke="currentColor" stroke-width="1.4"/><g stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 2.5v2"/><path d="M10 15.5v2"/><path d="M2.5 10h2"/><path d="M15.5 10h2"/><path d="M4.7 4.7l1.4 1.4"/><path d="M13.9 13.9l1.4 1.4"/><path d="M4.7 15.3l1.4-1.4"/><path d="M13.9 6.1l1.4-1.4"/></g>`;
-  const paint = () => { icon.innerHTML = getTheme() === 'light' ? moon : sun; };
-  paint(); btn.addEventListener('click', toggleTheme); onThemeChange(paint);
 }
 
 function setupTabAway() {

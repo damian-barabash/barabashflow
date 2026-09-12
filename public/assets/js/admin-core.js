@@ -2,7 +2,7 @@
 // storage upload (WebP downscale), AI translation, HTML escaping, dates.
 // Every admin module imports from here; nothing here imports the modules.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-09-12a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-09-12b';
 
 export { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl };
 

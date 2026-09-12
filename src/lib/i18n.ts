@@ -206,7 +206,8 @@ export const STRINGS: Record<Locale, Record<string, string>> = {
     'about.projects': 'Zrealizowane projekty',
 
     // cookie
-    'cookie.text': 'Ta strona nie śledzi. W pamięci przeglądarki zapisuje tylko język i to, że zamknąłeś ten komunikat.',
+    'cookie.text': 'Strona zapisuje w przeglądarce język i ten komunikat oraz korzysta z Plerdy (anonimowe statystyki i mapy kliknięć). Bez reklam.',
+    'away.1': '✦ Wracaj — projekt czeka', 'away.2': 'Strona sama się nie zrobi…', 'away.3': 'Wycena w 24 h — pamiętasz?', 'away.4': 'barabashflow ✦ tu jestem', 'away.5': 'Sklep? Platforma? Napisz ✦',
     'cookie.ok': 'Rozumiem',
     'cookie.policy': 'Polityka',
 
@@ -404,7 +405,8 @@ export const STRINGS: Record<Locale, Record<string, string>> = {
     'about.cta': 'Write to me',
     'about.projects': 'Delivered projects',
 
-    'cookie.text': 'This site does not track you. It only stores your language and the fact you closed this notice.',
+    'cookie.text': 'This site stores your language and this notice in the browser and uses Plerdy (anonymous stats and click maps). No ads.',
+    'away.1': '✦ Come back — the project is waiting', 'away.2': 'The website won\'t build itself…', 'away.3': 'Quote in 24 h — remember?', 'away.4': 'barabashflow ✦ still here', 'away.5': 'Store? Platform? Write ✦',
     'cookie.ok': 'Got it',
     'cookie.policy': 'Policy',
 
@@ -601,7 +603,8 @@ export const STRINGS: Record<Locale, Record<string, string>> = {
     'about.cta': 'Написать мне',
     'about.projects': 'Реализованные проекты',
 
-    'cookie.text': 'Этот сайт не следит за вами. В памяти браузера хранится только язык и факт закрытия этого уведомления.',
+    'cookie.text': 'Сайт хранит в браузере язык и это уведомление и использует Plerdy (анонимная статистика и карты кликов). Без рекламы.',
+    'away.1': '✦ Возвращайтесь — проект ждёт', 'away.2': 'Сайт сам себя не сделает…', 'away.3': 'Смета за 24 ч — помните?', 'away.4': 'barabashflow ✦ я здесь', 'away.5': 'Магазин? Платформа? Напишите ✦',
     'cookie.ok': 'Понятно',
     'cookie.policy': 'Политика',
 
@@ -679,7 +682,9 @@ export function applyDom(root: Document | HTMLElement = document) {
   // crawlers, swapped client-side): data-lm-pl / data-lm-en / data-lm-ru.
   root.querySelectorAll<HTMLElement>('[data-lm-pl]').forEach((el) => {
     const v = el.getAttribute(`data-lm-${current}`) || el.getAttribute('data-lm-pl');
-    if (v != null) el.textContent = v;
+    if (v == null) return;
+    const attrName = el.getAttribute('data-lm-attr');
+    if (attrName) el.setAttribute(attrName, v); else if (!el.hasAttribute('data-typewrite') || !el.classList.contains('is-typing')) el.textContent = v;
   });
   // Whole blocks per language (markdown bodies): show the current one, PL fallback.
   const groups = new Map<HTMLElement, HTMLElement[]>();

@@ -3,7 +3,7 @@
 // due date, deal value, activity timeline (notes / calls / e-mails /
 // meetings / status changes), files (private crm-files bucket, signed
 // URLs) and the enquiries linked to the client. List + Kanban views.
-import { sb, $, $$, banner, escapeHtml, attr, fmtDate, relDays, modal, ask, readForm } from './admin-core.js?v=2026-09-12a';
+import { sb, $, $$, banner, escapeHtml, attr, fmtDate, relDays, modal, ask, readForm } from './admin-core.js?v=2026-09-12b';
 
 export const STATUSES = [
   ['lead', 'Lead', 'Nowy kontakt — jeszcze bez rozmowy'],

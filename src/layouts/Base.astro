@@ -112,6 +112,24 @@ const siteGraphLd = {
     {jsonLd.map((ld) => <script type="application/ld+json" set:html={JSON.stringify(ld)} />)}
   </>}
 
+  {!noindex && (
+    <!-- Plerdy (heatmaps / SEO checker) — owner's account, loads async. -->
+    <script is:inline data-plerdy_code="1">
+      (function(w,d){
+        if(w.__plerdyCode)return;
+        w.__plerdyCode=1;
+        w._protocol=w.location.protocol=="https:"?"https://":"http://";
+        w._site_hash_code="03cdbb4e0879d18c5236e41605774d76";
+        w._suid=81056;
+        var s=d.createElement("script");
+        s.async=true;
+        s.referrerPolicy="strict-origin-when-cross-origin";
+        s.src="https://a.plerdy.com/public/js/click/main.js?v="+Math.random();
+        d.head.appendChild(s);
+      })(window,document);
+    </script>
+  )}
+
   <!-- Anti-FOUC: apply saved locale before first paint. -->
   <script is:inline>
     (function () {

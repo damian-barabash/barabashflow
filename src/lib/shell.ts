@@ -17,6 +17,8 @@ export function mountShell() {
   bindContactForms();
   setupCookieNotice();
   setupScrollTop();
+  setupMascot();
+  setupTabAway();
   trackPageView();
 }
 
@@ -294,6 +296,91 @@ export function bindContactForms() {
         });
       }, wait);
     });
+  });
+}
+
+// ── mascot bot ──────────────────────────────────────────────────────────────
+// Floating helper bottom-left: opens by itself after MASCOT_DELAY (once per
+// session), types the greeting, takes a question + e-mail → contact_submissions
+// (source 'mascot-bot'), shows an in-card success with a BF-ref. Closing
+// leaves a small avatar button to reopen it.
+const MASCOT_DELAY = 45_000;
+function typewrite(el: HTMLElement, text: string, speed = 22, done?: () => void) {
+  el.classList.add('is-typing');
+  el.textContent = '';
+  let i = 0;
+  const tick = () => {
+    el.textContent = text.slice(0, ++i);
+    if (i < text.length) setTimeout(tick, speed); else { el.classList.remove('is-typing'); el.classList.add('is-done'); done?.(); }
+  };
+  tick();
+}
+function setupMascot() {
+  const root = document.getElementById('mascot');
+  if (!root) return;
+  const KEY = 'bf:mascot-dismissed';
+  const card = root.querySelector<HTMLElement>('.mascot-card')!;
+  const bubble = root.querySelector<HTMLElement>('[data-typewrite]')!;
+  const form = root.querySelector<HTMLFormElement>('[data-mascot-form]')!;
+  const status = form.querySelector<HTMLElement>('.form-status');
+  const stageAsk = root.querySelector<HTMLElement>('[data-stage="ask"]')!;
+  const stageDone = root.querySelector<HTMLElement>('[data-stage="done"]')!;
+  let typed = false;
+  root.hidden = false;
+  const greeting = () => bubble.getAttribute(`data-lm-${getLocale()}`) || bubble.getAttribute('data-lm-pl') || bubble.textContent || '';
+  const open = () => {
+    root.classList.add('is-open');
+    requestAnimationFrame(() => card.classList.add('is-in'));
+    if (!typed) { typed = true; typewrite(bubble, greeting(), 20); }
+  };
+  const close = (remember = true) => {
+    card.classList.remove('is-in');
+    setTimeout(() => root.classList.remove('is-open'), 300);
+    if (remember) { try { sessionStorage.setItem(KEY, '1'); } catch {} }
+  };
+  root.querySelector('[data-mascot-open]')?.addEventListener('click', () => { if (root.classList.contains('is-open')) close(); else open(); });
+  root.querySelector('[data-mascot-close]')?.addEventListener('click', () => close());
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && root.classList.contains('is-open')) close(); });
+  onLocaleChange(() => { if (typed && !bubble.classList.contains('is-typing')) bubble.textContent = greeting(); });
+  let dismissed = false;
+  try { dismissed = sessionStorage.getItem(KEY) === '1'; } catch {}
+  if (!dismissed && !(navigator as any).webdriver) setTimeout(() => { if (!root.classList.contains('is-open') && !document.querySelector('.rcp')) open(); }, MASCOT_DELAY);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const message = String(fd.get('message') || '').trim(), email = String(fd.get('email') || '').trim();
+    if (String(fd.get('website_url') || '')) return;
+    if (!message || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { if (status) status.textContent = t('contact.required'); return; }
+    const btn = form.querySelector<HTMLButtonElement>('button[type=submit]'); if (btn) btn.disabled = true;
+    if (status) status.textContent = t('contact.sending');
+    const ref = makeRef();
+    const { error } = await restInsert('contact_submissions', { name: email.split('@')[0], email, message, ref, source: 'mascot-bot', page: location.pathname.slice(0, 200), locale: getLocale() });
+    if (btn) btn.disabled = false;
+    if (error) { if (status) status.textContent = t('contact.error'); return; }
+    stageAsk.hidden = true; stageDone.hidden = false;
+    stageDone.querySelector<HTMLElement>('[data-mascot-ref]')!.textContent = ref;
+    requestAnimationFrame(() => requestAnimationFrame(() => stageDone.classList.add('is-in')));
+    try { sessionStorage.setItem(KEY, '1'); } catch {}
+  });
+}
+
+// ── tab-away title ──────────────────────────────────────────────────────────
+// When the visitor switches tabs the title cycles through short on-brand
+// lines (localized); the original title comes back on return.
+function setupTabAway() {
+  const original = document.title;
+  let last = -1, cycler = 0;
+  const pick = () => {
+    let i; do { i = 1 + Math.floor(Math.random() * 5); } while (i === last);
+    last = i; return t(`away.${i}`);
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      document.title = pick();
+      clearInterval(cycler);
+      cycler = window.setInterval(() => { document.title = pick(); }, 6000);
+    } else { clearInterval(cycler); cycler = 0; document.title = original; }
   });
 }
 

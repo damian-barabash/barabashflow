@@ -814,3 +814,39 @@ ul { margin: 0; padding: 0; list-style: none; }
 .rcp-codeno { text-align: center; margin-top: 6px; font-size: 10.5px; letter-spacing: 0.3em; color: var(--muted); }
 .rcp-skip { position: absolute; left: 0; right: 0; bottom: -34px; text-align: center; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,.55); }
 @media (prefers-reduced-motion: reduce) { .rcp-paperwrap { transition: none; } .rcp[data-phase="fly"] .rcp-paper { animation: none; opacity: 0; } .form-success > * { transition: none; } .fs-ring, .fs-tick { stroke-dashoffset: 0; } }
+
+/* ── mascot bot ────────────────────────────────────────────────────────── */
+.mascot { position: fixed; left: max(16px, env(safe-area-inset-left)); bottom: max(16px, env(safe-area-inset-bottom)); z-index: 75; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.mascot-fab { position: relative; width: 56px; height: 56px; border-radius: 16px; border: 1px solid var(--border); background: var(--white); box-shadow: 0 20px 40px -18px rgba(3, 7, 18, 0.4); display: grid; place-items: center; cursor: pointer; transition: transform 0.4s var(--ease); animation: mascotBob 4.5s ease-in-out infinite; }
+.mascot-fab:hover { transform: translateY(-3px) rotate(-4deg); }
+.mascot-fab img { width: 34px; height: 34px; }
+.mascot-fab-dot { position: absolute; top: -3px; right: -3px; width: 12px; height: 12px; border-radius: 50%; background: var(--lime); border: 2px solid var(--white); }
+.mascot.is-open .mascot-fab { animation: none; }
+@keyframes mascotBob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-4px) rotate(2deg); } }
+.mascot-card { display: none; width: min(340px, calc(100vw - 32px)); background: var(--white); border: 1px solid var(--border); border-radius: var(--r-xl); box-shadow: 0 30px 70px -30px rgba(3, 7, 18, 0.45); padding: 14px 16px 16px; transform: translateY(14px) scale(0.98); opacity: 0; transition: transform 0.45s var(--ease), opacity 0.3s; order: -1; }
+.mascot.is-open .mascot-card { display: block; }
+.mascot-card.is-in { transform: none; opacity: 1; }
+.mascot-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.mascot-avatar { width: 36px; height: 36px; border-radius: 10px; background: var(--lime); padding: 5px; }
+.mascot-head .kicker { padding: 4px 8px; }
+.mascot-x { margin-left: auto; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px; background: var(--white); font-size: 16px; line-height: 1; color: var(--ink); }
+.mascot-bubble { font-size: 14px; color: var(--ink-2); line-height: 1.55; min-height: 3.1em; }
+.mascot-bubble.is-typing::after { content: '▍'; color: var(--lime-2); animation: caret 0.9s steps(2) infinite; }
+@keyframes caret { to { opacity: 0; } }
+.mascot-bubble.is-strong { font-weight: 600; color: var(--ink); font-size: 16px; min-height: 0; }
+.mascot-form { display: grid; gap: 8px; margin-top: 12px; }
+.mascot-form textarea, .mascot-form input { width: 100%; border: 1px solid var(--border-2); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); outline: none; }
+.mascot-form textarea:focus, .mascot-form input:focus { border-color: var(--ink); background: var(--white); }
+.mascot-form textarea { resize: none; }
+.mascot-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mascot-row .form-status { font-size: 12px; color: var(--body); min-height: 0; margin: 0; }
+.mascot-row .btn { min-height: 40px; padding-inline: 16px; font-size: 13px; }
+.mascot-stage[data-stage="done"] { display: grid; gap: 8px; }
+.mascot-stage[hidden] { display: none !important; }
+.mascot-stage[data-stage="done"] .fs-mark { width: 56px; height: 56px; color: var(--ink); }
+.mascot-stage[data-stage="done"].is-in .fs-ring { animation: fsDraw 0.9s var(--ease) forwards; }
+.mascot-stage[data-stage="done"].is-in .fs-tick { animation: fsDraw 0.55s var(--ease) 0.7s forwards; }
+.mascot-sub { font-size: 13px; color: var(--body); }
+.mascot-ref { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.mascot-ref b { color: var(--ink); font-weight: 500; }
+@media (max-width: 760px) { .mascot-fab { width: 50px; height: 50px; } .mascot-card { width: calc(100vw - 32px); } .cookie-notice { bottom: max(84px, calc(env(safe-area-inset-bottom) + 84px)); } }

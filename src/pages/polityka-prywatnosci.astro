@@ -20,7 +20,7 @@ const pageLd = { '@context': 'https://schema.org', '@type': 'WebPage', '@id': `$
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span>Polityka prywatności</span></nav>
         <span class="kicker">Dokument · aktualizacja <time datetime={UPDATED}>12 września 2026</time></span>
         <h1>Polityka prywatności i plików cookie</h1>
-        <p class="lead">Strona barabashflow.pl nie śledzi użytkowników, nie używa zewnętrznych narzędzi analitycznych ani reklamowych. Poniżej — dokładnie, jakie dane są przetwarzane i dlaczego.</p>
+        <p class="lead">Strona barabashflow.pl nie wyświetla reklam i nie sprzedaje danych. Do statystyk używa własnego, anonimowego licznika oraz narzędzia Plerdy. Poniżej — dokładnie, jakie dane są przetwarzane i dlaczego.</p>
       </div>
     </section>
     <div class="divider" aria-hidden="true"></div>
@@ -35,23 +35,26 @@ const pageLd = { '@context': 'https://schema.org', '@type': 'WebPage', '@id': `$
           <p>Gdy wysyłasz zapytanie (formularz na stronie głównej, w stopce lub na stronie <a href="/kontakt/">Kontakt</a>), zapisujemy: imię i nazwisko, adres e-mail, treść wiadomości oraz — jeśli je podasz — telefon, nazwę firmy, rodzaj usługi i orientacyjny budżet. Cel: odpowiedź na zapytanie i przygotowanie wyceny (art. 6 ust. 1 lit. b i f RODO). Dane trafiają do bazy Supabase (serwery w Unii Europejskiej, region eu-west-1) i są dostępne wyłącznie dla administratora, który odpowiada z własnej skrzynki e-mail. Jeśli dojdzie do współpracy, Twoje dane kontaktowe są przechowywane w wewnętrznej bazie klientów (CRM) razem z notatkami z rozmów i plikami projektu.</p>
           <h3>Anonimowe statystyki odwiedzin</h3>
           <p>Strona liczy odsłony w sposób anonimowy i bez plików cookie: zapisujemy ścieżkę strony, źródło wejścia (adres strony odsyłającej, jeśli jest), język interfejsu i informację, czy ekran jest mobilny. Nie zapisujemy adresu IP, identyfikatorów urządzenia ani żadnych danych pozwalających Cię zidentyfikować. Cel: wiedzieć, które treści są czytane (art. 6 ust. 1 lit. f RODO).</p>
+          <h3>Plerdy — mapy kliknięć i analiza SEO</h3>
+          <p>Strona korzysta z narzędzia <a href="https://www.plerdy.com/" rel="noopener nofollow" target="_blank">Plerdy</a> (Plerdy LLC), które rejestruje kliknięcia, przewijanie i ścieżki po stronie w formie zagregowanych map ciepła oraz nagrań sesji bez danych z formularzy. Plerdy może zapisać w przeglądarce własne pliki cookie analityczne; adres IP jest przetwarzany przez dostawcę w celu przypisania sesji. Cel: zrozumienie, jak korzystasz ze strony, i poprawa jej użyteczności (art. 6 ust. 1 lit. f RODO). Możesz zablokować te cookies w ustawieniach przeglądarki — strona działa bez nich.</p>
           <h3>Logi hostingu</h3>
           <p>Strona jest serwowana z GitHub Pages. Dostawca hostingu może przetwarzać standardowe logi serwera (adres IP, czas żądania) na własnych zasadach — szczegóły w polityce prywatności GitHub.</p>
 
           <h2>3. Pliki cookie i pamięć przeglądarki</h2>
-          <p>Nie używamy ciasteczek śledzących. Strona zapisuje w pamięci lokalnej Twojej przeglądarki (localStorage / sessionStorage) wyłącznie ustawienia potrzebne do działania:</p>
+          <p>Poza cookies analitycznymi Plerdy (patrz wyżej) strona zapisuje w pamięci lokalnej Twojej przeglądarki (localStorage / sessionStorage) wyłącznie ustawienia potrzebne do działania:</p>
           <ul>
             <li><code>bf:locale</code> — język interfejsu (PL / EN / RU),</li>
             <li><code>bf:cookies-accepted</code> — informacja, że zamknąłeś komunikat o prywatności,</li>
-            <li><code>bf:sess</code> — znacznik bieżącej sesji do anonimowego licznika odwiedzin.</li>
+            <li><code>bf:sess</code> — znacznik bieżącej sesji do anonimowego licznika odwiedzin,</li>
+            <li><code>bf:mascot-dismissed</code> — zamknięcie okienka maskotki w bieżącej sesji.</li>
           </ul>
           <p>Te dane nie opuszczają Twojej przeglądarki i nie służą do identyfikacji. Możesz je w każdej chwili usunąć w ustawieniach przeglądarki — strona nadal będzie działać, po prostu zapomni Twoje preferencje.</p>
 
           <h2>4. Czego nie robimy</h2>
           <ul>
-            <li>Nie używamy Google Analytics, Meta Pixel, Hotjar ani innych narzędzi analitycznych firm trzecich.</li>
+            <li>Nie używamy Google Analytics, Meta Pixel ani narzędzi reklamowych; jedynym zewnętrznym narzędziem analitycznym jest Plerdy.</li>
             <li>Nie wyświetlamy reklam, nie używamy ciasteczek reklamowych ani śledzenia między witrynami.</li>
-            <li>Nie sprzedajemy, nie wymieniamy i nie udostępniamy Twoich danych podmiotom trzecim — poza dostawcami technicznymi wymienionymi wyżej (Supabase, GitHub, Google Fonts dla czcionek), którzy przetwarzają dane wyłącznie w naszym imieniu.</li>
+            <li>Nie sprzedajemy, nie wymieniamy i nie udostępniamy Twoich danych podmiotom trzecim — poza dostawcami technicznymi wymienionymi wyżej (Supabase, GitHub, Google Fonts dla czcionek, Plerdy dla statystyk), którzy przetwarzają dane wyłącznie w naszym imieniu.</li>
           </ul>
 
           <h2>5. Jak długo przechowujemy dane</h2>

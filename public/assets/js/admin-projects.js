@@ -3,7 +3,7 @@
 // first = cover unless cover_path is set; case-study fields (client, year,
 // services, stack, results, tagline, long body); PL-first with AI fill of
 // EN/RU on save.
-import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, uploadImage, removeMedia, pickFile, autoTranslateRow, trio, readForm, ask, slugify } from './admin-core.js?v=2026-09-12a';
+import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, uploadImage, removeMedia, pickFile, autoTranslateRow, trio, readForm, ask, slugify } from './admin-core.js?v=2026-09-12b';
 
 const CATS = [['site', 'Strona'], ['shop', 'Sklep'], ['platform', 'Platforma'], ['app', 'Aplikacja'], ['panel', 'Panel'], ['other', 'Inne']];
 const CAT_LABEL = { site: ['Strona', 'Website', 'Сайт'], shop: ['Sklep', 'Store', 'Магазин'], platform: ['Platforma', 'Platform', 'Платформа'], app: ['Aplikacja', 'App', 'Приложение'], panel: ['Panel', 'Panel', 'Панель'], other: ['Projekt', 'Project', 'Проект'] };
