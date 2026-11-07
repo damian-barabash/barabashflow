@@ -1,0 +1,17 @@
+---
+// Service card with a live mini-scene (hover / auto-cycle on desktop, in-view on phones).
+import { lmRow, type Service } from '../lib/content';
+import { sceneFor } from '../lib/scenes';
+export interface Props { sv: Service; i: number; }
+const { sv, i } = Astro.props;
+---
+<article class="svc" data-svc data-reveal data-reveal-delay={(i % 4) * 80}>
+  <a class="over-link" href={`/uslugi/${sv.slug}/`} aria-label={sv.title_pl}></a>
+  <span class="kicker is-dark svc-tag" {...lmRow(sv, 'title')}>{sv.title_pl}</span>
+  <p class="tagline" {...lmRow(sv, 'tagline')}>{sv.tagline_pl}</p>
+  <div class="svc-stage" aria-hidden="true"><div class="svc-num">0{i + 1}</div><div class={`svc-scene sc-${(i % 4) + 1}`} set:html={sceneFor(i)} /></div>
+  <div class="svc-foot">
+    {sv.price_from && <span class="svc-price"><b>{sv.price_from}</b></span>}
+    <a class="svc-link" href={`/uslugi/${sv.slug}/`} aria-label={`${sv.title_pl} — szczegóły`}><svg viewBox="0 0 16 16" fill="none"><path d="M5 2l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  </div>
+</article>

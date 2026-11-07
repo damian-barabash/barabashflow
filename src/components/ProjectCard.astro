@@ -1,13 +1,17 @@
 ---
 import { type Project, projectCover, categoryLm, lmRow, firstSentence } from '../lib/content';
+import { mediaUrl } from '../lib/supabase';
 export interface Props { p: Project; }
 const { p } = Astro.props;
 const cover = projectCover(p);
+const second = p.photos.map((ph) => mediaUrl(ph.storage_path)).find((u) => u && u !== cover) || null;
 const tag = { pl: p.tagline_pl || firstSentence(p.description_pl), en: p.tagline_en || firstSentence(p.description_en) || p.tagline_pl || firstSentence(p.description_pl), ru: p.tagline_ru || firstSentence(p.description_ru) || p.tagline_pl || firstSentence(p.description_pl) };
 ---
 <a class="pcard" href={`/projekty/${p.slug}/`} data-services={p.services.join(' ')}>
   <div class="pcard-media">
-    {cover ? <img src={cover} alt={p.photos[0]?.alt_pl || p.title_pl} loading="lazy" decoding="async" /> : <div class="tile-pattern" style="position:absolute;inset:0"><span class="tp-label">{p.title_pl}</span></div>}
+    {second && <img class="pcard-alt" data-src={second} alt="" aria-hidden="true" decoding="async" />}
+    {cover ? <img class="pcard-main" src={cover} alt={p.photos[0]?.alt_pl || p.title_pl} loading="lazy" decoding="async" /> : <div class="tile-pattern" style="position:absolute;inset:0"><span class="tp-label">{p.title_pl}</span></div>}
+    <span class="pcard-go" aria-hidden="true"><span data-i18n="home.projects.view">Zobacz projekt</span> ↗</span>
   </div>
   <div class="pcard-body">
     <div class="pcard-meta">

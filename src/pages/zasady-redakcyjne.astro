@@ -3,6 +3,7 @@
 // produced, sourced, updated and corrected (E-E-A-T trust signal).
 import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
+import Arrows from '../components/Arrows.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { fetchSettings, fetchServices } from '../lib/content';
 import { SITE, AUTHOR_NAME, EMAIL, ORG_ID, PERSON_ID } from '../lib/site';
@@ -26,6 +27,7 @@ const SOURCES = [
   <main class="container">
     <section class="sec">
       <div class="sec-inner page-head">
+        <Arrows />
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span>Zasady redakcyjne</span></nav>
         <span class="kicker">Editorial policy · aktualizacja <time datetime={UPDATED}>12 września 2026</time></span>
         <h1>Zasady redakcyjne i etyka treści</h1>

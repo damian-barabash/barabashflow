@@ -1,6 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
+import Arrows from '../../components/Arrows.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import ProjectCard from '../../components/ProjectCard.astro';
 import { fetchSettings, fetchServices, fetchProjects, lmRow } from '../../lib/content';
@@ -21,6 +22,7 @@ const usedServices = services.filter((sv) => projects.some((p) => p.services.inc
   <main class="container">
     <section class="sec">
       <div class="sec-inner page-head">
+        <Arrows />
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span data-i18n="nav.projects">Projekty</span></nav>
         <span class="kicker" data-i18n="nav.projects">Projekty</span>
         <h1 data-i18n="projects.h1">Projekty: strony, sklepy, portale i systemy SaaS</h1>

@@ -4,6 +4,7 @@
 // and complaints. Individual written offers take precedence.
 import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
+import Arrows from '../components/Arrows.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { fetchSettings, fetchServices } from '../lib/content';
 import { SITE, AUTHOR_NAME, EMAIL, ORG_ID } from '../lib/site';
@@ -19,6 +20,7 @@ const pageLd = { '@context': 'https://schema.org', '@type': 'WebPage', '@id': `$
   <main class="container">
     <section class="sec">
       <div class="sec-inner page-head">
+        <Arrows />
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span>Regulamin</span></nav>
         <span class="kicker">Dokument · aktualizacja <time datetime={UPDATED}>12 września 2026</time></span>
         <h1>Regulamin świadczenia usług</h1>

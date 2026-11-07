@@ -4,7 +4,7 @@
 // No framework — a few hundred lines of vanilla TS bundled by Astro.
 import { LOCALES, getLocale, setLocale, onLocaleChange, applyDom, t, type Locale } from './i18n';
 import { restInsert } from './supabase';
-import { setupPageTransitions, setMenuOrigin } from './fx';
+import { setupPageTransitions, setMenuOrigin, setupServices, setupDotTiles, setupProjectCards, setupCaseMedia } from './fx';
 
 export function mountShell() {
   applyDom();
@@ -16,6 +16,10 @@ export function mountShell() {
   setupCounters();
   setupFaq();
   setupProjectFilter();
+  setupServices();
+  setupDotTiles();
+  setupProjectCards();
+  setupCaseMedia();
   bindContactForms();
   setupCookieNotice();
   setupScrollTop();

@@ -9,6 +9,7 @@ import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import FaqList from '../components/FaqList.astro';
 import BlogCard from '../components/BlogCard.astro';
+import ServiceCard from '../components/ServiceCard.astro';
 import { mediaUrl } from '../lib/supabase';
 import { fetchSettings, fetchServices, fetchProjects, fetchFaq, s, lm, lmRow, projectCover, categoryLm, firstSentence, type Project } from '../lib/content';
 import { restGet } from '../lib/supabase';
@@ -63,13 +64,6 @@ const ICONS: Record<string, string> = {
   platform: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
   care: '<path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/>',
 };
-// Live mini-scenes for the service cards (hover / auto-cycle): language-free.
-const SCENES = [
-  '<div class="sc-win"><div class="sc-bar"><i></i><i></i><i></i><u></u></div><div class="sc-body"><b class="l1"></b><b class="l2"></b><b class="l3"></b><span class="sc-btn"></span><span class="sc-img"></span><span class="sc-cursor"></span></div></div>',
-  '<div class="sc-prod"><span class="sc-thumb"></span><b></b><b class="s"></b><span class="sc-add">+</span></div><div class="sc-cart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11h11L21 8H6.2"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg><em><span>0</span><span>1</span></em></div><div class="sc-steps"><i></i><i></i><i></i></div><span class="sc-paid"><svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5 6.5 11.5 12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>',
-  '<div class="sc-dash"><div class="sc-kpi"><b></b><b></b></div><div class="sc-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><svg class="sc-line" viewBox="0 0 160 44" preserveAspectRatio="none"><path d="M0 38 L20 30 L40 34 L60 20 L80 24 L100 12 L120 16 L140 6 L160 9"/></svg></div><div class="sc-chat"><span></span><span class="me"></span></div><span class="sc-ping"></span>',
-  '<div class="sc-ed"><div class="sc-tool"><i></i><i></i><i></i><u></u></div><b class="t1"></b><b class="t2"></b><b class="t3"></b><span class="sc-pub"></span></div><ol class="sc-serp"><li><i></i><b></b></li><li><i></i><b></b></li><li class="us"><i>#1</i><b></b></li></ol>',
-];
 // Hero "live" widget: covers of the newest/strongest works, cycled in a mini browser.
 const liveShots = projects
   .filter((p) => p.cover_path && p.url)
@@ -221,18 +215,7 @@ const tagOf = (p: Project) => ({
             <h2 class="h-sec is-center" data-i18n="home.services.title">Co dla Ciebie zbuduję</h2>
           </div>
           <div class="services-grid">
-            {services.map((sv, i) => (
-              <article class="svc" data-svc data-reveal data-reveal-delay={i * 80}>
-                <a class="over-link" href={`/uslugi/${sv.slug}/`} aria-label={sv.title_pl}></a>
-                <span class="kicker is-dark svc-tag" {...lmRow(sv, 'title')}>{sv.title_pl}</span>
-                <p class="tagline" {...lmRow(sv, 'tagline')}>{sv.tagline_pl}</p>
-                <div class="svc-stage" aria-hidden="true"><div class="svc-num">0{i + 1}</div><div class={`svc-scene sc-${(i % 4) + 1}`} set:html={SCENES[i % 4]} /></div>
-                <div class="svc-foot">
-                  {sv.price_from && <span class="svc-price"><b>{sv.price_from}</b></span>}
-                  <a class="svc-link" href={`/uslugi/${sv.slug}/`} aria-label={`${sv.title_pl} — szczegóły`}><svg viewBox="0 0 16 16" fill="none"><path d="M5 2l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-                </div>
-              </article>
-            ))}
+            {services.map((sv, i) => <ServiceCard sv={sv} i={i} />)}
           </div>
         </div>
       </section>
@@ -394,11 +377,9 @@ const tagOf = (p: Project) => ({
   <script>
     import { mountShell } from '../lib/shell';
     import { mountLogo3D } from '../lib/logo3d';
-    import { setupServices, setupHeroWidgets, setupDotTiles, setupReel, setupReelInline } from '../lib/fx';
+    import { setupHeroWidgets, setupReel, setupReelInline } from '../lib/fx';
     mountShell();
-    setupServices();
     setupHeroWidgets();
-    setupDotTiles();
     setupReel();
     setupReelInline();
     // 3D mark after first paint — three.js is a separate lazy chunk.

@@ -1,8 +1,11 @@
 ---
 import Base from '../../layouts/Base.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
+import Arrows from '../../components/Arrows.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import ProjectCard from '../../components/ProjectCard.astro';
+import ServiceCard from '../../components/ServiceCard.astro';
+import { sceneFor } from '../../lib/scenes';
 import { fetchSettings, fetchServices, fetchProjects, md, lmRow, type Service, type Project, type Settings } from '../../lib/content';
 import { SITE, ORG_ID } from '../../lib/site';
 
@@ -17,6 +20,7 @@ const { service: sv, services, settings, projects } = Astro.props as { service: 
 const title = `${sv.title_pl} — ${sv.price_from ? sv.price_from + ' | ' : ''}BarabashFlow`;
 const description = (sv.tagline_pl || '').slice(0, 158);
 const others = services.filter((x) => x.slug !== sv.slug);
+const idx = Math.max(0, services.findIndex((x) => x.slug === sv.slug));
 const serviceLd = {
   '@context': 'https://schema.org',
   '@type': 'Service',
@@ -40,6 +44,7 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
   <main class="container">
     <section class="sec">
       <div class="sec-inner page-head">
+        <Arrows />
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><a href="/uslugi/" data-i18n="nav.services">Usługi</a><span>/</span><span {...lmRow(sv, 'title')}>{sv.title_pl}</span></nav>
         <span class="kicker" data-i18n="nav.services">Usługi</span>
         <h1 {...lmRow(sv, 'title')}>{sv.title_pl}</h1>
@@ -56,6 +61,7 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
             {sv.description_ru && <div data-locale="ru" hidden set:html={md(sv.description_ru)} />}
           </div>
           <aside class="svc-aside">
+            <div class="svc svc-solo is-live" aria-hidden="true"><div class="svc-stage"><div class={`svc-scene sc-${(idx % 4) + 1}`} set:html={sceneFor(idx)} /></div></div>
             <div class="aside-card">
               <h3 data-i18n="services.scope">Zakres</h3>
               <ul>{sv.bullets_pl.map((b, j) => <li data-lm-pl={b} data-lm-en={sv.bullets_en[j] || b} data-lm-ru={sv.bullets_ru[j] || b}>{b}</li>)}</ul>
@@ -93,17 +99,7 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
           <h2 class="h-sub" data-i18n="services.other">Pozostałe usługi</h2>
         </div>
         <div class="services-grid">
-          {others.map((o, i) => (
-            <article class="svc" style="min-height:auto">
-              <a class="over-link" href={`/uslugi/${o.slug}/`} aria-label={o.title_pl}></a>
-              <span class="kicker is-dark svc-tag" {...lmRow(o, 'title')}>{o.title_pl}</span>
-              <p class="tagline" {...lmRow(o, 'tagline')}>{o.tagline_pl}</p>
-              <div class="svc-foot">
-                {o.price_from && <span class="svc-price"><b>{o.price_from}</b></span>}
-                <a class="svc-link" href={`/uslugi/${o.slug}/`} aria-label={o.title_pl}><svg viewBox="0 0 16 16" fill="none"><path d="M5 2l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-              </div>
-            </article>
-          ))}
+          {others.map((o) => <ServiceCard sv={o} i={services.findIndex((x) => x.slug === o.slug)} />)}
         </div>
       </div>
     </section>

@@ -3,6 +3,7 @@
 // contact block is skipped here (the form IS the page).
 import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
+import Arrows from '../components/Arrows.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import ContactForm from '../components/ContactForm.astro';
 import { fetchSettings, fetchServices } from '../lib/content';
@@ -22,6 +23,7 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
   <main class="container">
     <section class="sec">
       <div class="sec-inner page-head">
+        <Arrows />
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span data-i18n="nav.contact">Kontakt</span></nav>
         <span class="kicker"><span class="status-dot" aria-hidden="true" style="margin-right:6px"></span><span data-i18n="meta.available">Dostępny</span></span>
         <h1 data-i18n="contact.page.title">Porozmawiajmy o Twoim projekcie</h1>
@@ -31,6 +33,7 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
     <div class="divider" aria-hidden="true"></div>
     <section class="sec" id="contact">
       <div class="sec-inner is-grey sec-pad">
+        <div class="dot-strip"><div class="dot-tile" data-dots="24H|HI!|BF"><canvas aria-hidden="true"></canvas><span class="dt-k">■ <span data-i18n="contact.page.reply">Czas odpowiedzi</span></span><span class="dt-hint" data-i18n="dots.hint">Porusz kursorem</span><span class="dt-meta" data-i18n="contact.page.reply.v">do 24 godzin w dni robocze</span></div></div>
         <dl class="contact-facts">
           <div class="fact">
             <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18v12H3z"/><path d="m3 7 9 6 9-6"/></svg></span>

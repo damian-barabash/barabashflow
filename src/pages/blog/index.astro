@@ -1,6 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
+import Arrows from '../../components/Arrows.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import BlogCard from '../../components/BlogCard.astro';
 import { fetchPostList } from '../../lib/blog';
@@ -17,6 +18,7 @@ const blogLd = { '@context': 'https://schema.org', '@type': 'Blog', '@id': `${SI
   <main class="container">
     <section class="sec">
       <div class="sec-inner page-head">
+        <Arrows />
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span>Blog</span></nav>
         <span class="kicker" data-i18n="blog.chip">Strony · Platformy · SEO</span>
         <h1 data-i18n="blog.h1">Blog o stronach internetowych, platformach i SEO</h1>

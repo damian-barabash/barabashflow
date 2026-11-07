@@ -3,6 +3,7 @@
 // the projects, how they work, editorial policy for the blog, public profiles.
 import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
+import Arrows from '../components/Arrows.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { mediaUrl } from '../lib/supabase';
 import { fetchSettings, fetchServices, fetchProjects, s, lm, lmRow } from '../lib/content';
@@ -24,6 +25,7 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
   <main class="container">
     <section class="sec">
       <div class="sec-inner page-head">
+        <Arrows />
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span data-i18n="nav.about">O mnie</span></nav>
         <span class="kicker" data-i18n="about.kicker">O mnie</span>
         <h1 data-i18n="about.title">Damian Barabash — web developer i założyciel BarabashFlow</h1>
@@ -35,7 +37,9 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
       <div class="sec-inner sec-pad">
         <div class="about-grid" style="margin-bottom: clamp(32px,5vw,64px)">
           <div class="about-media tile-pattern">
-            {ownerPhoto ? <img src={ownerPhoto} alt={AUTHOR_NAME} loading="eager" /> : <><span class="tp-label">{AUTHOR_NAME}</span><span class="tp-num">BF</span></>}
+            {ownerPhoto ? <img src={ownerPhoto} alt={AUTHOR_NAME} loading="eager" /> : (
+              <div class="dot-tile" data-dots="logo|DB|</>"><canvas aria-hidden="true"></canvas><span class="dt-k">■ {AUTHOR_NAME}</span><span class="dt-hint" data-i18n="dots.hint">Porusz kursorem</span><span class="dt-meta">Warszawa · PL / EN / RU</span></div>
+            )}
           </div>
           <div class="prose" style="margin:0">
             <h2 style="margin-top:0" {...lm(settings, 'about_title')}>{s(settings, 'about_title')}</h2>

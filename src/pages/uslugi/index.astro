@@ -1,8 +1,10 @@
 ---
 import Base from '../../layouts/Base.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
+import Arrows from '../../components/Arrows.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import FaqList from '../../components/FaqList.astro';
+import ServiceCard from '../../components/ServiceCard.astro';
 import { fetchSettings, fetchServices, fetchFaq, lmRow, s, lm } from '../../lib/content';
 import { SITE } from '../../lib/site';
 
@@ -20,6 +22,7 @@ const listLd = { '@context': 'https://schema.org', '@type': 'ItemList', itemList
   <main class="container">
     <section class="sec">
       <div class="sec-inner page-head">
+        <Arrows />
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span data-i18n="nav.services">Usługi</span></nav>
         <span class="kicker" data-i18n="nav.services">Usługi</span>
         <h1 data-i18n="services.h1">Usługi: strony, sklepy, platformy i opieka</h1>
@@ -30,19 +33,7 @@ const listLd = { '@context': 'https://schema.org', '@type': 'ItemList', itemList
     <section class="sec">
       <div class="sec-inner">
         <div class="services-grid">
-          {services.map((sv, i) => (
-            <article class="svc" data-reveal data-reveal-delay={i * 80}>
-              <a class="over-link" href={`/uslugi/${sv.slug}/`} aria-label={sv.title_pl}></a>
-              <span class="kicker is-dark svc-tag" {...lmRow(sv, 'title')}>{sv.title_pl}</span>
-              <p class="tagline" {...lmRow(sv, 'tagline')}>{sv.tagline_pl}</p>
-              <div class="svc-num">0{i + 1}</div>
-              <ul>{sv.bullets_pl.map((b, j) => <li data-lm-pl={b} data-lm-en={sv.bullets_en[j] || b} data-lm-ru={sv.bullets_ru[j] || b}>{b}</li>)}</ul>
-              <div class="svc-foot">
-                {sv.price_from && <span class="svc-price"><b>{sv.price_from}</b></span>}
-                <a class="svc-link" href={`/uslugi/${sv.slug}/`} aria-label={`${sv.title_pl} — szczegóły`}><svg viewBox="0 0 16 16" fill="none"><path d="M5 2l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-              </div>
-            </article>
-          ))}
+          {services.map((sv, i) => <ServiceCard sv={sv} i={i} />)}
         </div>
       </div>
     </section>

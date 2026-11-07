@@ -344,3 +344,55 @@ export function setupReelInline() {
   });
   video.addEventListener('playing', () => wrap.classList.add('is-playing'));
 }
+
+// ── project cards: second frame on hover + a "view" pill that follows the cursor
+export function setupProjectCards() {
+  const cards = document.querySelectorAll<HTMLElement>('.pcard');
+  if (!cards.length || touch()) return;
+  cards.forEach((c) => {
+    const media = c.querySelector<HTMLElement>('.pcard-media');
+    const alt = c.querySelector<HTMLImageElement>('.pcard-alt');
+    if (!media) return;
+    c.addEventListener('pointerenter', () => { if (alt && !alt.src && alt.dataset.src) alt.src = alt.dataset.src; });
+    media.addEventListener('pointermove', (e) => {
+      const r = media.getBoundingClientRect();
+      media.style.setProperty('--gx', `${e.clientX - r.left}px`); media.style.setProperty('--gy', `${e.clientY - r.top}px`);
+    });
+  });
+}
+
+// ── case page: cover tilts with the cursor, photos open full-screen ─────────
+export function setupCaseMedia() {
+  const cover = document.querySelector<HTMLElement>('.proj-cover');
+  if (cover && !touch() && !reduced()) {
+    cover.addEventListener('pointermove', (e) => {
+      const r = cover.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+      cover.style.setProperty('--tx', `${(-y * 5).toFixed(2)}deg`); cover.style.setProperty('--ty', `${(x * 7).toFixed(2)}deg`);
+    });
+    cover.addEventListener('pointerleave', () => { cover.style.removeProperty('--tx'); cover.style.removeProperty('--ty'); });
+  }
+  const imgs = Array.from(document.querySelectorAll<HTMLImageElement>('.proj-cover img, .gallery-1 img, .gallery-2 img'));
+  if (!imgs.length) return;
+  const box = document.createElement('div');
+  box.className = 'lb'; box.hidden = true; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+  box.innerHTML = '<button class="lb-x" type="button" aria-label="Zamknij">✕</button><button class="lb-nav is-prev" type="button" aria-label="Poprzednie">‹</button><img alt="" /><button class="lb-nav is-next" type="button" aria-label="Następne">›</button><span class="lb-count"></span>';
+  document.body.appendChild(box);
+  const big = box.querySelector('img')!, count = box.querySelector<HTMLElement>('.lb-count')!;
+  let i = 0;
+  const show = (n: number) => { i = (n + imgs.length) % imgs.length; big.src = imgs[i].currentSrc || imgs[i].src; big.alt = imgs[i].alt; count.textContent = `${String(i + 1).padStart(2, '0')} / ${String(imgs.length).padStart(2, '0')}`; };
+  const open = (n: number) => { show(n); box.hidden = false; document.body.classList.add('nav-locked'); requestAnimationFrame(() => box.classList.add('is-open')); };
+  const close = () => { box.classList.remove('is-open'); document.body.classList.remove('nav-locked'); setTimeout(() => { box.hidden = true; }, 300); };
+  imgs.forEach((im, n) => { im.style.cursor = 'zoom-in'; im.addEventListener('click', () => open(n)); });
+  box.querySelector('.lb-x')!.addEventListener('click', close);
+  box.querySelector('.is-prev')!.addEventListener('click', () => show(i - 1));
+  box.querySelector('.is-next')!.addEventListener('click', () => show(i + 1));
+  box.addEventListener('click', (e) => { if (e.target === box) close(); });
+  window.addEventListener('keydown', (e) => {
+    if (box.hidden) return;
+    if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') show(i - 1); else if (e.key === 'ArrowRight') show(i + 1);
+  });
+  let sx = 0;
+  box.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+  box.addEventListener('touchend', (e) => { const d = e.changedTouches[0].clientX - sx; if (Math.abs(d) > 40) show(i + (d < 0 ? 1 : -1)); });
+}
