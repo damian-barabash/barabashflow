@@ -10,6 +10,9 @@ const STORAGE_KEY = 'bf:locale';
 
 export const STRINGS: Record<Locale, Record<string, string>> = {
   pl: {
+    'why.s.a': 'Bez agencji. Bez szablonów.',
+    'why.s.b': 'Kod, który należy do Ciebie.',
+    'home.sources.short': 'Standardy i źródła',
     'reel.sound': 'Dźwięk',
     'reel.full': 'Pełny ekran',
     'reel.open': 'Showreel',
@@ -226,6 +229,9 @@ export const STRINGS: Record<Locale, Record<string, string>> = {
     'nf.home': 'Strona główna',
   },
   en: {
+    'why.s.a': 'No agency. No templates.',
+    'why.s.b': 'Code that belongs to you.',
+    'home.sources.short': 'Standards and sources',
     'reel.sound': 'Sound',
     'reel.full': 'Full screen',
     'reel.open': 'Showreel',
@@ -433,6 +439,9 @@ export const STRINGS: Record<Locale, Record<string, string>> = {
     'nf.home': 'Home',
   },
   ru: {
+    'why.s.a': 'Без агентства. Без шаблонов.',
+    'why.s.b': 'Код, который принадлежит вам.',
+    'home.sources.short': 'Стандарты и источники',
     'reel.sound': 'Звук',
     'reel.full': 'На весь экран',
     'reel.open': 'Шоурил',

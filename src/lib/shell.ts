@@ -312,7 +312,7 @@ export function bindContactForms() {
 // session), types the greeting, takes a question + e-mail → contact_submissions
 // (source 'mascot-bot'), shows an in-card success with a BF-ref. Closing
 // leaves a small avatar button to reopen it.
-const MASCOT_DELAY = 45_000;
+const MASCOT_DELAY = 30_000; // counted from the first page of the visit, across page loads
 function typewrite(el: HTMLElement, text: string, speed = 22, done?: () => void) {
   el.classList.add('is-typing');
   el.textContent = '';
@@ -352,7 +352,10 @@ function setupMascot() {
   onLocaleChange(() => { if (typed && !bubble.classList.contains('is-typing')) bubble.textContent = greeting(); });
   let dismissed = false;
   try { dismissed = sessionStorage.getItem(KEY) === '1'; } catch {}
-  if (!dismissed && !(navigator as any).webdriver) setTimeout(() => { if (!root.classList.contains('is-open') && !document.querySelector('.rcp')) open(); }, MASCOT_DELAY);
+  let since = Date.now();
+  try { since = Number(sessionStorage.getItem('bf:visit-start')) || since; sessionStorage.setItem('bf:visit-start', String(since)); } catch {}
+  const wait = Math.max(1500, MASCOT_DELAY - (Date.now() - since));
+  if (!dismissed && !(navigator as any).webdriver) setTimeout(() => { if (!root.classList.contains('is-open') && !document.querySelector('.rcp') && !document.querySelector('.menu-open') && document.getElementById('reel')?.hidden !== false) open(); }, wait);
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

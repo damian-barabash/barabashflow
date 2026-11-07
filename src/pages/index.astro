@@ -28,6 +28,7 @@ const visionImg = projectCover(featured[0]);
 const title = 'Strony, sklepy i platformy — Warszawa | BarabashFlow';
 const description = 'BarabashFlow, Warszawa: tworzenie stron internetowych, sklepów i platform na zamówienie. Kod na miarę, własny CMS, wycena projektu w 24 h — bez szablonów.';
 const heroSub = s(settings, 'hero_subtitle', 'pl', 'Kod na miarę, własny panel CMS i wycena projektu w 24 h.');
+const heroSubShort = { pl: firstSentence(heroSub) || heroSub, en: firstSentence(s(settings, 'hero_subtitle', 'en')) || heroSub, ru: firstSentence(s(settings, 'hero_subtitle', 'ru')) || heroSub };
 const BUILT = new Date().toISOString().slice(0, 10);
 const priceLine = services.filter((sv) => sv.price_from).slice(0, 3);
 const webPageLd = {
@@ -102,18 +103,7 @@ const tagOf = (p: Project) => ({
 
             <div class="hero-copy">
               <h1 class="hero-h1" {...lm(settings, 'hero_title')}>{s(settings, 'hero_title', 'pl', 'Strony internetowe, sklepy i platformy na zamówienie — Warszawa')}</h1>
-              <p class="hero-sub" {...lm(settings, 'hero_subtitle')}>{heroSub}</p>
-              <div class="hero-actions">
-                <a class="btn btn-dark with-icon" href="#contact">
-                  <span class="btn-ico"><svg viewBox="0 0 16 16" fill="none"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                  <span {...lm(settings, 'cta_label', 'Wycena w 24 h')}>{s(settings, 'cta_label', 'pl', 'Wycena w 24 h')}</span>
-                </a>
-                <a class="btn btn-white" href="/projekty/" {...lm(settings, 'cta_secondary', 'Zobacz projekty')}>{s(settings, 'cta_secondary', 'pl', 'Zobacz projekty')}</a>
-                {hasReel && <a class="btn btn-ghost reel-btn" href="#showreel" data-no-pt><span class="reel-ico" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg></span><span data-i18n="reel.open">Showreel</span></a>}
-              </div>
-              {priceLine.length > 0 && (
-                <p class="hero-price"><span class="hp-k" data-i18n="hero.prices">Orientacyjnie</span>{priceLine.map((sv) => <a href={`/uslugi/${sv.slug}/`}><span {...lmRow(sv, 'title')}>{sv.title_pl}</span> <b>{sv.price_from}</b></a>)}</p>
-              )}
+              <p class="hero-sub" data-lm-pl={heroSubShort.pl} data-lm-en={heroSubShort.en} data-lm-ru={heroSubShort.ru}>{heroSubShort.pl}</p>
             </div>
             <div class="hero-visual" aria-hidden="true">
               <span class="hero-word" {...lm(settings, 'hero_word_a')}>{s(settings, 'hero_word_a', 'pl', 'TWORZYMY')}</span>
@@ -123,10 +113,6 @@ const tagOf = (p: Project) => ({
                 </div>
               </div>
               <span class="hero-word" {...lm(settings, 'hero_word_b')}>{s(settings, 'hero_word_b', 'pl', 'STRONY')}</span>
-              <div class="hw hw-score" style="--d:0">
-                <div class="hw-k" data-i18n="hw.score">Lighthouse</div>
-                <div class="hw-rings">{['Perf', 'SEO', 'A11y', 'BP'].map((l, i) => <div class="ring" style={`--i:${i}`}><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.5" /><circle class="v" cx="18" cy="18" r="15.5" pathLength="100" /></svg><b data-count="100">100</b><span>{l}</span></div>)}</div>
-              </div>
               <div class="hw hw-live" style="--d:1">
                 <div class="hw-bar"><i></i><i></i><i></i><span class="hw-url">{liveShots[0]?.host}</span><em class="hw-dot" data-i18n="hw.live">live</em></div>
                 <div class="hw-shots">{liveShots.map((ls, i) => <img src={i === 0 ? ls.src : undefined} data-src={ls.src} data-host={ls.host} alt="" class={i === 0 ? 'is-on' : ''} width="320" height="200" decoding="async" />)}</div>
@@ -135,13 +121,15 @@ const tagOf = (p: Project) => ({
                 <span class="hw-av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span>
                 <div><b data-i18n="hw.lead">Nowe zapytanie</b><span class="hw-ref">BF-<em>28417</em> · <span data-i18n="hw.now">teraz</span></span></div>
               </div>
-              <div class="hw hw-term" style="--d:3">
-                <div class="hw-k">~/projekt</div>
-                <pre><span class="ln l1">$ npm run build</span><span class="ln l2"><i>✓</i> 288 stron · 1.2 s</span><span class="ln l3">$ deploy --prod</span><span class="ln l4"><i>✓</i> live · 0.9 s</span></pre>
-              </div>
-            </div>
           </div>
         </div>
+      </section>
+
+      <section class="sec">
+        <a class="cta-bar" href="#contact">
+          <span {...lm(settings, 'cta_label', 'Wycena w 24 h')}>{s(settings, 'cta_label', 'pl', 'Wycena w 24 h')}</span>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 18 18 6M18 6H8M18 6v10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
       </section>
 
       <!-- ── SHOWREEL (autoplay, muted, right after the hero) ──────────── -->
@@ -180,7 +168,6 @@ const tagOf = (p: Project) => ({
           <div class="about-grid">
             <div>
               <ul class="stats">
-                <li class="note" data-i18n="home.about.note">Liczby, które mówią same za siebie.</li>
                 {stats.map((st, i) => {
                   const isAuto = st.auto === 'projects';
                   const num = isAuto ? String(projects.length) : String(st.value);
@@ -214,14 +201,13 @@ const tagOf = (p: Project) => ({
               )}
             </div>
           </div>
-          <aside class="author-strip" aria-label="Autor">
-            <img class="author-avatar" src={ownerPhoto || '/assets/img/logo.png'} alt="" width="48" height="48" />
-            <div class="author-text">
-              <span class="kicker" data-i18n="home.author.kicker">Autor strony</span>
-              <p><a href="/o-mnie/" rel="author"><strong>{s(settings, 'owner_name', 'pl', AUTHOR_NAME)}</strong></a> — <span data-i18n="home.author.role">web developer, założyciel BarabashFlow — projektuje i koduje wszystkie opisane tu realizacje oraz pisze wpisy na blogu.</span> <a class="author-more" href="/o-mnie/" data-i18n="home.author.more">O autorze</a></p>
-              <p class="author-dates"><span data-i18n="home.author.published">Strona opublikowana</span> <time datetime={SITE_PUBLISHED}>{formatDatePl(SITE_PUBLISHED)}</time> · <span data-i18n="home.author.updated">Ostatnia aktualizacja</span> <time datetime={BUILT}>{formatDatePl(BUILT)}</time></p>
-              <p class="author-sources"><span data-i18n="home.sources">Standardy i źródła, według których pracuję:</span> {SOURCES.map((src, i) => <><a href={src.url} rel="noopener" target="_blank">{src.label}</a>{i < SOURCES.length - 1 ? ' · ' : ''}</>)} · <a href="/zasady-redakcyjne/" data-i18n="nav.editorial">Zasady redakcyjne</a></p>
-            </div>
+          <aside class="author-line" aria-label="Autor">
+            <img class="author-avatar" src={ownerPhoto || '/assets/img/logo.png'} alt="" width="32" height="32" />
+            <p><a href="/o-mnie/" rel="author"><strong>{s(settings, 'owner_name', 'pl', AUTHOR_NAME)}</strong></a> · <span data-i18n="home.author.updated">Ostatnia aktualizacja</span> <time datetime={BUILT}>{formatDatePl(BUILT)}</time></p>
+            <details class="author-src">
+              <summary data-i18n="home.sources.short">Standardy i źródła</summary>
+              <p><span data-i18n="home.author.role">web developer, założyciel BarabashFlow — projektuje i koduje wszystkie opisane tu realizacje oraz pisze wpisy na blogu.</span> <span data-i18n="home.author.published">Strona opublikowana</span> <time datetime={SITE_PUBLISHED}>{formatDatePl(SITE_PUBLISHED)}</time>. {SOURCES.map((src, i) => <><a href={src.url} rel="noopener" target="_blank">{src.label}</a>{i < SOURCES.length - 1 ? ' · ' : ''}</>)} · <a href="/zasady-redakcyjne/" data-i18n="nav.editorial">Zasady redakcyjne</a></p>
+            </details>
           </aside>
         </div>
       </section>
@@ -233,7 +219,6 @@ const tagOf = (p: Project) => ({
           <div class="sec-head is-center" style="padding: clamp(40px,6vw,80px) 18px 0; margin-bottom: clamp(28px,4vw,56px);">
             <span class="kicker" data-i18n="home.services.kicker">Usługi</span>
             <h2 class="h-sec is-center" data-i18n="home.services.title">Co dla Ciebie zbuduję</h2>
-            <p class="lead" {...lm(settings, 'services_intro')}>{s(settings, 'services_intro')}</p>
           </div>
           <div class="services-grid">
             {services.map((sv, i) => (
@@ -242,9 +227,6 @@ const tagOf = (p: Project) => ({
                 <span class="kicker is-dark svc-tag" {...lmRow(sv, 'title')}>{sv.title_pl}</span>
                 <p class="tagline" {...lmRow(sv, 'tagline')}>{sv.tagline_pl}</p>
                 <div class="svc-stage" aria-hidden="true"><div class="svc-num">0{i + 1}</div><div class={`svc-scene sc-${(i % 4) + 1}`} set:html={SCENES[i % 4]} /></div>
-                <ul>
-                  {sv.bullets_pl.map((b, j) => <li data-lm-pl={b} data-lm-en={sv.bullets_en[j] || b} data-lm-ru={sv.bullets_ru[j] || b}>{b}</li>)}
-                </ul>
                 <div class="svc-foot">
                   {sv.price_from && <span class="svc-price"><b>{sv.price_from}</b></span>}
                   <a class="svc-link" href={`/uslugi/${sv.slug}/`} aria-label={`${sv.title_pl} — szczegóły`}><svg viewBox="0 0 16 16" fill="none"><path d="M5 2l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
@@ -268,7 +250,6 @@ const tagOf = (p: Project) => ({
             <span data-i18n="home.vision.c">zrozumienia</span><br />
             <span data-i18n="home.vision.d">celu Twojej firmy</span>
           </h2>
-          <p class="lead" data-i18n="home.vision.p">Nie sprzedaję „ładnych stron”. Najpierw pytam, skąd mają przyjść klienci i co mają zrobić na stronie — a potem projektuję i koduję dokładnie pod ten cel.</p>
         </div>
       </section>
       <div class="divider" aria-hidden="true"></div>
@@ -280,7 +261,6 @@ const tagOf = (p: Project) => ({
             <div>
               <span class="kicker is-white" data-i18n="home.projects.kicker">Projekty</span>
               <h2 class="h-sec" style="margin-top:18px" data-i18n="home.projects.title">Wybrane realizacje</h2>
-              <p class="lead" style="margin-top:14px" {...lm(settings, 'projects_intro')}>{s(settings, 'projects_intro')}</p>
             </div>
             <a class="btn btn-white" href="/projekty/" data-i18n="home.projects.all">Wszystkie projekty</a>
           </div>
@@ -298,11 +278,6 @@ const tagOf = (p: Project) => ({
                     <p class="desc" data-lm-pl={tg.pl} data-lm-en={tg.en} data-lm-ru={tg.ru}>{tg.pl}</p>
                     <a class="feat-view" href={`/projekty/${p.slug}/`}><span data-i18n="home.projects.view">Zobacz projekt</span><svg viewBox="0 0 18 18" fill="none"><path d="M18 0v13.5h-1.5V2.5L1 18l-1-1L15.4 1.5H4.5V0z" fill="currentColor"/></svg></a>
                   </div>
-                  {p.results.length > 0 && (
-                    <ul class="feat-results">
-                      {p.results.slice(0, 3).map((r) => <li><b>{r.value}</b><span {...lmRow(r, 'label')}>{r.label_pl}</span></li>)}
-                    </ul>
-                  )}
                 </div>
               </article>
             ); })}
@@ -318,7 +293,6 @@ const tagOf = (p: Project) => ({
             <div class="process-left">
               <span class="kicker" data-i18n="home.process.kicker">Proces</span>
               <h2 class="h-sec" data-i18n="home.process.title">Jasny plan od briefu do startu</h2>
-              <p class="lead" data-i18n="home.process.p">Każdy etap ma konkretny efekt, który widzisz i akceptujesz.</p>
               <div>
                 <a class="btn btn-dark with-icon" href="#contact">
                   <span class="btn-ico"><svg viewBox="0 0 16 16" fill="none"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
@@ -334,12 +308,6 @@ const tagOf = (p: Project) => ({
                     <span class="step-num">//0{n}</span>
                     <div>
                       <h3 data-i18n={`process.${n}.t`}>{['Brief i wycena', 'Struktura i treści', 'Projekt i kod', 'Start i opieka'][n - 1]}</h3>
-                      <p data-i18n={`process.${n}.p`}>{[
-                        'Krótka rozmowa lub formularz. W 24 godziny dostajesz plan, zakres, harmonogram i cenę — bez zobowiązań.',
-                        'Układamy strony i sekcje pod cel biznesowy, piszemy prawdziwe teksty i dobieramy zdjęcia. Tu decydujemy, co ma sprzedawać.',
-                        'Projekt graficzny pod Twoją markę, potem szybki, statyczny kod. Postęp oglądasz na żywo na adresie testowym.',
-                        'Wdrożenie na domenie, panel CMS, Search Console. Po starcie — monitoring, kopie i rozwój w abonamencie.',
-                      ][n - 1]}</p>
                     </div>
                   </div>
                 </div>
@@ -365,26 +333,13 @@ const tagOf = (p: Project) => ({
 
       <!-- ── WHY ──────────────────────────────────────────────────────── -->
       <section class="sec">
-        <div class="sec-inner sec-pad">
-          <div class="sec-head is-center">
-            <span class="kicker" data-i18n="home.why.kicker">Różnica</span>
-            <h2 class="h-sec is-center" data-i18n="home.why.title">Dlaczego nie agencja i nie szablon</h2>
+        <div class="sec-inner is-dark why-sec">
+          <div class="why-statement">
+            <span class="kicker is-white" data-i18n="home.why.kicker">Różnica</span>
+            <h2 class="ws-h"><span data-i18n="why.s.a">Bez agencji. Bez szablonów.</span><br /><em data-i18n="why.s.b">Kod, który należy do Ciebie.</em></h2>
+            <ul class="ws-facts">{[1, 3, 5].map((n) => <li data-i18n={`why.r.${n}`}>…</li>)}</ul>
+            <a class="btn btn-lime" href="#contact" data-i18n="home.why.cta">Porozmawiajmy</a>
           </div>
-          <div class="why-grid">
-            <div class="why-card" data-reveal>
-              <div class="head"><span data-i18n="why.left.h">Agencja lub szablon</span></div>
-              <ul>
-                {[1, 2, 3, 4, 5, 6].map((n) => <li><i><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5 5 9l4.5-6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span data-i18n={`why.l.${n}`}>…</span></li>)}
-              </ul>
-            </div>
-            <div class="why-card is-us" data-reveal data-reveal-delay="120">
-              <div class="head"><img src="/assets/img/logo.png" alt="" width="22" height="27" style="display:inline-block;vertical-align:-6px;margin-right:8px" /><span style="color:var(--ink);font-weight:600" data-i18n="why.right.h">BarabashFlow</span><sup style="font-size:9px;color:var(--muted)">™</sup></div>
-              <ul>
-                {[1, 2, 3, 4, 5, 6].map((n) => <li><i><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5 5 9l4.5-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span data-i18n={`why.r.${n}`}>…</span></li>)}
-              </ul>
-            </div>
-          </div>
-          <div class="why-cta"><a class="btn btn-dark" href="#contact" data-i18n="home.why.cta">Porozmawiajmy</a></div>
         </div>
       </section>
       <div class="divider" aria-hidden="true"></div>
@@ -398,7 +353,6 @@ const tagOf = (p: Project) => ({
                 <div>
                   <span class="kicker is-white" data-i18n="home.blog.kicker">Blog</span>
                   <h2 class="h-sec" style="margin-top:18px" data-i18n="home.blog.title">Ostatnio na blogu</h2>
-                  <p class="lead" style="margin-top:14px" data-i18n="home.blog.sub">Praktyczne odpowiedzi na pytania, które klienci zadają przed zleceniem strony lub platformy.</p>
                 </div>
                 <a class="btn btn-white" href="/blog/" data-i18n="home.blog.all">Wszystkie wpisy</a>
               </div>

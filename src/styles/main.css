@@ -1156,3 +1156,63 @@ html.pt-cover #pt { visibility: visible; background: var(--dark); }
   .reel-inline:not(.is-v) { border-radius: 0; }
   .ri-btn span { display: none; } .ri-btn { width: 44px; padding: 0; justify-content: center; }
 }
+
+/* ══ 2026-11-07 (3) — cleaner home: fewer words, more air ═════════════════ */
+.hero-inner { min-height: min(68vh, 640px); padding-block: clamp(48px, 6vw, 96px); }
+.hero-h1 { font-size: clamp(38px, 5vw, 76px); max-width: 13ch; }
+.hero-sub { max-width: 38ch; font-size: clamp(16px, 1.3vw, 19px); }
+.hw-live { top: 24%; }
+.hw-lead { bottom: 12%; }
+
+/* big CTA bar (one clear action under the hero) */
+.cta-bar { display: flex; align-items: center; justify-content: center; gap: 14px; min-height: clamp(96px, 11vw, 168px); padding: 24px; background: var(--white); border: 1px solid var(--border-2);
+  font: 500 clamp(26px, 3.2vw, 48px)/1.05 var(--font-head); letter-spacing: -0.03em; color: var(--ink); position: relative; overflow: hidden; isolation: isolate; transition: color 0.35s; }
+.cta-bar::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--lime); transform: scaleY(0); transform-origin: bottom; transition: transform 0.55s var(--ease); }
+.cta-bar svg { width: 0.9em; height: 0.9em; transition: transform 0.45s var(--ease); }
+.cta-bar:hover::before, .cta-bar:focus-visible::before { transform: none; }
+.cta-bar:hover svg { transform: translate(4px, -4px); }
+
+/* about: compact author line */
+.author-line { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: clamp(28px, 4vw, 48px); padding-top: 20px; border-top: 1px solid var(--border); font-size: 13.5px; color: var(--body); }
+.author-line .author-avatar { width: 32px; height: 32px; padding: 4px; border-radius: 9px; }
+.author-line strong { color: var(--ink); font-weight: 600; }
+.author-src { margin-left: auto; }
+.author-src summary { cursor: pointer; list-style: none; font: 500 11px/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.author-src summary::-webkit-details-marker { display: none; }
+.author-src summary::after { content: ' +'; }
+.author-src[open] summary::after { content: ' −'; }
+.author-src p { flex-basis: 100%; margin-top: 10px; max-width: 70ch; font-size: 13px; }
+.author-src a { text-decoration: underline; text-underline-offset: 3px; }
+.author-src[open] { flex-basis: 100%; margin-left: 0; }
+
+/* services: no bullets → lighter cards */
+.svc { min-height: 470px; }
+.svc .tagline { min-height: 0; }
+
+/* projects: no result tiles */
+.feat-body { padding-bottom: clamp(28px, 3vw, 40px); }
+
+/* process: 2×2 tiles, titles only */
+.steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.step-row p { display: none; }
+
+/* why → one dark statement */
+.why-sec { padding: clamp(64px, 10vw, 150px) clamp(18px, 4vw, 56px); background-image: linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px); background-size: 72px 72px; background-position: center; }
+.why-statement { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 28px; }
+.ws-h { color: #fff; font-size: clamp(34px, 5.4vw, 80px); line-height: 1.02; letter-spacing: -0.04em; max-width: 18ch; }
+.ws-h em { font-style: normal; color: var(--lime); }
+.ws-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.ws-facts li { padding: 9px 14px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; font-size: 13.5px; color: rgba(255, 255, 255, 0.75); }
+
+@media (max-width: 1024px) { .hero-inner { min-height: 0; } }
+@media (max-width: 760px) {
+  .steps { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .step { padding: 8px 8px 14px; }
+  .step-row { gap: 6px; } .step-row h3 { font-size: 15px; }
+  .author-src { margin-left: 0; }
+  .cta-bar { font-size: 26px; }
+}
+.hw-lead { left: -9%; bottom: auto; top: 58%; }
+@media (max-width: 1024px) { .hw-lead { left: auto; right: -4%; top: 56%; } }
+@media (max-width: 760px) { .svc-stage { height: 180px; margin: 14px 0; } .svc { padding-bottom: 22px; } }
+@media (max-width: 760px) { .step-media.dot-tile .tp-num { display: none; } }
