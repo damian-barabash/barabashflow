@@ -3,6 +3,7 @@
 export interface Props {
   active?: 'home' | 'services' | 'projects' | 'blog' | 'about' | 'contact' | 'privacy' | 'none';
 }
+import { EMAIL } from '../lib/site';
 const { active = 'none' } = Astro.props;
 const items: { key: Props['active']; href: string; label: string; i18n: string }[] = [
   { key: 'home', href: '/', label: 'Strona główna', i18n: 'nav.home' },
@@ -20,9 +21,13 @@ const items: { key: Props['active']; href: string; label: string; i18n: string }
       <span>barabashflow<span class="brand-tm">™</span></span>
     </a>
     <nav class="site-nav" aria-label="Nawigacja">
-      {items.map((it) => (
-        <a href={it.href} data-i18n={it.i18n} aria-current={active === it.key ? 'page' : undefined}>{it.label}</a>
+      {items.map((it, i) => (
+        <a href={it.href} aria-current={active === it.key ? 'page' : undefined} style={`--i:${i}`}><span class="ni" aria-hidden="true">0{i + 1}</span><span class="nl" data-i18n={it.i18n}>{it.label}</span></a>
       ))}
+      <div class="nav-extra" style={`--i:${items.length}`}>
+        <a class="nav-mail" href={`mailto:${EMAIL}`}>{EMAIL}</a>
+        <a class="btn btn-lime" href="/kontakt/" data-i18n="nav.cta">Wycena projektu</a>
+      </div>
     </nav>
     <div class="header-actions">
       <div class="lang-switch" aria-label="Język / Language"></div>

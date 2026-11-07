@@ -3,6 +3,7 @@
 // approach, featured projects, process, marquee, why-us, blog, FAQ; the CTA
 // band + contact + footer come from SiteFooter. All CMS content is baked in
 // at build (PL in markup, EN/RU in data-lm-* attributes).
+import fs from 'node:fs';
 import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
@@ -61,6 +62,22 @@ const ICONS: Record<string, string> = {
   platform: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
   care: '<path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/>',
 };
+// Live mini-scenes for the service cards (hover / auto-cycle): language-free.
+const SCENES = [
+  '<div class="sc-win"><div class="sc-bar"><i></i><i></i><i></i><u></u></div><div class="sc-body"><b class="l1"></b><b class="l2"></b><b class="l3"></b><span class="sc-btn"></span><span class="sc-img"></span><span class="sc-cursor"></span></div></div>',
+  '<div class="sc-prod"><span class="sc-thumb"></span><b></b><b class="s"></b><span class="sc-add">+</span></div><div class="sc-cart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11h11L21 8H6.2"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg><em><span>0</span><span>1</span></em></div><div class="sc-steps"><i></i><i></i><i></i></div><span class="sc-paid"><svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5 6.5 11.5 12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>',
+  '<div class="sc-dash"><div class="sc-kpi"><b></b><b></b></div><div class="sc-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><svg class="sc-line" viewBox="0 0 160 44" preserveAspectRatio="none"><path d="M0 38 L20 30 L40 34 L60 20 L80 24 L100 12 L120 16 L140 6 L160 9"/></svg></div><div class="sc-chat"><span></span><span class="me"></span></div><span class="sc-ping"></span>',
+  '<div class="sc-ed"><div class="sc-tool"><i></i><i></i><i></i><u></u></div><b class="t1"></b><b class="t2"></b><b class="t3"></b><span class="sc-pub"></span></div><ol class="sc-serp"><li><i></i><b></b></li><li><i></i><b></b></li><li class="us"><i>#1</i><b></b></li></ol>',
+];
+// Hero "live" widget: covers of the newest/strongest works, cycled in a mini browser.
+const liveShots = projects
+  .filter((p) => p.cover_path && p.url)
+  .slice(0, 7)
+  .map((p) => ({ src: mediaUrl(p.cover_path!)!, host: new URL(p.url!).host.replace(/^www\./, '') }));
+// Showreel: rendered only when the video files are in public/assets/video/.
+const hasReel = fs.existsSync('public/assets/video/showreel-1080.mp4');
+const hasReelV = fs.existsSync('public/assets/video/showreel-9x16-720.mp4');
+const YEAR = new Date().getFullYear();
 const tagOf = (p: Project) => ({
   pl: p.tagline_pl || firstSentence(p.description_pl),
   en: p.tagline_en || firstSentence(p.description_en) || p.tagline_pl || firstSentence(p.description_pl),
@@ -76,8 +93,6 @@ const tagOf = (p: Project) => ({
       <section class="sec">
         <div class="hero">
           <div class="hero-inner">
-            <div class="px is-tl" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-            <div class="px is-br" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
             <div class="arrow-track is-left" aria-hidden="true">
               <svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 4h3l6 8-6 8H6l6-8z"/></svg><svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 4h3l6 8-6 8H6l6-8z"/></svg><svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 4h3l6 8-6 8H6l6-8z"/></svg>
             </div>
@@ -86,10 +101,6 @@ const tagOf = (p: Project) => ({
             </div>
 
             <div class="hero-copy">
-              <div class="hero-kicker">
-                <span class="kicker is-white"><span class="status-dot" aria-hidden="true"></span><span data-i18n="meta.available">Dostępny</span></span>
-                <span class="kicker is-white" {...lm(settings, 'hero_kicker')}>{s(settings, 'hero_kicker')}</span>
-              </div>
               <h1 class="hero-h1" {...lm(settings, 'hero_title')}>{s(settings, 'hero_title', 'pl', 'Strony internetowe, sklepy i platformy na zamówienie — Warszawa')}</h1>
               <p class="hero-sub" {...lm(settings, 'hero_subtitle')}>{heroSub}</p>
               <div class="hero-actions">
@@ -98,6 +109,7 @@ const tagOf = (p: Project) => ({
                   <span {...lm(settings, 'cta_label', 'Wycena w 24 h')}>{s(settings, 'cta_label', 'pl', 'Wycena w 24 h')}</span>
                 </a>
                 <a class="btn btn-white" href="/projekty/" {...lm(settings, 'cta_secondary', 'Zobacz projekty')}>{s(settings, 'cta_secondary', 'pl', 'Zobacz projekty')}</a>
+                {hasReel && <a class="btn btn-ghost reel-btn" href="#showreel" data-no-pt><span class="reel-ico" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg></span><span data-i18n="reel.open">Showreel</span></a>}
               </div>
               {priceLine.length > 0 && (
                 <p class="hero-price"><span class="hp-k" data-i18n="hero.prices">Orientacyjnie</span>{priceLine.map((sv) => <a href={`/uslugi/${sv.slug}/`}><span {...lmRow(sv, 'title')}>{sv.title_pl}</span> <b>{sv.price_from}</b></a>)}</p>
@@ -111,10 +123,41 @@ const tagOf = (p: Project) => ({
                 </div>
               </div>
               <span class="hero-word" {...lm(settings, 'hero_word_b')}>{s(settings, 'hero_word_b', 'pl', 'STRONY')}</span>
+              <div class="hw hw-score" style="--d:0">
+                <div class="hw-k" data-i18n="hw.score">Lighthouse</div>
+                <div class="hw-rings">{['Perf', 'SEO', 'A11y', 'BP'].map((l, i) => <div class="ring" style={`--i:${i}`}><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.5" /><circle class="v" cx="18" cy="18" r="15.5" pathLength="100" /></svg><b data-count="100">100</b><span>{l}</span></div>)}</div>
+              </div>
+              <div class="hw hw-live" style="--d:1">
+                <div class="hw-bar"><i></i><i></i><i></i><span class="hw-url">{liveShots[0]?.host}</span><em class="hw-dot" data-i18n="hw.live">live</em></div>
+                <div class="hw-shots">{liveShots.map((ls, i) => <img src={i === 0 ? ls.src : undefined} data-src={ls.src} data-host={ls.host} alt="" class={i === 0 ? 'is-on' : ''} width="320" height="200" decoding="async" />)}</div>
+              </div>
+              <div class="hw hw-lead" style="--d:2">
+                <span class="hw-av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span>
+                <div><b data-i18n="hw.lead">Nowe zapytanie</b><span class="hw-ref">BF-<em>28417</em> · <span data-i18n="hw.now">teraz</span></span></div>
+              </div>
+              <div class="hw hw-term" style="--d:3">
+                <div class="hw-k">~/projekt</div>
+                <pre><span class="ln l1">$ npm run build</span><span class="ln l2"><i>✓</i> 288 stron · 1.2 s</span><span class="ln l3">$ deploy --prod</span><span class="ln l4"><i>✓</i> live · 0.9 s</span></pre>
+              </div>
             </div>
           </div>
         </div>
       </section>
+
+      <!-- ── SHOWREEL (autoplay, muted, right after the hero) ──────────── -->
+      {hasReel && (
+        <section class="sec reel-sec" id="showreel" aria-label="Showreel BarabashFlow">
+          <div class="reel-inline">
+            <video class="ri-video" muted loop playsinline preload="none" poster="/assets/video/poster.jpg"
+              data-hd="/assets/video/showreel-1080.mp4" data-sd="/assets/video/showreel-720.mp4"
+              data-v={hasReelV ? '/assets/video/showreel-9x16-720.mp4' : undefined} data-v-poster={hasReelV ? '/assets/video/poster-9x16.jpg' : undefined}></video>
+            <div class="ri-actions">
+              <button class="ri-btn" type="button" data-ri-sound aria-pressed="false"><svg class="i-off" viewBox="0 0 20 20" fill="none"><path d="M4 8h3l4-3v10l-4-3H4z" fill="currentColor"/><path d="m14 8 4 4m0-4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><svg class="i-on" viewBox="0 0 20 20" fill="none"><path d="M4 8h3l4-3v10l-4-3H4z" fill="currentColor"/><path d="M14 7.5a3.5 3.5 0 0 1 0 5M16 5.5a6.5 6.5 0 0 1 0 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span data-i18n="reel.sound">Dźwięk</span></button>
+              <button class="ri-btn" type="button" data-reel><svg viewBox="0 0 20 20" fill="none"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="reel.full">Pełny ekran</span></button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <!-- trusted strip -->
       {trusted.length > 0 && (
@@ -160,7 +203,15 @@ const tagOf = (p: Project) => ({
               </div>
             </div>
             <div class="about-media tile-pattern" data-reveal>
-              {ownerPhoto ? <img src={ownerPhoto} alt={s(settings, 'owner_name', 'pl', AUTHOR_NAME)} loading="lazy" /> : <><span class="tp-label">BarabashFlow</span><span class="tp-num">BF</span></>}
+              {ownerPhoto ? <img src={ownerPhoto} alt={s(settings, 'owner_name', 'pl', AUTHOR_NAME)} loading="lazy" /> : (
+                <div class="dot-tile" data-dots="logo|BF|</>">
+                  <canvas></canvas>
+                  <span class="dt-k">■ barabashflow studio</span>
+                  <span class="dt-hint" data-i18n="dots.hint">Porusz kursorem</span>
+                  <span class="dt-meta"><b>{projects.length}</b> <span data-i18n="dots.projects">projektów</span> · PL / EN / RU</span>
+                  {hasReel && <button class="dt-play" type="button" data-reel><span class="reel-ico" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg></span><span data-i18n="reel.open">Showreel</span></button>}
+                </div>
+              )}
             </div>
           </div>
           <aside class="author-strip" aria-label="Autor">
@@ -186,11 +237,11 @@ const tagOf = (p: Project) => ({
           </div>
           <div class="services-grid">
             {services.map((sv, i) => (
-              <article class="svc" data-reveal data-reveal-delay={i * 80}>
+              <article class="svc" data-svc data-reveal data-reveal-delay={i * 80}>
                 <a class="over-link" href={`/uslugi/${sv.slug}/`} aria-label={sv.title_pl}></a>
                 <span class="kicker is-dark svc-tag" {...lmRow(sv, 'title')}>{sv.title_pl}</span>
                 <p class="tagline" {...lmRow(sv, 'tagline')}>{sv.tagline_pl}</p>
-                <div class="svc-num">0{i + 1}</div>
+                <div class="svc-stage" aria-hidden="true"><div class="svc-num">0{i + 1}</div><div class={`svc-scene sc-${(i % 4) + 1}`} set:html={SCENES[i % 4]} /></div>
                 <ul>
                   {sv.bullets_pl.map((b, j) => <li data-lm-pl={b} data-lm-en={sv.bullets_en[j] || b} data-lm-ru={sv.bullets_ru[j] || b}>{b}</li>)}
                 </ul>
@@ -278,7 +329,7 @@ const tagOf = (p: Project) => ({
             <div class="steps">
               {[1, 2, 3, 4].map((n) => (
                 <div class="step" data-reveal>
-                  <div class="step-media tile-pattern"><span class="tp-label">BarabashFlow</span><span class="tp-num">0{n}</span></div>
+                  <div class="step-media tile-pattern dot-tile is-step" data-dots={['24H', 'UX', '</>', 'GO'][n - 1]} aria-hidden="true"><canvas></canvas><span class="tp-num">0{n}</span></div>
                   <div class="step-row">
                     <span class="step-num">//0{n}</span>
                     <div>
@@ -375,12 +426,27 @@ const tagOf = (p: Project) => ({
     </div>
   </main>
 
+  {hasReel && (
+    <div class="reel" id="reel" hidden role="dialog" aria-modal="true" aria-label="Showreel BarabashFlow">
+      <button class="reel-x" type="button" data-reel-close aria-label="Zamknij"><svg viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5 5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <div class="reel-frame">
+        <video controls playsinline preload="none" poster="/assets/video/poster.jpg" data-src-hd="/assets/video/showreel-1080.mp4" data-src-sd="/assets/video/showreel-720.mp4"></video>
+      </div>
+      <p class="reel-k">■ BarabashFlow · Showreel {new Date().getFullYear()}</p>
+    </div>
+  )}
   <SiteFooter services={services} settings={settings} />
 
   <script>
     import { mountShell } from '../lib/shell';
     import { mountLogo3D } from '../lib/logo3d';
+    import { setupServices, setupHeroWidgets, setupDotTiles, setupReel, setupReelInline } from '../lib/fx';
     mountShell();
+    setupServices();
+    setupHeroWidgets();
+    setupDotTiles();
+    setupReel();
+    setupReelInline();
     // 3D mark after first paint — three.js is a separate lazy chunk.
     if ('requestIdleCallback' in window) (window as any).requestIdleCallback(() => mountLogo3D(), { timeout: 1200 });
     else setTimeout(() => mountLogo3D(), 300);

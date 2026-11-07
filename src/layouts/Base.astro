@@ -130,9 +130,13 @@ const siteGraphLd = {
     </script>
   )}
 
-  <!-- Anti-FOUC: apply saved locale before first paint. -->
+  <!-- Anti-FOUC: apply saved locale before first paint; keep the page
+       covered when arriving through the pixel page transition. -->
   <script is:inline>
     (function () {
+      try {
+        if (sessionStorage.getItem('bf:pt') && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('pt-cover');
+      } catch (e) {}
       try {
         var l = localStorage.getItem('bf:locale');
         if (l === 'pl' || l === 'en' || l === 'ru') document.documentElement.lang = l;
@@ -141,6 +145,7 @@ const siteGraphLd = {
   </script>
 </head>
 <body class={bodyClass}>
+  <div id="pt" aria-hidden="true"><div class="pt-grid"></div><div class="pt-mark"><img src="/assets/img/logo.png" alt="" width="26" height="32" /><span class="pt-label">BarabashFlow</span></div></div>
   <slot />
 </body>
 </html>

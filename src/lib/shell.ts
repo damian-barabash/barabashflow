@@ -4,9 +4,11 @@
 // No framework — a few hundred lines of vanilla TS bundled by Astro.
 import { LOCALES, getLocale, setLocale, onLocaleChange, applyDom, t, type Locale } from './i18n';
 import { restInsert } from './supabase';
+import { setupPageTransitions, setMenuOrigin } from './fx';
 
 export function mountShell() {
   applyDom();
+  setupPageTransitions();
   bindLangSwitcher();
   setupStickyHeader();
   setupBurger();
@@ -63,8 +65,14 @@ export function setupBurger() {
   const header = document.querySelector<HTMLElement>('.site-header');
   if (!btn || !header) return;
   const close = () => { header.classList.remove('menu-open'); btn.setAttribute('aria-expanded', 'false'); document.body.classList.remove('nav-locked'); };
+  const nav = header.querySelector<HTMLElement>('.site-nav');
+  nav?.addEventListener('pointerover', (e) => {
+    const a = (e.target as HTMLElement).closest<HTMLElement>('a[style]');
+    if (a) nav.dataset.hover = a.querySelector('.ni')?.textContent || '';
+  });
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
+    setMenuOrigin();
     const open = header.classList.toggle('menu-open');
     btn.setAttribute('aria-expanded', String(open));
     document.body.classList.toggle('nav-locked', open);
