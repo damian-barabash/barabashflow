@@ -485,12 +485,12 @@ ul { margin: 0; padding: 0; list-style: none; }
 .footer-links i { width: 7px; height: 7px; background: var(--border-2); }
 .footer-brand { position: relative; display: flex; align-items: center; justify-content: center; padding: clamp(48px, 8vw, 110px) 16px; border-bottom: 1px solid var(--border); overflow: hidden; }
 .footer-brand::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(3, 7, 18, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(3, 7, 18, 0.04) 1px, transparent 1px); background-size: 72px 72px; }
-.footer-brand .word { position: relative; font-family: var(--font-display); font-weight: 800; text-transform: uppercase; letter-spacing: -0.05em; font-size: clamp(56px, 12vw, 200px); line-height: 0.9; color: var(--ink); display: inline-flex; align-items: center; gap: 0.12em; }
+.footer-brand .word { position: relative; font-family: var(--font-display); font-weight: 800; text-transform: uppercase; letter-spacing: -0.05em; font-size: clamp(26px, 9vw, 140px); line-height: 0.9; /* word ≈ 8.6em: always fits */ color: var(--ink); display: inline-flex; align-items: center; gap: 0.12em; }
 .footer-brand .word img { height: 0.7em; width: auto; }
 .footer-brand .px { opacity: 0.9; }
 .footer-brand .px.is-tl { width: 180px; height: 120px; } .footer-brand .px.is-tl i { width: 60px; height: 60px; }
 .footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; padding: 20px clamp(18px, 4vw, 48px); font-size: 13.5px; color: var(--body); }
-.footer-bottom .social { display: flex; gap: 20px; }
+.footer-bottom .social { display: flex; flex-wrap: wrap; gap: 8px 20px; min-width: 0; }
 .footer-bottom .social a { color: var(--ink); font-weight: 500; }
 .footer-bottom .social a:hover { color: var(--body); }
 .scroll-top { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; color: var(--ink); font-size: 13px; font-weight: 500; }
@@ -663,7 +663,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   .header-actions .btn { display: none; }
   .brand { border-right: 0; padding-right: 0; }
   .header-actions { border-left: 0; padding-left: 0; }
-  .about-grid, .process, .why-grid, .feat, .svc-detail, .proj-hero, .contact-block { grid-template-columns: 1fr; }
+  .about-grid, .process, .why-grid, .feat, .svc-detail, .proj-hero, .contact-block { grid-template-columns: minmax(0, 1fr); }
   .hero-inner { grid-template-columns: 1fr; min-height: 0; padding-bottom: clamp(40px, 6vw, 64px); }
   .hero-visual { padding-top: 12px; }
   .feat:nth-child(even) .feat-media { order: 0; }
@@ -1206,9 +1206,9 @@ html.pt-cover #pt { visibility: visible; background: var(--dark); }
 
 @media (max-width: 1024px) { .hero-inner { min-height: 0; } }
 @media (max-width: 760px) {
-  .steps { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .step { padding: 8px 8px 14px; }
-  .step-row { gap: 6px; } .step-row h3 { font-size: 15px; }
+  .step-row { gap: 4px; grid-template-columns: minmax(0, 1fr); padding: 14px 6px 0; } .step-row h3 { font-size: 15px; overflow-wrap: break-word; }
   .author-src { margin-left: 0; }
   .cta-bar { font-size: 26px; }
 }
@@ -1244,6 +1244,7 @@ html.pt-cover #pt { visibility: visible; background: var(--dark); }
 .proj-cover img { transform: rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg)); transition: transform 0.5s var(--ease); }
 .lb { position: fixed; inset: 0; z-index: 9100; display: grid; place-items: center; padding: clamp(12px, 4vw, 64px); background: rgba(11, 11, 11, 0.94); opacity: 0; transition: opacity 0.3s; }
 .lb.is-open { opacity: 1; }
+.lb[hidden] { display: none; } /* closed lightbox must not cover the header */
 .lb img { max-width: 100%; max-height: calc(100dvh - 120px); border-radius: 12px; box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.8); transform: scale(0.96); transition: transform 0.4s var(--ease); }
 .lb.is-open img { transform: none; }
 .lb-x, .lb-nav { position: absolute; border: 0; display: grid; place-items: center; font: 500 22px/1 var(--font-head); }
