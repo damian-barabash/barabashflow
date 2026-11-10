@@ -5,6 +5,8 @@ import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import Arrows from '../components/Arrows.astro';
 import SiteFooter from '../components/SiteFooter.astro';
+import OfferCta from '../components/OfferCta.astro';
+import { caseFor } from '../lib/offer';
 import { mediaUrl } from '../lib/supabase';
 import { fetchSettings, fetchServices, fetchProjects, s, lm, lmRow } from '../lib/content';
 import { SITE, AUTHOR_NAME, EMAIL, PERSON_ID, SOCIAL } from '../lib/site';
@@ -13,6 +15,8 @@ const [settings, services, projects] = await Promise.all([fetchSettings(), fetch
 const title = 'O mnie — Damian Barabash, web developer | BarabashFlow';
 const description = 'Damian Barabash — web developer z Warszawy, założyciel BarabashFlow. Strony, sklepy, platformy i aplikacje webowe dla firm: jak pracuję, technologie, zasady.';
 const STACK = ['Astro', 'React', 'Next.js', 'TypeScript', 'Supabase', 'PostgreSQL', 'Three.js', 'Flutter', 'WooCommerce', 'GitHub Pages', 'Cloudflare'];
+const siteSv = services.find((x) => x.slug === 'strony-internetowe');
+const offer = siteSv ? { kind: 'offer' as const, service: siteSv, project: caseFor(siteSv, projects) } : null;
 const ownerPhoto = mediaUrl(settings.owner_photo_path?.value_meta?.path);
 const profileLd = { '@context': 'https://schema.org', '@type': 'ProfilePage', '@id': `${SITE}/o-mnie/#profile`, url: `${SITE}/o-mnie/`, name: title, description, inLanguage: 'pl', mainEntity: { '@id': PERSON_ID } };
 const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
@@ -30,6 +34,7 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
         <span class="kicker" data-i18n="about.kicker">O mnie</span>
         <h1 data-i18n="about.title">Damian Barabash — web developer i założyciel BarabashFlow</h1>
         <p class="lead" data-i18n="about.lead">Projektuję i buduję strony internetowe, sklepy, platformy i aplikacje webowe dla firm. Pracuję z Warszawy, dla klientów z Polski i zagranicy — po polsku, angielsku i rosyjsku.</p>
+        {offer && <OfferCta offer={offer} source="about-offer" />}
       </div>
     </section>
     <div class="divider" aria-hidden="true"></div>

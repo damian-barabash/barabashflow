@@ -21,6 +21,7 @@ export function mountShell() {
   setupProjectCards();
   setupCaseMedia();
   bindContactForms();
+  setupOfferLinks();
   setupCookieNotice();
   setupScrollTop();
   setupMascot();
@@ -263,6 +264,20 @@ function showSuccess(wrap: HTMLElement, form: HTMLFormElement, ref: string) {
     form.hidden = false; form.classList.remove('is-sent');
     form.querySelector<HTMLInputElement>('input[name=name]')?.focus();
   }, { once: true });
+}
+
+// Offer-block quote buttons: tag the footer form with where the click came from
+// (admin inbox shows it as `source`) and pre-fill the brief if the box is empty.
+function setupOfferLinks() {
+  document.querySelectorAll<HTMLAnchorElement>('a[data-offer-source]').forEach((a) => {
+    a.addEventListener('click', () => {
+      const form = document.querySelector<HTMLFormElement>('#contact form[data-contact-form]');
+      if (!form) return;
+      form.dataset.contactForm = a.dataset.offerSource!;
+      const msg = form.querySelector<HTMLTextAreaElement>('textarea[name=message]');
+      if (a.dataset.brief && msg && !msg.value.trim()) msg.value = t(a.dataset.brief);
+    });
+  });
 }
 
 export function bindContactForms() {

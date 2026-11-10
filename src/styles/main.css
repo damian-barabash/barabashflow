@@ -1299,3 +1299,31 @@ html.pt-cover #pt { visibility: visible; background: var(--dark); }
 .page-head.is-compact h1 { font-size: clamp(30px, 4vw, 52px); }
 .page-head.is-compact .lead { margin-top: 14px; }
 .sec-pad.is-tight { padding-top: clamp(16px, 2vw, 28px); }
+
+/* ── audit 2026-11-10 (Search Console): offer block = price, scope, case, quote ── */
+.offer-cta { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(14px, 2vw, 24px); align-items: stretch; text-align: left; padding: clamp(16px, 2vw, 22px); background: var(--white); border: 1px solid var(--border); border-left: 4px solid var(--lime); border-radius: 0 var(--r-lg) var(--r-lg) 0; box-shadow: var(--sh-card); }
+.post > .offer-cta { margin: clamp(24px, 3vw, 36px) 0 0; }
+.page-head .offer-cta { max-width: 980px; margin: clamp(24px, 3vw, 36px) auto 0; }
+
+.oc-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.oc-k { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.oc-t { margin: 0; font-family: var(--font-head); font-size: clamp(18px, 1.7vw, 22px); font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; color: var(--ink); }
+.oc-price { margin: 0; font-size: 14px; color: var(--body); }
+.oc-price b { margin-left: 4px; font-size: clamp(20px, 1.8vw, 24px); font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+.oc-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.oc-list li { position: relative; padding-left: 20px; font-size: 14.5px; line-height: 1.45; color: var(--ink-2); }
+.oc-list li::before { content: ''; position: absolute; left: 2px; top: 0.5em; width: 8px; height: 8px; border-radius: 2px; background: var(--lime-2); }
+.oc-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 6px; }
+.oc-link { font-size: 14px; font-weight: 600; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.oc-case { display: flex; flex-direction: column; gap: 10px; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); color: inherit; text-decoration: none; transition: transform 0.35s var(--ease), border-color 0.25s; }
+.oc-case:hover { transform: translateY(-2px); border-color: var(--border-2); }
+.oc-case img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 8px; background: var(--bg-2); }
+.oc-case .hc-body { padding: 0 4px 4px; }
+.oc-case:hover .hc-more svg { transform: translate(2px, -2px); }
+.post-body .offer-cta a, .offer-cta a.btn { text-decoration: none; }
+@media (max-width: 760px) {
+  .offer-cta { grid-template-columns: minmax(0, 1fr); }
+  .oc-case { flex-direction: row; align-items: center; }
+  .oc-case img { flex: none; width: 96px; aspect-ratio: 4 / 3; }
+  .oc-actions .btn { flex: 1 1 100%; justify-content: center; }
+}

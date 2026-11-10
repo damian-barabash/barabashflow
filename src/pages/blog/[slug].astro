@@ -4,15 +4,17 @@ import SiteHeader from '../../components/SiteHeader.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import { mediaUrl } from '../../lib/supabase';
 import { fetchAllPosts, formatDatePl, isoDate, wasUpdated, relatedPosts, renderMarkdown, clampTitle, clampDescription, type BlogPost } from '../../lib/blog';
-import { fetchSettings, fetchServices, type Service, type Settings } from '../../lib/content';
+import { fetchSettings, fetchServices, fetchProjects, type Service, type Settings } from '../../lib/content';
+import OfferCta from '../../components/OfferCta.astro';
+import { offerForPost, type Offer } from '../../lib/offer';
 import { SITE, AUTHOR_NAME, PERSON_ID, ORG_ID } from '../../lib/site';
 
 export async function getStaticPaths() {
-  const [posts, settings, services] = await Promise.all([fetchAllPosts(), fetchSettings(), fetchServices()]);
-  return posts.map((post) => ({ params: { slug: post.slug }, props: { post, related: relatedPosts(post, posts, 3), settings, services } }));
+  const [posts, settings, services, projects] = await Promise.all([fetchAllPosts(), fetchSettings(), fetchServices(), fetchProjects()]);
+  return posts.map((post) => ({ params: { slug: post.slug }, props: { post, related: relatedPosts(post, posts, 3), settings, services, offer: offerForPost(post, services, projects) } }));
 }
 
-const { post, related, settings, services } = Astro.props as { post: BlogPost; related: BlogPost[]; settings: Settings; services: Service[] };
+const { post, related, settings, services, offer } = Astro.props as { post: BlogPost; related: BlogPost[]; settings: Settings; services: Service[]; offer: Offer | null };
 const site = SITE;
 const url = `${site}/blog/${post.slug}/`;
 const coverUrl = post.cover_path ? mediaUrl(post.cover_path) : `${site}/assets/img/og.png`;
@@ -56,6 +58,8 @@ const jsonLd = [postLd, crumbsLd, ...(faqLd ? [faqLd] : [])];
             {updated && <><span aria-hidden="true">·</span><span><span data-i18n="blog.updated">Aktualizacja</span> <time datetime={isoDate(post.updated_at)}>{formatDatePl(post.updated_at!)}</time></span></>}
           </p>
         </header>
+
+        {offer && <OfferCta offer={offer} source={offer.kind === 'training' ? 'blog-training' : 'blog-offer'} />}
 
         {post.cover_path && (
           <figure class="post-cover-wrap">

@@ -1,0 +1,50 @@
+---
+// "Next step" block: starting price, what's included, one matching case and a
+// quote button. kind=training → pitch for training companies (Aino case);
+// kind=offer → service offer. mode=service is used on the service page itself
+// (button goes straight to the form instead of to the service page).
+import { projectCover, lmRow } from '../lib/content';
+import type { Offer } from '../lib/offer';
+import { t } from '../lib/i18n';
+export interface Props { offer: Offer; mode?: 'post' | 'service'; source: string }
+const { offer, mode = 'post', source } = Astro.props;
+const { kind, service: sv, project: p } = offer;
+const cover = p ? projectCover(p) : null;
+const training = kind === 'training';
+const bullets = training
+  ? ['offer.tr.b1', 'offer.tr.b2', 'offer.tr.b3']
+  : null;
+const arrow = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+---
+<aside class={`offer-cta is-${kind} is-${mode}`} aria-label="Oferta">
+  <div class="oc-main">
+    {training
+      ? <span class="oc-k" data-i18n="offer.tr.k">Dla firm szkoleniowych</span>
+      : <span class="oc-k" data-i18n={mode === 'service' ? 'offer.k.service' : 'offer.k'}>{mode === 'service' ? 'Cena i zakres' : 'Oferta'}</span>}
+    {training
+      ? <p class="oc-t" data-i18n="offer.tr.t">Projektuję strony dla firm szkoleniowych — z ofertą kursów i zapisami online</p>
+      : mode === 'post' && <p class="oc-t" {...lmRow(sv, 'title')}>{sv.title_pl}</p>}
+    {sv.price_from && <p class="oc-price"><span data-i18n="offer.from">Cena</span> <b>{sv.price_from}</b></p>}
+    <ul class="oc-list">
+      {bullets
+        ? bullets.map((k) => <li data-i18n={k}>{t(k)}</li>)
+        : sv.bullets_pl.map((b, j) => <li data-lm-pl={b} data-lm-en={sv.bullets_en[j] || b} data-lm-ru={sv.bullets_ru[j] || b}>{b}</li>)}
+    </ul>
+    <div class="oc-actions">
+      {training || mode === 'service'
+        ? <a class="btn btn-dark with-icon" href="#contact" data-offer-source={source} data-brief={training ? 'brief.training' : undefined}><span class="btn-ico" set:html={arrow} /><span data-i18n={training ? 'offer.tr.cta' : 'offer.quote'}>{training ? 'Wyceń stronę dla firmy szkoleniowej' : 'Wyceń projekt'}</span></a>
+        : <a class="btn btn-dark with-icon" href={`/uslugi/${sv.slug}/`}><span class="btn-ico" set:html={arrow} /><span data-i18n="offer.cta">Zobacz ofertę i wyceń stronę</span></a>}
+      {training && <a class="oc-link" href={`/uslugi/${sv.slug}/`} data-i18n="offer.see">Zobacz ofertę</a>}
+    </div>
+  </div>
+  {p && (
+    <a class="oc-case" href={`/projekty/${p.slug}/`}>
+      {cover && <img src={cover} alt="" loading="lazy" decoding="async" width="320" height="200" />}
+      <span class="hc-body">
+        <span class="hc-k"><span data-i18n="offer.case">Przykład realizacji</span> · {p.client || p.title_pl}</span>
+        {p.challenge_pl && <span class="hc-t" {...lmRow(p, 'challenge')}>{p.challenge_pl}</span>}
+        <span class="hc-more"><span data-i18n="hero.case.more">Zobacz, jak to rozwiązałem</span><Fragment set:html={arrow} /></span>
+      </span>
+    </a>
+  )}
+</aside>

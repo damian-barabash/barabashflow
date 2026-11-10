@@ -5,6 +5,8 @@ import Arrows from '../../components/Arrows.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import ProjectCard from '../../components/ProjectCard.astro';
 import ServiceCard from '../../components/ServiceCard.astro';
+import OfferCta from '../../components/OfferCta.astro';
+import { caseFor } from '../../lib/offer';
 import { sceneFor } from '../../lib/scenes';
 import { fetchSettings, fetchServices, fetchProjects, md, lmRow, type Service, type Project, type Settings } from '../../lib/content';
 import { SITE, ORG_ID } from '../../lib/site';
@@ -13,10 +15,10 @@ export async function getStaticPaths() {
   const [services, projects, settings] = await Promise.all([fetchServices(), fetchProjects(), fetchSettings()]);
   return services.map((service) => ({
     params: { slug: service.slug },
-    props: { service, services, settings, projects: projects.filter((p) => p.services.includes(service.slug)) },
+    props: { service, services, settings, projects: projects.filter((p) => p.services.includes(service.slug)), featured: caseFor(service, projects) },
   }));
 }
-const { service: sv, services, settings, projects } = Astro.props as { service: Service; services: Service[]; settings: Settings; projects: Project[] };
+const { service: sv, services, settings, projects, featured } = Astro.props as { service: Service; services: Service[]; settings: Settings; projects: Project[]; featured: Project | null };
 const title = `${sv.title_pl} — ${sv.price_from ? sv.price_from + ' | ' : ''}BarabashFlow`;
 const description = (sv.tagline_pl || '').slice(0, 158);
 const others = services.filter((x) => x.slug !== sv.slug);
@@ -49,6 +51,7 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
         <span class="kicker" data-i18n="nav.services">Usługi</span>
         <h1 {...lmRow(sv, 'title')}>{sv.title_pl}</h1>
         <p class="lead" {...lmRow(sv, 'tagline')}>{sv.tagline_pl}</p>
+        <OfferCta offer={{ kind: 'offer', service: sv, project: featured }} mode="service" source={`service-${sv.slug}`} />
       </div>
     </section>
     <div class="divider" aria-hidden="true"></div>
@@ -62,15 +65,6 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
           </div>
           <aside class="svc-aside">
             <div class="svc svc-solo is-live" aria-hidden="true"><div class="svc-stage"><div class={`svc-scene sc-${(idx % 4) + 1}`} set:html={sceneFor(idx)} /></div></div>
-            <div class="aside-card">
-              <h3 data-i18n="services.scope">Zakres</h3>
-              <ul>{sv.bullets_pl.map((b, j) => <li data-lm-pl={b} data-lm-en={sv.bullets_en[j] || b} data-lm-ru={sv.bullets_ru[j] || b}>{b}</li>)}</ul>
-            </div>
-            <div class="aside-card">
-              <h3 data-i18n="services.price">Cena</h3>
-              <div class="price">{sv.price_from || '—'}<small data-i18n="contact.hours">Odpowiadam w ciągu 24 godzin w dni robocze</small></div>
-              <a class="btn btn-dark is-block" href="#contact" data-i18n="services.cta">Zapytaj o wycenę</a>
-            </div>
           </aside>
         </div>
       </div>
