@@ -25,6 +25,11 @@ const trusted = projects.map((p) => ({ name: p.client || p.title_pl, slug: p.slu
 const stats: any[] = settings.home_stats?.value_meta?.items || [];
 const ownerPhoto = mediaUrl(settings.owner_photo_path?.value_meta?.path);
 const visionImg = projectCover(featured[0]);
+// Hero case (audit 2026-11-10): one real client task next to the H1. Picked in
+// admin → Strona (site_settings.hero_case); fallback = first featured with a task.
+const heroCaseSlug = settings.hero_case?.value_meta?.slug;
+const heroCase = projects.find((p) => p.slug === heroCaseSlug && p.challenge_pl) || featured.find((p) => p.challenge_pl) || projects.find((p) => p.challenge_pl);
+const heroCaseThumb = heroCase ? projectCover(heroCase) : null;
 
 const title = 'Strony, sklepy i platformy — Warszawa | BarabashFlow';
 const description = 'BarabashFlow, Warszawa: tworzenie stron internetowych, sklepów i platform na zamówienie. Kod na miarę, własny CMS, wycena projektu w 24 h — bez szablonów.';
@@ -98,6 +103,23 @@ const tagOf = (p: Project) => ({
             <div class="hero-copy">
               <h1 class="hero-h1" {...lm(settings, 'hero_title')}>{s(settings, 'hero_title', 'pl', 'Strony internetowe, sklepy i platformy na zamówienie — Warszawa')}</h1>
               <p class="hero-sub" data-lm-pl={heroSubShort.pl} data-lm-en={heroSubShort.en} data-lm-ru={heroSubShort.ru}>{heroSubShort.pl}</p>
+              <div class="hero-actions">
+                <a class="btn btn-dark with-icon" href="#contact">
+                  <span class="btn-ico"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                  <span data-i18n="hero.cta">Wyceń projekt</span>
+                </a>
+                <a class="btn btn-white" href="/projekty/" data-i18n="hero.work">Zobacz realizacje</a>
+              </div>
+              {heroCase && (
+                <a class="hero-case" href={`/projekty/${heroCase.slug}/`}>
+                  {heroCaseThumb && <img src={heroCaseThumb} alt="" width="120" height="75" loading="eager" decoding="async" />}
+                  <span class="hc-body">
+                    <span class="hc-k"><span data-i18n="projects.task">Zadanie klienta</span> · {heroCase.client || heroCase.title_pl}</span>
+                    <span class="hc-t" {...lmRow(heroCase, 'challenge')}>{heroCase.challenge_pl}</span>
+                    <span class="hc-more"><span data-i18n="hero.case.more">Zobacz, jak to rozwiązałem</span> <svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 11 11 3M11 3H5M11 3v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                  </span>
+                </a>
+              )}
             </div>
             <div class="hero-visual" aria-hidden="true">
               <span class="hero-word" {...lm(settings, 'hero_word_a')}>{s(settings, 'hero_word_a', 'pl', 'TWORZYMY')}</span>

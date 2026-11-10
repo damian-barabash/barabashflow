@@ -3,7 +3,7 @@
 // first = cover unless cover_path is set; case-study fields (client, year,
 // services, stack, results, tagline, long body); PL-first with AI fill of
 // EN/RU on save.
-import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, uploadImage, removeMedia, pickFile, autoTranslateRow, trio, readForm, ask, slugify } from './admin-core.js?v=2026-09-12b';
+import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, uploadImage, removeMedia, pickFile, autoTranslateRow, trio, readForm, ask, slugify } from './admin-core.js?v=2026-11-10a';
 
 const CATS = [['site', 'Strona'], ['shop', 'Sklep'], ['platform', 'Platforma'], ['app', 'Aplikacja'], ['panel', 'Panel'], ['other', 'Inne']];
 const CAT_LABEL = { site: ['Strona', 'Website', 'Сайт'], shop: ['Sklep', 'Store', 'Магазин'], platform: ['Platforma', 'Platform', 'Платформа'], app: ['Aplikacja', 'App', 'Приложение'], panel: ['Panel', 'Panel', 'Панель'], other: ['Projekt', 'Project', 'Проект'] };
@@ -73,6 +73,7 @@ function emptyDraft() {
   return {
     id: null, slug: '', title_pl: '', title_en: '', title_ru: '', category_key: 'site', category_pl: 'Strona', category_en: 'Website', category_ru: 'Сайт',
     tagline_pl: '', tagline_en: '', tagline_ru: '', description_pl: '', description_en: '', description_ru: '', body_pl: '', body_en: '', body_ru: '',
+    challenge_pl: '', challenge_en: '', challenge_ru: '', testimonial_pl: '', testimonial_en: '', testimonial_ru: '', testimonial_author: '',
     url: '', client: '', year: new Date().getFullYear(), services: [], stack: [], results: [], accent_color: '#030712', cover_path: null,
     sort_order: state.projects.length + 1, is_published: true, is_featured: false,
   };
@@ -118,6 +119,13 @@ export function openEditor(id) {
         <label class="check"><input type="checkbox" data-f="is_published" ${d.is_published ? 'checked' : ''} /> Opublikowany na stronie</label>
         <label class="check"><input type="checkbox" data-f="is_featured" ${d.is_featured ? 'checked' : ''} /> Wyróżniony na stronie głównej (max 4)</label>
       </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="section-title">Zadanie klienta i opinia</span><span class="section-aside">zadanie — nad technologiami na stronie projektu i w hero (jeśli wybrany w Strona)</span></div>
+      <div class="field"><label class="field-label">Zadanie klienta — 1–2 zdania: czego potrzebował biznes</label>${trio('challenge', d, { textarea: true, rows: 3, placeholder: 'Jeden serwis dla salonu, który prowadzi klienta do umówienia wizyty i jazdy próbnej…' })}</div>
+      <div class="field"><label class="field-label">Opinia klienta (tylko prawdziwa, za zgodą — pusta = blok ukryty)</label>${trio('testimonial', d, { textarea: true, rows: 3 })}</div>
+      <div class="field"><label class="field-label">Autor opinii</label><input data-f="testimonial_author" value="${attr(d.testimonial_author)}" placeholder="np. Jan Kowalski, dyrektor salonu" /></div>
     </div>
 
     <div class="section">
@@ -184,7 +192,7 @@ export function openEditor(id) {
     collectDraft();
     banner('Tłumaczenie…', null);
     try {
-      const n = await autoTranslateRow(P.draft, ['title', 'tagline', 'category', 'description', 'body'], 'karta projektu w portfolio studia web-developmentu (tytuł, jedno zdanie, etykieta typu, opis)', true);
+      const n = await autoTranslateRow(P.draft, ['title', 'tagline', 'category', 'challenge', 'testimonial', 'description', 'body'], 'karta projektu w portfolio studia web-developmentu (tytuł, jedno zdanie, etykieta typu, opis)', true);
       for (const r of P.draft.results) await autoTranslateRow(r, ['label'], 'krótki podpis pod liczbą-efektem projektu', true);
       openEditorKeepScroll();
       banner(`Przetłumaczono ${n} pól — sprawdź i zapisz`, 'ok');
@@ -296,7 +304,7 @@ async function saveProject() {
   try {
     try {
       banner('Tłumaczenie PL → EN/RU…', null);
-      await autoTranslateRow(d, ['title', 'tagline', 'category', 'description', 'body'], 'karta projektu w portfolio studia web-developmentu');
+      await autoTranslateRow(d, ['title', 'tagline', 'category', 'challenge', 'testimonial', 'description', 'body'], 'karta projektu w portfolio studia web-developmentu');
       for (const r of d.results) if (r.label_pl) await autoTranslateRow(r, ['label'], 'krótki podpis pod liczbą-efektem projektu');
     } catch (e) { console.warn('translate', e); banner('Tłumaczenie niedostępne — zapisuję bez niego', null); }
 
@@ -306,6 +314,8 @@ async function saveProject() {
       tagline_pl: d.tagline_pl || null, tagline_en: d.tagline_en || null, tagline_ru: d.tagline_ru || null,
       description_pl: d.description_pl || null, description_en: d.description_en || null, description_ru: d.description_ru || null,
       body_pl: d.body_pl || null, body_en: d.body_en || null, body_ru: d.body_ru || null,
+      challenge_pl: d.challenge_pl || null, challenge_en: d.challenge_en || null, challenge_ru: d.challenge_ru || null,
+      testimonial_pl: d.testimonial_pl || null, testimonial_en: d.testimonial_en || null, testimonial_ru: d.testimonial_ru || null, testimonial_author: d.testimonial_author || null,
       url: d.url || null, client: d.client || null, year: d.year || null, services: d.services, stack: d.stack,
       results: d.results.filter((r) => r.value), accent_color: d.accent_color || null,
       sort_order: d.sort_order ?? 0, is_published: !!d.is_published, is_featured: !!d.is_featured, cover_path: d.cover_path || null,

@@ -21,6 +21,8 @@ export interface Project {
   url?: string | null; accent_color?: string | null; sort_order: number; is_published: boolean; is_featured: boolean;
   client?: string | null; year?: number | null; services: string[]; stack: string[];
   results: { value: string; label_pl?: string; label_en?: string; label_ru?: string }[];
+  challenge_pl?: string | null; challenge_en?: string | null; challenge_ru?: string | null;
+  testimonial_pl?: string | null; testimonial_en?: string | null; testimonial_ru?: string | null; testimonial_author?: string | null;
   cover_path?: string | null;
   photos: Photo[];
 }

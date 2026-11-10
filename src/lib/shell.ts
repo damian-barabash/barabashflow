@@ -312,11 +312,12 @@ export function bindContactForms() {
 }
 
 // ── mascot bot ──────────────────────────────────────────────────────────────
-// Floating helper bottom-left: opens by itself after MASCOT_DELAY (once per
-// session), types the greeting, takes a question + e-mail → contact_submissions
-// (source 'mascot-bot'), shows an in-card success with a BF-ref. Closing
-// leaves a small avatar button to reopen it.
-const MASCOT_DELAY = 30_000; // counted from the first page of the visit, across page loads
+// Floating helper bottom-left: opens ONLY on click (audit 2026-11-10 — the
+// auto-open covered the contact form's submit button), types the greeting,
+// takes a question + e-mail → contact_submissions (source 'mascot-bot'), shows
+// an in-card success with a BF-ref. Not rendered on /kontakt/ (the page is the
+// form); elsewhere the avatar button steps aside while a form's submit button
+// is on screen.
 function typewrite(el: HTMLElement, text: string, speed = 22, done?: () => void) {
   el.classList.add('is-typing');
   el.textContent = '';
@@ -329,7 +330,7 @@ function typewrite(el: HTMLElement, text: string, speed = 22, done?: () => void)
 }
 function setupMascot() {
   const root = document.getElementById('mascot');
-  if (!root) return;
+  if (!root || /^\/kontakt\/?$/.test(location.pathname)) return;
   const KEY = 'bf:mascot-dismissed';
   const card = root.querySelector<HTMLElement>('.mascot-card')!;
   const bubble = root.querySelector<HTMLElement>('[data-typewrite]')!;
@@ -354,12 +355,16 @@ function setupMascot() {
   root.querySelector('[data-mascot-close]')?.addEventListener('click', () => close());
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && root.classList.contains('is-open')) close(); });
   onLocaleChange(() => { if (typed && !bubble.classList.contains('is-typing')) bubble.textContent = greeting(); });
-  let dismissed = false;
-  try { dismissed = sessionStorage.getItem(KEY) === '1'; } catch {}
-  let since = Date.now();
-  try { since = Number(sessionStorage.getItem('bf:visit-start')) || since; sessionStorage.setItem('bf:visit-start', String(since)); } catch {}
-  const wait = Math.max(1500, MASCOT_DELAY - (Date.now() - since));
-  if (!dismissed && !(navigator as any).webdriver) setTimeout(() => { if (!root.classList.contains('is-open') && !document.querySelector('.rcp') && !document.querySelector('.menu-open') && document.getElementById('reel')?.hidden !== false) open(); }, wait);
+  // Keep the avatar button off any visible form submit button.
+  const submits = Array.from(document.querySelectorAll<HTMLElement>('[data-contact-form] button[type=submit]'));
+  if (submits.length && 'IntersectionObserver' in window) {
+    const seen = new Set<Element>();
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((en) => { if (en.isIntersecting) seen.add(en.target); else seen.delete(en.target); });
+      root.classList.toggle('is-tucked', seen.size > 0 && !root.classList.contains('is-open'));
+    });
+    submits.forEach((b) => io.observe(b));
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

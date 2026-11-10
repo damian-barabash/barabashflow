@@ -23,6 +23,8 @@ const cover = projectCover(p);
 const gallery = p.photos.filter((ph) => mediaUrl(ph.storage_path) !== cover);
 const tag = { pl: p.tagline_pl || firstSentence(p.description_pl), en: p.tagline_en || firstSentence(p.description_en) || p.tagline_pl || firstSentence(p.description_pl), ru: p.tagline_ru || firstSentence(p.description_ru) || p.tagline_pl || firstSentence(p.description_pl) };
 const body = { pl: md(p.body_pl || textToMd(p.description_pl)), en: md(p.body_en || textToMd(p.description_en)), ru: md(p.body_ru || textToMd(p.description_ru)) };
+const task = p.challenge_pl ? { 'data-lm-pl': p.challenge_pl, 'data-lm-en': p.challenge_en || p.challenge_pl, 'data-lm-ru': p.challenge_ru || p.challenge_pl } : null;
+const quote = p.testimonial_pl ? { 'data-lm-pl': p.testimonial_pl, 'data-lm-en': p.testimonial_en || p.testimonial_pl, 'data-lm-ru': p.testimonial_ru || p.testimonial_pl } : null;
 const svcOf = (slug: string) => services.find((sv) => sv.slug === slug);
 const title = `${p.title_pl} — ${p.category_pl || 'projekt'} | BarabashFlow`;
 const description = (tag.pl || '').slice(0, 158);
@@ -60,6 +62,12 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
             <span class="kicker" {...categoryLm(p)}>{p.category_pl}</span>
             <h1 style="margin-top:18px" {...lmRow(p, 'title')}>{p.title_pl}</h1>
             <p class="lead" data-lm-pl={tag.pl} data-lm-en={tag.en} data-lm-ru={tag.ru}>{tag.pl}</p>
+            {task && (
+              <div class="proj-task">
+                <span class="proj-task-k" data-i18n="projects.task">Zadanie klienta</span>
+                <p {...task}>{p.challenge_pl}</p>
+              </div>
+            )}
           </div>
           <dl class="proj-meta">
             {p.client && <div><dt data-i18n="projects.client">Klient</dt><dd>{p.client}</dd></div>}
@@ -72,6 +80,26 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
         {cover && <div class="proj-cover"><img src={cover} alt={p.photos[0]?.alt_pl || p.title_pl} loading="eager" decoding="async" /></div>}
       </div>
     </section>
+
+    {p.results.length > 0 && (
+      <section class="sec">
+        <div class="sec-inner results-wrap">
+          <span class="results-k" data-i18n="projects.results">Efekt</span>
+          <ul class="results-row">
+            {p.results.map((r) => <li><b>{r.value}</b><span {...lmRow(r, 'label')}>{r.label_pl}</span></li>)}
+          </ul>
+        </div>
+      </section>
+    )}
+
+    {quote && (
+      <section class="sec">
+        <figure class="sec-inner proj-quote">
+          <blockquote {...quote}>{p.testimonial_pl}</blockquote>
+          {p.testimonial_author && <figcaption>— {p.testimonial_author}</figcaption>}
+        </figure>
+      </section>
+    )}
 
     <section class="sec">
       <div class="sec-inner text-area">
@@ -86,14 +114,6 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
         </div>
       </div>
     </section>
-
-    {p.results.length > 0 && (
-      <section class="sec">
-        <ul class="sec-inner results-row">
-          {p.results.map((r) => <li><b>{r.value}</b><span {...lmRow(r, 'label')}>{r.label_pl}</span></li>)}
-        </ul>
-      </section>
-    )}
 
     {gallery.length > 0 && (
       <section class="sec">

@@ -1,8 +1,8 @@
 // Wiadomości — every enquiry from the site forms (home/footer/kontakt).
 // Read/replied/archive flags, internal note, reply via mail client, one-click
 // "add to CRM" (creates the client + a timeline entry and links the message).
-import { sb, $, $$, banner, escapeHtml, attr, fmtDate, ask } from './admin-core.js?v=2026-09-12b';
-import { upsertClientFromMessage, openClient } from './admin-crm.js?v=2026-09-12b';
+import { sb, $, $$, banner, escapeHtml, attr, fmtDate, ask } from './admin-core.js?v=2026-11-10a';
+import { upsertClientFromMessage, openClient } from './admin-crm.js?v=2026-11-10a';
 
 const I = { items: [], filter: 'inbox' };
 

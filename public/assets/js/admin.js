@@ -1,11 +1,11 @@
 // BarabashFlow admin — entry point. Auth, tabs, Strona (site settings +
 // stats + FAQ), Blog (AI autopilot), Statystyki; the collection editors live
 // in admin-projects / admin-services / admin-inbox / admin-crm.
-import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, MEDIA_BUCKET, uploadImage, removeMedia, pickFile, translateItems, readForm } from './admin-core.js?v=2026-09-12b';
-import { loadProjects, bindProjectsUI, renderProjectList } from './admin-projects.js?v=2026-09-12b';
-import { loadServices, loadFaq, bindServicesUI, renderServiceList, renderFaq } from './admin-services.js?v=2026-09-12b';
-import { loadInbox, bindInboxUI, renderInbox } from './admin-inbox.js?v=2026-09-12b';
-import { loadCrm, bindCrmUI, renderCrm, openClient } from './admin-crm.js?v=2026-09-12b';
+import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, MEDIA_BUCKET, uploadImage, removeMedia, pickFile, translateItems, readForm } from './admin-core.js?v=2026-11-10a';
+import { loadProjects, bindProjectsUI, renderProjectList } from './admin-projects.js?v=2026-11-10a';
+import { loadServices, loadFaq, bindServicesUI, renderServiceList, renderFaq } from './admin-services.js?v=2026-11-10a';
+import { loadInbox, bindInboxUI, renderInbox } from './admin-inbox.js?v=2026-11-10a';
+import { loadCrm, bindCrmUI, renderCrm, openClient } from './admin-crm.js?v=2026-11-10a';
 
 init().catch((err) => console.error('[admin] init failed', err));
 
@@ -109,9 +109,18 @@ function renderSettings() {
     const row = state.settings[el.dataset.setting];
     el.value = row ? (row[`value_${el.dataset.lang}`] || '') : '';
   });
+  paintHeroCase();
   const photoPath = state.settings.owner_photo_path?.value_meta?.path;
   paintOwnerPhoto(photoPath ? mediaUrl(photoPath) : null);
   state.pendingOwnerPhoto = null; state.removeOwnerPhoto = false;
+}
+// Hero case picker: any published project with a client task (challenge_pl).
+async function paintHeroCase() {
+  const sel = $('#hero-case-select'); if (!sel) return;
+  const { data } = await sb.from('projects').select('slug,title_pl,challenge_pl').eq('is_published', true).order('sort_order');
+  const cur = state.settings.hero_case?.value_meta?.slug || '';
+  sel.innerHTML = '<option value="">— automatycznie (pierwszy wyróżniony) —</option>' + (data || []).map((p) =>
+    `<option value="${attr(p.slug)}" ${p.slug === cur ? 'selected' : ''} ${p.challenge_pl ? '' : 'disabled'}>${escapeHtml(p.title_pl)}${p.challenge_pl ? '' : ' (brak zadania klienta)'}</option>`).join('');
 }
 function paintOwnerPhoto(url) {
   const slot = $('#owner-photo-slot');
@@ -161,6 +170,8 @@ async function saveSettings() {
     if (state.pendingOwnerPhoto) { const path = await uploadImage(state.pendingOwnerPhoto, 'owner'); if (ownerMeta.path && ownerMeta.path !== path) await removeMedia(ownerMeta.path).catch(() => {}); ownerMeta = { path }; }
     else if (state.removeOwnerPhoto) { if (ownerMeta.path) await removeMedia(ownerMeta.path).catch(() => {}); ownerMeta = {}; }
     upserts.push({ key: 'owner_photo_path', value_meta: ownerMeta });
+    const heroCase = $('#hero-case-select');
+    if (heroCase) upserts.push({ key: 'hero_case', value_meta: heroCase.value ? { slug: heroCase.value } : {} });
     // stats (translate labels)
     syncStats();
     const items = statsDraft();

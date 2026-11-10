@@ -1,5 +1,6 @@
 ---
-// Contact page: three fact cards + the light form card; the dark footer
+// Contact page: the light form card first (audit 2026-11-10: form above the
+// fold), fact cards + dot tile beside it (below on phones); the dark footer
 // contact block is skipped here (the form IS the page).
 import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
@@ -22,7 +23,7 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
   <SiteHeader active="contact" />
   <main class="container">
     <section class="sec">
-      <div class="sec-inner page-head">
+      <div class="sec-inner page-head is-compact">
         <Arrows />
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">BarabashFlow</a><span>/</span><span data-i18n="nav.contact">Kontakt</span></nav>
         <span class="kicker"><span class="status-dot" aria-hidden="true" style="margin-right:6px"></span><span data-i18n="meta.available">Dostępny</span></span>
@@ -30,11 +31,14 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
         <p class="lead" data-i18n="contact.page.lead">Opisz pomysł w kilku zdaniach — w ciągu 24 godzin odpiszę z planem, zakresem i wyceną. Strona, sklep, platforma czy panel: zaczynamy od rozmowy.</p>
       </div>
     </section>
-    <div class="divider" aria-hidden="true"></div>
     <section class="sec" id="contact">
-      <div class="sec-inner is-grey sec-pad">
-        <div class="dot-strip"><div class="dot-tile" data-dots="24H|HI!|BF"><canvas aria-hidden="true"></canvas><span class="dt-k">■ <span data-i18n="contact.page.reply">Czas odpowiedzi</span></span><span class="dt-hint" data-i18n="dots.hint">Porusz kursorem</span><span class="dt-meta" data-i18n="contact.page.reply.v">do 24 godzin w dni robocze</span></div></div>
-        <dl class="contact-facts">
+      <div class="sec-inner is-grey sec-pad is-tight">
+        <div class="contact-layout">
+          <div class="cl-form">
+          <ContactForm source="kontakt-page" variant="light" id="cf-page" />
+          </div>
+          <aside class="cl-aside">
+        <dl class="contact-facts is-stack">
           <div class="fact">
             <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18v12H3z"/><path d="m3 7 9 6 9-6"/></svg></span>
             <dt data-i18n="contact.page.email">E-mail</dt>
@@ -51,7 +55,9 @@ const crumbsLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', 
             <dd data-i18n="contact.page.location.v">Warszawa, Polska — zdalnie dla klientów z całego świata</dd>
           </div>
         </dl>
-        <ContactForm source="kontakt-page" variant="light" id="cf-page" />
+        <div class="dot-strip"><div class="dot-tile" data-dots="24H|HI!|BF"><canvas aria-hidden="true"></canvas><span class="dt-k">■ <span data-i18n="contact.page.reply">Czas odpowiedzi</span></span><span class="dt-hint" data-i18n="dots.hint">Porusz kursorem</span><span class="dt-meta" data-i18n="contact.page.reply.v">do 24 godzin w dni robocze</span></div></div>
+          </aside>
+        </div>
       </div>
     </section>
   </main>
