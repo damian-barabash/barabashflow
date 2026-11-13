@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
+import ProjectReel from '../components/ProjectReel.astro';
 import FaqList from '../components/FaqList.astro';
 import BlogCard from '../components/BlogCard.astro';
 import ServiceCard from '../components/ServiceCard.astro';
@@ -20,6 +21,7 @@ const [settings, services, projects, faq, posts] = await Promise.all([
   fetchSettings(), fetchServices(), fetchProjects(), fetchFaq('home'),
   restGet<BlogPost>('blog_posts?select=slug,title_pl,title_en,title_ru,excerpt_pl,excerpt_en,excerpt_ru,cover_path,cover_alt,published_at,tags&status=eq.published&order=published_at.desc&limit=3'),
 ]);
+const reelProjects = projects.slice(0, 10);
 const featured = (projects.filter((p) => p.is_featured).length ? projects.filter((p) => p.is_featured) : projects).slice(0, 4);
 const trusted = projects.map((p) => ({ name: p.client || p.title_pl, slug: p.slug })).filter((x, i, a) => a.findIndex((y) => y.name === x.name) === i && !/barabash/i.test(x.name)).slice(0, 6);
 const stats: any[] = settings.home_stats?.value_meta?.items || [];
@@ -259,36 +261,8 @@ const tagOf = (p: Project) => ({
       </section>
       <div class="divider" aria-hidden="true"></div>
 
-      <!-- ── FEATURED PROJECTS ────────────────────────────────────────── -->
-      <section class="sec" id="projekty">
-        <div class="sec-inner is-grey sec-pad">
-          <div class="sec-head is-split">
-            <div>
-              <span class="kicker is-white" data-i18n="home.projects.kicker">Projekty</span>
-              <h2 class="h-sec" style="margin-top:18px" data-i18n="home.projects.title">Wybrane realizacje</h2>
-            </div>
-            <a class="btn btn-white" href="/projekty/" data-i18n="home.projects.all">Wszystkie projekty</a>
-          </div>
-          <div class="feat-list">
-            {featured.map((p) => { const cover = projectCover(p); const tg = tagOf(p); return (
-              <article class="feat" data-reveal>
-                <a class="feat-media" href={`/projekty/${p.slug}/`}>
-                  {cover ? <img src={cover} alt={p.title_pl} loading="lazy" decoding="async" /> : <div class="tile-pattern" style="position:absolute;inset:0"><span class="tp-label">{p.title_pl}</span></div>}
-                  <span class="corner" aria-hidden="true"></span>
-                </a>
-                <div class="feat-body">
-                  <div>
-                    <span class="cat" {...categoryLm(p)}>{p.category_pl}</span>
-                    <h3><a href={`/projekty/${p.slug}/`} {...lmRow(p, 'title')}>{p.title_pl}</a></h3>
-                    <p class="desc" data-lm-pl={tg.pl} data-lm-en={tg.en} data-lm-ru={tg.ru}>{tg.pl}</p>
-                    <a class="feat-view" href={`/projekty/${p.slug}/`}><span data-i18n="home.projects.view">Zobacz projekt</span><svg viewBox="0 0 18 18" fill="none"><path d="M18 0v13.5h-1.5V2.5L1 18l-1-1L15.4 1.5H4.5V0z" fill="currentColor"/></svg></a>
-                  </div>
-                </div>
-              </article>
-            ); })}
-          </div>
-        </div>
-      </section>
+      <!-- ── PROJECT REEL (pinned drum, lib/reel.ts) ──────────────────── -->
+      <ProjectReel projects={reelProjects} total={projects.length} />
       <div class="divider" aria-hidden="true"></div>
 
       <!-- ── PROCESS ──────────────────────────────────────────────────── -->
@@ -399,11 +373,13 @@ const tagOf = (p: Project) => ({
   <script>
     import { mountShell } from '../lib/shell';
     import { mountLogo3D } from '../lib/logo3d';
+    import { setupProjectReel } from '../lib/reel';
     import { setupHeroWidgets, setupReel, setupReelInline } from '../lib/fx';
     mountShell();
     setupHeroWidgets();
     setupReel();
     setupReelInline();
+    setupProjectReel();
     // 3D mark after first paint — three.js is a separate lazy chunk.
     if ('requestIdleCallback' in window) (window as any).requestIdleCallback(() => mountLogo3D(), { timeout: 1200 });
     else setTimeout(() => mountLogo3D(), 300);

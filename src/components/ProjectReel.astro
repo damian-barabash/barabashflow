@@ -1,0 +1,78 @@
+---
+// Project reel: a pinned "drum" of project covers driven by page scroll
+// (desktop) / a curved native swipe track (phones). All content is static
+// HTML (titles, tasks, links) — the motion layer is src/lib/reel.ts.
+import { type Project, projectCover, categoryLm, lmRow, firstSentence } from '../lib/content';
+export interface Props { projects: Project[]; total?: number; showAll?: boolean; id?: string }
+const { projects: all, total, showAll = true, id = 'projekty' } = Astro.props;
+const projects = all.filter((p) => projectCover(p));
+const N = projects.length;
+const pad = (n: number) => String(n).padStart(2, '0');
+const textOf = (p: Project) => {
+  const pl = p.challenge_pl || p.tagline_pl || firstSentence(p.description_pl);
+  return {
+    pl,
+    en: p.challenge_en || p.tagline_en || firstSentence(p.description_en) || pl,
+    ru: p.challenge_ru || p.tagline_ru || firstSentence(p.description_ru) || pl,
+  };
+};
+const ARROW = '<svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M18 0v13.5h-1.5V2.5L1 18l-1-1L15.4 1.5H4.5V0z" fill="currentColor"/></svg>';
+---
+{N > 0 && (
+<section class="sec" id={id}>
+  <div class="preel" data-preel style={`--n:${N}`}>
+    <div class="preel-stage">
+      <div class="preel-band" aria-hidden="true">
+        <div class="preel-band-row">
+          {projects.map((p, i) => <span class="preel-band-w" data-i={i}>{p.title_pl}</span>)}
+        </div>
+      </div>
+
+      <div class="preel-top">
+        <span class="kicker is-white" data-i18n="home.projects.title">Wybrane realizacje</span>
+        <span class="preel-count"><b data-preel-idx>01</b> / {pad(N)}</span>
+        {showAll && <a class="preel-all" href="/projekty/"><span data-i18n="home.projects.all">Wszystkie projekty</span>{total ? ` (${total})` : ''} <Fragment set:html={ARROW} /></a>}
+      </div>
+
+      <ol class="preel-list">
+        {projects.map((p, i) => (
+          <li data-i={i}>
+            <a href={`/projekty/${p.slug}/`} data-preel-go={i}>
+              <span class="pl-n">{pad(i + 1)}</span>
+              <span class="pl-t" {...lmRow(p, 'title')}>{p.title_pl}</span>
+              <span class="pl-c" {...categoryLm(p)}>{p.category_pl}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
+
+      <div class="preel-drum" data-preel-drum>
+        <div class="preel-track" data-preel-track>
+        {projects.map((p, i) => (
+          <a class="preel-card" href={`/projekty/${p.slug}/`} data-i={i} aria-label={p.title_pl} tabindex={i === 0 ? 0 : -1}>
+            <span class="pc-in">
+              <img data-src={projectCover(p)} src={i === 0 ? projectCover(p) : undefined} alt={p.photos[0]?.alt_pl || p.title_pl} width="2000" height="1250" decoding="async" />
+            </span>
+          </a>
+        ))}
+        </div>
+        <span class="preel-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </div>
+
+      <div class="preel-info">
+        {projects.map((p, i) => { const tx = textOf(p); return (
+          <div class="pi" data-i={i}>
+            <span class="pi-meta"><span {...categoryLm(p)}>{p.category_pl}</span>{p.client ? <> · {p.client}</> : null}</span>
+            <h3 class="pi-t"><a href={`/projekty/${p.slug}/`} {...lmRow(p, 'title')}>{p.title_pl}</a></h3>
+            {tx.pl && <p class="pi-d"><span class="pi-k" data-i18n="projects.task">Zadanie klienta</span> <span data-lm-pl={tx.pl} data-lm-en={tx.en} data-lm-ru={tx.ru}>{tx.pl}</span></p>}
+            <a class="pi-go" href={`/projekty/${p.slug}/`}><span data-i18n="home.projects.view">Zobacz projekt</span> <Fragment set:html={ARROW} /></a>
+          </div>
+        ); })}
+      </div>
+
+      <div class="preel-prog" aria-hidden="true"><i data-preel-prog></i></div>
+      <span class="preel-hint" aria-hidden="true"><span class="h-d" data-i18n="reel.hint">Przewiń</span><span class="h-m" data-i18n="reel.swipe">Przesuń</span></span>
+    </div>
+  </div>
+</section>
+)}
