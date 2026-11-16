@@ -52,7 +52,7 @@ const DEFAULTS = {
   industries: Object.keys(INDUSTRIES), voivodeships: [] as string[],
   from_name: 'Damian Barabash', from_email: 'office@barabashflow.pl',
   reply_to: 'dmytrii.barabash@gmail.com', bcc: 'dmytrii.barabash@gmail.com',
-  signature: 'Damian Barabash\nBarabashFlow — strony, sklepy i platformy na zamówienie\nbarabashflow.pl',
+  signature: 'Damian Barabash\nBarabashFlow · strony, sklepy i platformy na zamówienie\nbarabashflow.pl',
   instructions: '', test_mode: false,
 };
 type Cfg = typeof DEFAULTS;
@@ -339,14 +339,15 @@ async function compose(svc: any, cfg: Cfg, lead: any, instruction: string) {
     },
   };
   const r = await claudeJson(svc, 'leads-compose', 'sonnet',
-    `Piszesz pierwszy e-mail od Damiana Barabasha (BarabashFlow, Warszawa — sam projektuje i wdraża strony, sklepy i platformy webowe) do świeżo zarejestrowanej firmy. Cel: konkretna, krótka propozycja dopasowana do TEJ firmy, na którą chce się odpisać.
+    `Piszesz pierwszy e-mail od Damiana Barabasha (BarabashFlow, Warszawa; sam projektuje i wdraża strony, sklepy i platformy webowe) do świeżo zarejestrowanej firmy. Cel: konkretna, krótka propozycja dopasowana do TEJ firmy, na którą chce się odpisać.
 Zasady:
-- Po polsku, forma "Państwo" (spółka) — uprzejmie, po ludzku, bez korpo-żargonu i bez wazeliny. Bez emoji, bez markdown, bez wykrzykników w nadmiarze.
-- 80–130 słów, 3–4 krótkie akapity oddzielone JEDNĄ pustą linią. Żadnych podwójnych pustych linii, list punktowanych ani długich odstępów.
-- Akapit 1: "Dzień dobry," + jedno zdanie: zauważyłem, że firma niedawno wystartowała (nazwa, czym się zajmuje — z PKD, naturalnie, bez cytowania kodów).
-- Akapit 2: konkretnie, co strona/sklep/system dałby właśnie im (np. rezerwacje online, galeria realizacji, formularz wyceny, katalog produktów) — 2 zdania, z sensem dla branży.
-- Akapit 3: jeden pasujący przykład realizacji z listy (sama nazwa, bez linku) ORAZ cena i czas: odpowiednia usługa "od X zł netto", typowo gotowe w 2–3 tygodnie. Potem zdanie z linkiem do strony przygotowanej specjalnie dla nich — wstaw dokładnie znacznik {{LINK}} (np. "Krótką propozycję dla [nazwa firmy] z wyceną i przykładem przygotowałem tutaj: {{LINK}}"). Żadnych innych linków.
-- Akapit 4: proste wezwanie — "Jeśli to temat na teraz, wystarczy odpisać — przygotuję wycenę w 24 h."
+- Po polsku, forma "Państwo" konsekwentnie w całym mailu ("mają Państwo", "u Państwa"; nigdy "macie", "wasz", "Ty"), uprzejmie, po ludzku, bez korpo-żargonu i bez wazeliny. Bez emoji, bez markdown, bez wykrzykników w nadmiarze.
+- 80-130 słów, 3-4 krótkie akapity oddzielone JEDNĄ pustą linią. Żadnych podwójnych pustych linii, list punktowanych ani długich odstępów.
+- Akapit 1: "Dzień dobry," + jedno zdanie: zauważyłem, że firma niedawno wystartowała (nazwa, czym się zajmuje według PKD, naturalnie, bez cytowania kodów).
+- Akapit 2: konkretnie, co strona/sklep/system dałby właśnie im (np. rezerwacje online, galeria realizacji, formularz wyceny, katalog produktów), 2 zdania, z sensem dla branży.
+- Akapit 3: jeden pasujący przykład realizacji z listy (sama nazwa, bez linku) ORAZ cena i czas: odpowiednia usługa "od X zł netto", typowo gotowe w 2-3 tygodnie. Potem zdanie z linkiem do strony przygotowanej specjalnie dla nich — wstaw dokładnie znacznik {{LINK}} (np. "Krótką propozycję dla [nazwa firmy] z wyceną i przykładem przygotowałem tutaj: {{LINK}}"). Żadnych innych linków.
+- Akapit 4: proste wezwanie, np. "Jeśli to temat na teraz, wystarczy odpisać, a przygotuję wycenę w 24 h."
+- ZAKAZ: nigdy nie używaj długiego myślnika (—) ani półpauzy (–), ani w treści, ani w temacie, ani w landing. Zamiast nich przecinek, kropka, dwukropek albo nawias; zakresy liczb z łącznikiem (2-3 tygodnie).
 - NIE dopisuj podpisu ani stopki (dodam je sam). Nie wymyślaj faktów o firmie ani wyników projektów.
 - Temat: krótki (do 60 znaków), konkretny, z nazwą firmy lub branżą, bez clickbaitu i bez "Oferta".
 - landing = treść osobistej strony z propozycją (ta sama obietnica co w mailu): headline (do 70 znaków, z nazwą firmy, np. "Strona z rezerwacjami dla Beztroskiej Zatoki"), intro (2–3 zdania do nich, forma "Państwo"), bullets (dokładnie 3 konkretne elementy, co zbuduję dla nich, każdy do 110 znaków), est_type + est_features (ustawienia kalkulatora pasujące do propozycji), case_slug (ten sam przykład co w mailu), service_slug (usługa, której dotyczy cena).
@@ -359,16 +360,27 @@ REALIZACJE: ${(projects || []).map((p: any) => `${p.slug} (${p.client || p.title
   const clean = String(r.body || '').replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   const landing = r.landing || null;
   if (landing) landing.bullets = (landing.bullets || []).slice(0, 3);
-  return { subject: String(r.subject || '').trim().slice(0, 120), body: withLink(clean, lead.public_token), landing };
+  if (landing) {
+    for (const k of ['headline', 'intro'] as const) landing[k] = noDash(landing[k]);
+    landing.bullets = (landing.bullets || []).map(noDash);
+  }
+  return { subject: noDash(String(r.subject || '').trim()).slice(0, 120), body: withLink(noDash(clean), lead.public_token), landing };
 }
 
 // ── send ────────────────────────────────────────────────────────────────────
 // Always present (code, not AI): where to see the work + the site link.
-const PORTFOLIO_LINE = 'Wszystkie moje realizacje — strony, sklepy i platformy — można zobaczyć na https://barabashflow.pl/projekty/';
+const PORTFOLIO_LINE = 'Wszystkie moje realizacje (strony, sklepy i platformy) można zobaczyć na https://barabashflow.pl/projekty/';
 function footer(cfg: Cfg, source: string) {
   const reg = source === 'ceidg' ? 'CEIDG' : 'KRS';
-  return `${PORTFOLIO_LINE}\n\n${cfg.signature}\n\nAdres pochodzi z publicznego rejestru ${reg}. Jeśli to nie temat dla Państwa, wystarczy odpisać „NIE” — więcej nie napiszę.`;
+  return `${PORTFOLIO_LINE}\n\n${cfg.signature}\n\nAdres pochodzi z publicznego rejestru ${reg}. Jeśli to nie temat dla Państwa, wystarczy odpisać „NIE”, a więcej nie napiszę.`;
 }
+// Owner's rule: NEVER an em/en dash in e-mails. Ranges → hyphen, dashes used as
+// punctuation → comma, leftovers → hyphen. Applied to everything that is sent.
+export const noDash = (t: string) => String(t ?? '')
+  .replace(/(\d)\s*[–—]\s*(\d)/g, '$1-$2')
+  .replace(/[ \t]+[—–][ \t]+/g, ', ')
+  .replace(/[—–]/g, '-')
+  .replace(/,\s*,/g, ',').replace(/,\s*([.:;!?])/g, '$1').replace(/\(\s*,\s*/g, '(');
 const personalUrl = (token: string) => `${SITE}/oferta/?l=${token}`;
 // Body always carries the personal link: {{LINK}} → URL; old drafts with the
 // calculator link get it replaced; if missing, a line goes before the last paragraph.
@@ -429,8 +441,8 @@ const toHtml = (text: string, company = '') => {
 async function send(svc: any, cfg: Cfg, b: any) {
   const { data: lead } = await svc.from('leads').select('*').eq('id', b.id).single();
   if (!lead) throw new Error('lead not found');
-  const subject = String(b.subject ?? lead.subject ?? '').trim();
-  const text0 = String(b.body ?? lead.body ?? '').replace(/\n{3,}/g, '\n\n').trim();
+  const subject = noDash(String(b.subject ?? lead.subject ?? '').trim());
+  const text0 = noDash(String(b.body ?? lead.body ?? '')).replace(/\n{3,}/g, '\n\n').trim();
   if (!subject || text0.length < 40) throw new Error('pusty temat lub treść');
   const test = !!(b.test || cfg.test_mode);
   if (!test) {
@@ -438,7 +450,7 @@ async function send(svc: any, cfg: Cfg, b: any) {
     const { data: sup } = await svc.from('lead_suppression').select('reason').eq('email', lead.email.toLowerCase()).maybeSingle();
     if (sup) throw new Error(`adres zablokowany (${sup.reason})`);
   }
-  const text = `${withLink(text0, lead.public_token)}\n\n${footer(cfg, lead.source)}`;
+  const text = noDash(`${withLink(text0, lead.public_token)}\n\n${footer(cfg, lead.source)}`);
   const { data: rkey } = await svc.rpc('get_secret', { p_name: 'resend_api_key' });
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',

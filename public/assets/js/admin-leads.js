@@ -14,7 +14,7 @@ const VOIV = ['DOLNOŚLĄSKIE', 'KUJAWSKO-POMORSKIE', 'LUBELSKIE', 'LUBUSKIE', '
 const DEFAULTS = {
   enabled: true, per_day: 10, max_age_days: 21, min_fit: 45, industries: Object.keys(INDUSTRIES), voivodeships: [],
   from_name: 'Damian Barabash', from_email: 'office@barabashflow.pl', reply_to: 'dmytrii.barabash@gmail.com', bcc: 'dmytrii.barabash@gmail.com',
-  signature: 'Damian Barabash\nBarabashFlow — strony, sklepy i platformy na zamówienie\nbarabashflow.pl', instructions: '', test_mode: false,
+  signature: 'Damian Barabash\nBarabashFlow · strony, sklepy i platformy na zamówienie\nbarabashflow.pl', instructions: '', test_mode: false,
 };
 const FILTERS = { ready: 'Do decyzji', sent: 'Wysłane', skipped: 'Pominięte', rejected: 'Odrzucone przez AI', failed: 'Błędy' };
 
@@ -93,7 +93,7 @@ function card(l) {
         <input data-f="subject" value="${escapeHtml(l.subject || '')}" ${sent ? 'readonly' : ''} />
         <label class="field-label">Treść</label>
         <textarea data-f="body" rows="8" ${sent ? 'readonly' : ''}>${escapeHtml(l.body || '')}</textarea>
-        <div class="lead-foot">Wszystkie moje realizacje — strony, sklepy i platformy — można zobaczyć na https://barabashflow.pl/projekty/<br><br>${escapeHtml(c.signature)}<br><br>Adres pochodzi z publicznego rejestru ${l.source === 'ceidg' ? 'CEIDG' : 'KRS'}. Jeśli to nie temat dla Państwa, wystarczy odpisać „NIE” — więcej nie napiszę.</div>`
+        <div class="lead-foot">Wszystkie moje realizacje (strony, sklepy i platformy) można zobaczyć na https://barabashflow.pl/projekty/<br><br>${escapeHtml(c.signature)}<br><br>Adres pochodzi z publicznego rejestru ${l.source === 'ceidg' ? 'CEIDG' : 'KRS'}. Jeśli to nie temat dla Państwa, wystarczy odpisać „NIE”, a więcej nie napiszę.</div>`
       : '<div class="coords">Oferta jeszcze nienapisana.</div>'}
       ${sent ? '' : `
         <div class="lead-ai"><input data-f="instr" placeholder="Przepisz z AI, np. krócej · bardziej o sklepie · inny przykład realizacji" /><button class="btn small" data-lact="rewrite">✦ Przepisz</button></div>
