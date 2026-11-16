@@ -13,7 +13,7 @@ const INDUSTRIES = {
 const VOIV = ['DOLNOŚLĄSKIE', 'KUJAWSKO-POMORSKIE', 'LUBELSKIE', 'LUBUSKIE', 'ŁÓDZKIE', 'MAŁOPOLSKIE', 'MAZOWIECKIE', 'OPOLSKIE', 'PODKARPACKIE', 'PODLASKIE', 'POMORSKIE', 'ŚLĄSKIE', 'ŚWIĘTOKRZYSKIE', 'WARMIŃSKO-MAZURSKIE', 'WIELKOPOLSKIE', 'ZACHODNIOPOMORSKIE'];
 const DEFAULTS = {
   enabled: true, per_day: 10, max_age_days: 21, min_fit: 45, industries: Object.keys(INDUSTRIES), voivodeships: [],
-  from_name: 'Damian Barabash', from_email: 'damian@barabashflow.pl', reply_to: 'dmytrii.barabash@gmail.com', bcc: 'dmytrii.barabash@gmail.com',
+  from_name: 'Damian Barabash', from_email: 'office@barabashflow.pl', reply_to: 'dmytrii.barabash@gmail.com', bcc: 'dmytrii.barabash@gmail.com',
   signature: 'Damian Barabash\nBarabashFlow — strony, sklepy i platformy na zamówienie\nbarabashflow.pl', instructions: '', test_mode: false,
 };
 const FILTERS = { ready: 'Do decyzji', sent: 'Wysłane', skipped: 'Pominięte', rejected: 'Odrzucone przez AI', failed: 'Błędy' };

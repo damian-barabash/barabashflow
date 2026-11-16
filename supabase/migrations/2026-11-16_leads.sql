@@ -1,6 +1,6 @@
 -- Lead finder (2026-11-16): new companies from the public KRS registry (later
 -- also CEIDG) → AI fit score + personalised offer e-mail → owner reviews in
--- admin → "Wyślij" sends via Resend from damian@barabashflow.pl (reply-to +
+-- admin → "Wyślij" sends via Resend from office@barabashflow.pl (reply-to +
 -- bcc the owner's Gmail). Only companies WITH an e-mail, only NEW ones
 -- (registered ≤ max_age_days), every address contacted at most once.
 

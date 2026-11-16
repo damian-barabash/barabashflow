@@ -50,7 +50,7 @@ export const INDUSTRIES: Record<string, { label: string; pkd: string[] }> = {
 const DEFAULTS = {
   enabled: true, per_day: 10, max_age_days: 21, min_fit: 45,
   industries: Object.keys(INDUSTRIES), voivodeships: [] as string[],
-  from_name: 'Damian Barabash', from_email: 'damian@barabashflow.pl',
+  from_name: 'Damian Barabash', from_email: 'office@barabashflow.pl',
   reply_to: 'dmytrii.barabash@gmail.com', bcc: 'dmytrii.barabash@gmail.com',
   signature: 'Damian Barabash\nBarabashFlow — strony, sklepy i platformy na zamówienie\nbarabashflow.pl',
   instructions: '', test_mode: false,
