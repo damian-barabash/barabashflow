@@ -1530,3 +1530,15 @@ html.pt-cover #pt { visibility: visible; background: var(--dark); }
   .est-loading { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { .est *, .est::before { animation: none !important; transition: none !important; } }
+
+/* estimator on the home page (after the showreel) — wider card, more columns */
+.sec-inner.home-est { padding: 0; background: var(--dark); border-color: var(--dark); overflow: hidden; }
+.est.is-home { margin: 0; padding: clamp(24px, 4.5vw, 64px) clamp(20px, 4.5vw, 64px); border-radius: 0; }
+.est.is-home .est-title { font-size: clamp(30px, 4vw, 52px); max-width: 18ch; }
+.est.is-home .est-sub { font-size: 16.5px; }
+.est.is-home .est-form, .est.is-home .est-result, .est.is-home .est-loading { max-width: 1080px; }
+@media (min-width: 1100px) {
+  .est.is-home .est-opts.is-types { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .est.is-home .est-opts.is-multi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) { .est.is-home { margin: 0; border-radius: 0; } }

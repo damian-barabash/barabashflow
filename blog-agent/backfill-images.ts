@@ -7,7 +7,7 @@
 // daily writer; when below it, sleeps until the hourly window resets.
 // Safe to kill and re-run: posts that already have photos are skipped.
 //   nohup ~/.bun/bin/bun backfill-images.ts >> logs/backfill.log 2>&1 &
-import { db, log, sleep, claudeJson, searchPhotos, pickPhotos, trackDownload, imageRecord, h2Count, unsplashRemaining } from './lib';
+import { db, removeMedia, log, sleep, claudeJson, searchPhotos, pickPhotos, trackDownload, imageRecord, h2Count, unsplashRemaining } from './lib';
 
 const RESERVE = 10;
 
@@ -53,11 +53,12 @@ inline: dokładnie 2 zdjęcia, after_h2 = numer sekcji (1..${Math.max(n, 1)}), r
       meta: { ...(p.meta || {}), cover_query: plan.cover.query, photos_backfill: '2026-11-16' },
     }),
   });
+  await removeMedia([p.cover_path]);
   log(`✓ ${p.slug}: "${plan.cover.query}" → ${pick.cover.author} (+${pick.inline.length} inline, n=${n}) · unsplash left ${unsplashRemaining}`);
 }
 
 async function main() {
-  const all = await db<any[]>('blog_posts?select=id,slug,title_pl,excerpt_pl,body_pl,images,meta,status&status=in.(published,scheduled)&order=published_at.desc&limit=2000');
+  const all = await db<any[]>('blog_posts?select=id,slug,title_pl,excerpt_pl,body_pl,images,meta,status,cover_path&status=in.(published,scheduled)&order=published_at.desc&limit=2000');
   for (const p of all) { for (const i of p.images || []) if (i?.id) used.add(i.id); if (p.meta?.cover_query) recentQueries.push(p.meta.cover_query); }
   const todo = all.filter((p) => !(p.images || []).some((i: any) => i.role === 'cover'));
   log(`backfill: ${todo.length} posts without Unsplash photos`);

@@ -11,6 +11,8 @@ import ProjectReel from '../components/ProjectReel.astro';
 import FaqList from '../components/FaqList.astro';
 import BlogCard from '../components/BlogCard.astro';
 import ServiceCard from '../components/ServiceCard.astro';
+import Estimator from '../components/Estimator.astro';
+import { buildConfig } from '../lib/estimate-model';
 import { mediaUrl } from '../lib/supabase';
 import { fetchSettings, fetchServices, fetchProjects, fetchFaq, s, lm, lmRow, projectCover, categoryLm, firstSentence, type Project } from '../lib/content';
 import { restGet } from '../lib/supabase';
@@ -22,6 +24,9 @@ const [settings, services, projects, faq, posts] = await Promise.all([
   restGet<BlogPost>('blog_posts?select=slug,title_pl,title_en,title_ru,excerpt_pl,excerpt_en,excerpt_ru,cover_path,cover_alt,published_at,tags&status=eq.published&order=published_at.desc&limit=3'),
 ]);
 const reelProjects = projects.slice(0, 10);
+// Project estimator (same widget as in blog posts) right after the showreel.
+const estimatorOn = (settings as any).estimator_config?.value_meta?.enabled !== false;
+const estimatorConfig = buildConfig((settings as any).estimator_config?.value_meta, services);
 const featured = (projects.filter((p) => p.is_featured).length ? projects.filter((p) => p.is_featured) : projects).slice(0, 4);
 const trusted = projects.map((p) => ({ name: p.client || p.title_pl, slug: p.slug })).filter((x, i, a) => a.findIndex((y) => y.name === x.name) === i && !/barabash/i.test(x.name)).slice(0, 6);
 const stats: any[] = settings.home_stats?.value_meta?.items || [];
@@ -161,6 +166,15 @@ const tagOf = (p: Project) => ({
               <button class="ri-btn" type="button" data-ri-sound aria-pressed="false"><svg class="i-off" viewBox="0 0 20 20" fill="none"><path d="M4 8h3l4-3v10l-4-3H4z" fill="currentColor"/><path d="m14 8 4 4m0-4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><svg class="i-on" viewBox="0 0 20 20" fill="none"><path d="M4 8h3l4-3v10l-4-3H4z" fill="currentColor"/><path d="M14 7.5a3.5 3.5 0 0 1 0 5M16 5.5a6.5 6.5 0 0 1 0 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span data-i18n="reel.sound">Dźwięk</span></button>
               <button class="ri-btn" type="button" data-reel><svg viewBox="0 0 20 20" fill="none"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="reel.full">Pełny ekran</span></button>
             </div>
+          </div>
+        </section>
+      )}
+
+      <!-- ── ESTIMATOR (brief → budget + timeline + AI note → lead) ───── -->
+      {estimatorOn && (
+        <section class="sec" id="kalkulator">
+          <div class="sec-inner home-est">
+            <Estimator config={estimatorConfig} topic="Strona główna" variant="home" />
           </div>
         </section>
       )}

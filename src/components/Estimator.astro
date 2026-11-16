@@ -4,8 +4,8 @@
 // in src/lib/estimator.ts. Pricing model: src/lib/estimate-model.ts.
 import type { EstimatorConfig } from '../lib/estimate-model';
 import { t } from '../lib/i18n';
-export interface Props { config: EstimatorConfig; topic?: string }
-const { config, topic = '' } = Astro.props;
+export interface Props { config: EstimatorConfig; topic?: string; variant?: 'post' | 'home' }
+const { config, topic = '', variant = 'post' } = Astro.props;
 const single = (q: string, key: string, items: { id: string }[], hints = false) => ({ q, key, items, hints });
 const steps = [
   single('est.q1', 'type', config.types, true),
@@ -17,7 +17,7 @@ const steps = [
 const prefix: Record<string, string> = { type: 'est.type.', pages: 'est.page.', features: 'est.feat.', content: 'est.content.', start: 'est.start.' };
 const arrow = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 ---
-<section class="est" data-estimator data-config={JSON.stringify(config)} data-topic={topic} aria-labelledby="est-title">
+<section class={`est is-${variant}`} data-estimator data-config={JSON.stringify(config)} data-topic={topic} aria-labelledby="est-title">
   <div class="est-head">
     <span class="est-k"><span class="est-dot" aria-hidden="true"></span><span data-i18n="est.k">{t('est.k')}</span></span>
     <h2 class="est-title" id="est-title" data-i18n="est.t">{t('est.t')}</h2>

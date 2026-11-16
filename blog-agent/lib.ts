@@ -53,6 +53,21 @@ export async function db<T = any>(path: string, init: RequestInit & { prefer?: s
   }
 }
 
+// Remove files from the public `media` bucket (old Openverse covers replaced
+// by Unsplash hotlinks). Best effort — a leftover file only costs storage.
+export async function removeMedia(paths: string[]) {
+  const list = paths.filter((p) => p && !/^https?:/.test(p));
+  if (!list.length) return;
+  try {
+    await fetch(`${CFG.supabaseUrl}/storage/v1/object/media`, {
+      method: 'DELETE',
+      headers: { apikey: CFG.serviceKey, Authorization: `Bearer ${CFG.serviceKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefixes: list }),
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (e) { log('removeMedia failed', String(e)); }
+}
+
 export async function reportStatus(status: Record<string, unknown>) {
   for (const wait of [0, 5000, 20000]) {
     if (wait) await sleep(wait);
