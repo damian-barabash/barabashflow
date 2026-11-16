@@ -93,7 +93,7 @@ function card(l) {
         <input data-f="subject" value="${escapeHtml(l.subject || '')}" ${sent ? 'readonly' : ''} />
         <label class="field-label">Treść</label>
         <textarea data-f="body" rows="8" ${sent ? 'readonly' : ''}>${escapeHtml(l.body || '')}</textarea>
-        <div class="lead-foot">${escapeHtml(c.signature)}<br><br>Adres pochodzi z publicznego rejestru ${l.source === 'ceidg' ? 'CEIDG' : 'KRS'}. Jeśli to nie temat dla Państwa, wystarczy odpisać „NIE” — więcej nie napiszę.</div>`
+        <div class="lead-foot">Wszystkie moje realizacje — strony, sklepy i platformy — można zobaczyć na https://barabashflow.pl/projekty/<br><br>${escapeHtml(c.signature)}<br><br>Adres pochodzi z publicznego rejestru ${l.source === 'ceidg' ? 'CEIDG' : 'KRS'}. Jeśli to nie temat dla Państwa, wystarczy odpisać „NIE” — więcej nie napiszę.</div>`
       : '<div class="coords">Oferta jeszcze nienapisana.</div>'}
       ${sent ? '' : `
         <div class="lead-ai"><input data-f="instr" placeholder="Przepisz z AI, np. krócej · bardziej o sklepie · inny przykład realizacji" /><button class="btn small" data-lact="rewrite">✦ Przepisz</button></div>

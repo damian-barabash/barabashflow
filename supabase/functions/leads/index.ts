@@ -363,9 +363,11 @@ REALIZACJE: ${(projects || []).map((p: any) => `${p.slug} (${p.client || p.title
 }
 
 // ── send ────────────────────────────────────────────────────────────────────
+// Always present (code, not AI): where to see the work + the site link.
+const PORTFOLIO_LINE = 'Wszystkie moje realizacje — strony, sklepy i platformy — można zobaczyć na https://barabashflow.pl/projekty/';
 function footer(cfg: Cfg, source: string) {
   const reg = source === 'ceidg' ? 'CEIDG' : 'KRS';
-  return `${cfg.signature}\n\nAdres pochodzi z publicznego rejestru ${reg}. Jeśli to nie temat dla Państwa, wystarczy odpisać „NIE” — więcej nie napiszę.`;
+  return `${PORTFOLIO_LINE}\n\n${cfg.signature}\n\nAdres pochodzi z publicznego rejestru ${reg}. Jeśli to nie temat dla Państwa, wystarczy odpisać „NIE” — więcej nie napiszę.`;
 }
 const personalUrl = (token: string) => `${SITE}/oferta/?l=${token}`;
 // Body always carries the personal link: {{LINK}} → URL; old drafts with the
@@ -382,8 +384,47 @@ function withLink(text: string, token: string) {
   return t;
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-const toHtml = (text: string) => `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#111">${text.split(/\n\n/).map((p, i, a) => `<p style="margin:0 0 ${i === a.length - 1 ? 0 : 10}px">${esc(p).replace(/\n/g, '<br>').replace(/(https:\/\/barabashflow\.pl[^\s<]*?)([.,;:]?)(?=\s|<|$)/g, '<a href="$1" style="color:#111">$1</a>$2')}</p>`).join('')}</div>`;
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!))
+  // keep '3 500 zł' / '2–3 tygodnie' together in HTML
+  .replace(/(\d) (\d{3})(?!\d)/g, '$1&nbsp;$2').replace(/(\d) (zł|tyg|PLN)/g, '$1&nbsp;$2');
+// HTML version: plain-looking letter, but the personal-page link becomes a
+// bulletproof (table-based) brand button; the text part keeps the raw URL.
+const shortName = (name: string) => String(name || '').replace(/\s+(sp\. z o\.o\.|sp\.j\.|sp\.k\.|sp\.p\.|S\.A\.|P\.S\.A\.).*$/i, '').trim();
+// Site-style button (like .btn-dark.with-icon): dark pill, lime square with an
+// arrow, white label — two table cells so it never wraps, each cell is a link.
+const button = (url: string, label: string) => {
+  const a = (inner: string, style: string) => `<a href="${url}" target="_blank" style="text-decoration:none;${style}">${inner}</a>`;
+  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:10px 0 18px;border-collapse:separate"><tr>` +
+    `<td style="background:#0b0b0b;border-radius:14px;padding:6px 22px 6px 6px;white-space:nowrap">` +
+      `<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>` +
+        `<td width="38" height="38" align="center" valign="middle" style="width:38px;height:38px;background:#98ff03;border-radius:10px;text-align:center;vertical-align:middle">` +
+          a('&rarr;', 'display:block;width:38px;line-height:38px;font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:700;color:#030712') +
+        `</td>` +
+        `<td valign="middle" style="padding-left:14px;vertical-align:middle;white-space:nowrap">` +
+          a(esc(label), 'display:inline-block;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;line-height:20px;color:#ffffff') +
+        `</td>` +
+      `</tr></table>` +
+    `</td></tr></table>`;
+};
+const linkify = (html: string) => html
+  .replace(/(https:\/\/barabashflow\.pl[^\s<]*?)([.,;:]?)(?=\s|<|$)/g, (_m, url, punct) => `<a href="${url}" style="color:#030712;font-weight:700;text-decoration:underline">${url.replace(/^https:\/\//, '').replace(/\/$/, '')}</a>${punct}`)
+  .replace(/(^|\s|<br>)barabashflow\.pl(?=\s|<|$)/g, '$1<a href="https://barabashflow.pl" style="color:#030712;font-weight:700;text-decoration:underline">barabashflow.pl</a>');
+const toHtml = (text: string, company = '') => {
+  const paras = text.split(/\n\n/);
+  const out: string[] = [];
+  paras.forEach((p, i) => {
+    const last = i === paras.length - 1;
+    const m = p.match(/https:\/\/barabashflow\.pl\/oferta\/\?l=[a-z0-9]+/);
+    if (m) {
+      const sentence = p.replace(m[0], '').replace(/\s*[.,;]\s*$/, '').replace(/\s*[:\-–—]?\s*$/, ':').replace(/\s+:/, ':').replace(/\s{2,}/g, ' ').trim();
+      if (sentence.length > 1) out.push(`<p style="margin:0 0 10px">${esc(sentence).replace(/\n/g, '<br>')}</p>`);
+      out.push(button(m[0], 'Zobacz propozycję dla Państwa'));
+      return;
+    }
+    out.push(`<p style="margin:0 0 ${last ? 0 : 10}px">${linkify(esc(p).replace(/\n/g, '<br>'))}</p>`);
+  });
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#111">${out.join('')}</div>`;
+};
 
 async function send(svc: any, cfg: Cfg, b: any) {
   const { data: lead } = await svc.from('leads').select('*').eq('id', b.id).single();
@@ -408,7 +449,7 @@ async function send(svc: any, cfg: Cfg, b: any) {
       reply_to: cfg.reply_to,
       ...(test || !cfg.bcc ? {} : { bcc: [cfg.bcc] }),
       subject: test ? `[TEST] ${subject}` : subject,
-      text, html: toHtml(text),
+      text, html: toHtml(text, lead.name),
       headers: { 'List-Unsubscribe': `<mailto:${cfg.reply_to}?subject=NIE>` },
       tags: [{ name: 'kind', value: 'lead' }],
     }),
