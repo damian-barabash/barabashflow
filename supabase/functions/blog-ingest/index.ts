@@ -23,6 +23,11 @@
 //                    (cover_b64 preferred, cover_image_url fallback).
 //   log_keywords  -> bulk-upserts the day's keyword research into seo_keywords.
 //   (v10, 2026-09-12: get_secret retried 3× — a single vault hiccup no longer 500s.)
+//   watchdog      -> (v11, 2026-11-16; called by pg_cron after the daily
+//                    publish) verifies today's post is LIVE on barabashflow.pl,
+//                    re-dispatches the Pages rebuild once if not, checks the
+//                    scheduled buffer depth and the generator heartbeat, stores
+//                    site_settings.blog_watchdog_status and emails problems.
 //   report_status -> stores the run status in site_settings.blog_agent_status
 //                    (shown in the admin Blog tab); a failed run also sends an
 //                    alert email to office@ via Resend.
@@ -190,6 +195,53 @@ Deno.serve(async (req) => {
         return json({ ok: true, inserted: count ?? rows.length });
       }
 
+      case 'watchdog': {
+        const problems: string[] = [];
+        const notes: string[] = [];
+        const warsawDay = (d: Date) => d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' });
+        const today = warsawDay(new Date());
+        const { data: recent } = await svc.from('blog_posts').select('slug,published_at').eq('status', 'published').order('published_at', { ascending: false }).limit(3);
+        const todays = (recent || []).find((p: any) => warsawDay(new Date(p.published_at)) === today);
+        let live: boolean | null = null;
+        if (todays) {
+          const ageMin = (Date.now() - new Date(todays.published_at).getTime()) / 60000;
+          const r = await fetch(`https://barabashflow.pl/blog/${todays.slug}/?wd=${Date.now()}`, { redirect: 'manual', signal: AbortSignal.timeout(15000) }).catch(() => null);
+          live = !!r && r.status === 200;
+          if (!live && ageMin > 20) {
+            const { data: pat } = await svc.rpc('get_secret', { p_name: 'github_pat' });
+            let code = 0;
+            if (pat) {
+              const d = await fetch('https://api.github.com/repos/damian-barabash/barabashflow/dispatches', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${pat}`, Accept: 'application/vnd.github+json', 'User-Agent': 'barabashflow-watchdog', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ event_type: 'blog-publish', client_payload: { slug: todays.slug, by: 'watchdog' } }),
+              }).catch(() => null);
+              code = d?.status ?? 0;
+            }
+            (payload.final ? problems : notes).push(`/blog/${todays.slug}/ nie działa na żywo (${r?.status ?? 'brak odpowiedzi'}) ${Math.round(ageMin)} min po publikacji — ponowny build: HTTP ${code || 'brak PAT'}`);
+          }
+        } else {
+          problems.push(`Dziś (${today}) nic nie opublikowano — bufor pusty albo cron publikacji nie ruszył.`);
+        }
+        const { count: buffer } = await svc.from('blog_posts').select('id', { count: 'exact', head: true }).eq('status', 'scheduled').gt('scheduled_for', new Date().toISOString()).not('cover_path', 'is', null);
+        if ((buffer ?? 0) < 3) problems.push(`Bufor zaplanowanych wpisów: ${buffer ?? 0} (min. 3). Generator na Mac Studio nie nadąża albo stoi.`);
+        const { data: st } = await svc.from('site_settings').select('value_meta').eq('key', 'blog_agent_status').maybeSingle();
+        const hb = st?.value_meta?.ts ? (Date.now() - new Date(st.value_meta.ts).getTime()) / 3600000 : 999;
+        if (hb > 26) problems.push(`Generator milczy od ${Math.round(hb)} h (ostatni status: ${st?.value_meta?.ts ?? 'brak'}). Sprawdź Mac Studio (launchd ai.barabash.blogwriter).`);
+        // PAT watchdog: GitHub tells the expiry date of fine-grained tokens.
+        const { data: pat2 } = await svc.rpc('get_secret', { p_name: 'github_pat' });
+        if (pat2) {
+          const g = await fetch('https://api.github.com/repos/damian-barabash/barabashflow', { headers: { Authorization: `Bearer ${pat2}`, 'User-Agent': 'barabashflow-watchdog' } }).catch(() => null);
+          if (!g || g.status === 401 || g.status === 403) problems.push(`GitHub PAT w Vault (github_pat) nie działa: HTTP ${g?.status ?? 'brak'} — publikacje nie przebudują strony.`);
+          const exp = g?.headers.get('github-authentication-token-expiration');
+          if (exp) { const days = (new Date(exp).getTime() - Date.now()) / 86400000; if (days < 14) problems.push(`GitHub PAT wygasa za ${Math.max(0, Math.round(days))} dni (${exp}).`); }
+        } else problems.push('Brak sekretu github_pat w Vault.');
+        const status = { ok: problems.length === 0, ts: new Date().toISOString(), day: today, published_today: todays?.slug ?? null, live, buffer: buffer ?? 0, generator_age_h: Math.round(hb), problems, notes };
+        await svc.from('site_settings').upsert({ key: 'blog_watchdog_status', value_meta: status }, { onConflict: 'key' });
+        if (problems.length) await alert(svc, `⚠ Blog: ${problems.length} problem(y) ${today}`, `Watchdog bloga barabashflow.pl:\n\n- ${problems.join('\n- ')}\n\n${notes.length ? 'Notatki:\n- ' + notes.join('\n- ') + '\n\n' : ''}Status: admin → Blog.`);
+        return json(status);
+      }
+
       case 'report_status': {
         const status = payload.status ?? {};
         const { error } = await svc
@@ -199,23 +251,7 @@ Deno.serve(async (req) => {
         // A failed run alerts the owner by email — silent failures were how the
         // 2026-07-05 incident went unnoticed until the evening.
         if (status.ok === false) {
-          try {
-            const { data: rkey } = await svc.rpc('get_secret', { p_name: 'resend_api_key' });
-            if (rkey) {
-              await fetch('https://api.resend.com/emails', {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${rkey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  from: 'BarabashFlow <office@barabashflow.pl>',
-                  to: ['office@barabashflow.pl'],
-                  subject: `⚠ Blog agent: błąd przebiegu ${status.day ?? ''}`.trim(),
-                  text: `Blog agent zgłosił błąd.\n\n${JSON.stringify(status, null, 2)}\n\nPełny log: ~/blog-agent/logs/blog-writer.log na Mac Studio.\nDrugi przebieg (catch-up) startuje o 13:40, fallback-build GH Actions o 14:30.`,
-                }),
-              });
-            }
-          } catch (e) {
-            console.warn('[blog-ingest] alert email failed:', String(e));
-          }
+          await alert(svc, `⚠ Blog generator: błąd ${status.day ?? ''}`.trim(), `Generator bloga (Mac Studio) zgłosił błąd. Publikacje idą dalej z bufora (${status.buffer ?? '?'} wpisów w kolejce).\n\n${JSON.stringify(status, null, 2)}\n\nLog: ~/blog-agent/logs/blog-writer.log na Mac Studio (przebieg co 3 h).`);
         }
         return json({ ok: true });
       }
@@ -265,6 +301,20 @@ async function uploadCover(svc: any, buf: ArrayBuffer, ct: string, ext: string, 
   });
   if (error) throw new Error(error.message);
   return path;
+}
+
+async function alert(svc: any, subject: string, text: string) {
+  try {
+    const { data: rkey } = await svc.rpc('get_secret', { p_name: 'resend_api_key' });
+    if (!rkey) return;
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${rkey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: 'BarabashFlow <office@barabashflow.pl>', to: ['office@barabashflow.pl'], subject, text }),
+    });
+  } catch (e) {
+    console.warn('[blog-ingest] alert email failed:', String(e));
+  }
 }
 
 function json(body: unknown, status = 200) {

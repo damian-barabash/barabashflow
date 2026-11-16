@@ -1,954 +1,488 @@
-// ═══════════════════════════════════════════════════════════════════════════
-// BarabashFlow blog agent — runs daily on the Mac Studio (launchd).
+// Blog agent v2 (2026-11-16) — Mac Studio, launchd every 3 h (idempotent).
 //
-// Pipeline:
-//   1. pull config + recent posts/keywords from the blog-ingest Edge Function
-//   2. keyword research: live Google Autosuggest (PL) + admin seed topics
-//   3. local LLM (Ollama qwen3.5:27b) picks N fresh topics with search intent
-//   4. writes each post in PL (SEO: keyword-led title, meta excerpt, question
-//      H2s, FAQ for AEO, internal links), then translates to EN and RU
-//      (two separate calls — one combined EN+RU response used to overflow
-//      num_predict and truncate the JSON)
-//   5. finds a CC-licensed cover on Openverse (commercial-use licenses only)
-//      and downloads it LOCALLY — the Edge Function's Fly.io egress 502s on
-//      many Flickr shards while the Mac fetches them fine (2026-07-06: a post
-//      shipped with no cover after 4 consecutive edge-side 502s)
-//   6. publishes via blog-ingest (cover travels as base64 in the payload)
-//   7. logs the day's keyword research to seo_keywords
-//   8. triggers a GitHub Pages rebuild (repository_dispatch) if a PAT is set,
-//      then VERIFIES the new posts actually serve 200 on the live site —
-//      GH Pages deployments can report success while the CDN keeps serving
-//      the previous build (2026-07-06 incident); one re-dispatch, then alert
-//   9. reports run status to the admin panel (site_settings.blog_agent_status);
-//      a failed run also emails office@ via the Edge Function
-//
-// Reliability contract:
-//   - launchd runs it at 08:40 AND 13:40; the second run is a catch-up — the
-//     script counts posts already published today and only writes the missing
-//     ones (idempotent, safe to run any number of times per day). Even when
-//     there is nothing to write, the catch-up run still verifies today's posts
-//     serve 200 on the live site and self-heals with a rebuild if they don't
-//     (2026-08-03: the morning dispatch got 401 and posts sat DB-only all day
-//     while the catch-up said "nothing to do" and overwrote the error status)
-//   - the day's post target is a hash of the date, NOT Math.random(): both
-//     runs must agree on it, otherwise the catch-up can roll a smaller target
-//     than the morning did and mask a missing post as "nothing to do"
-//   - topic/slug dedup runs against EVERY post that exists, not a recency
-//     window: the edge's `recent` returns the last 60 and on 2026-08-05 the
-//     LLM re-picked a topic whose twin had fallen out of that window — the
-//     insert died on the slug unique constraint and the day shipped 1/2.
-//     All slugs = edge all_slugs (v9+) ∪ live sitemap ∪ recent posts; picked
-//     topics are also stem-checked against existing slugs so near-duplicate
-//     content ("firma transportowa" two days in a row) gets rejected and
-//     re-picked, and a slug collision on INSERT retries once with a suffix
-//   - topic selection must never kill the day: if both LLM rounds yield only
-//     duplicates (2026-08-06: 8/8 rejected → 0 posts shipped), fresh topics
-//     are taken deterministically from the ranked research suggestions that
-//     pass the same corpus filter; the LLM only structures them, it does not
-//     get to choose. Price/city words are stop-listed in the stem filter and
-//     the same-subject window is 10 days — generic stems ("koszt", "warsz")
-//     must not act as a 3-week ban on half the topic space
-//   - every Edge Function call retries transient failures (5xx, network,
-//     "vault error" from a cold get_secret RPC) with backoff — 2026-09-12 the
-//     first call of the morning run failed once and the day shipped 0 posts
-//   - the GitHub PAT is validated on EVERY run and an alert goes out starting
-//     7 days before it expires — fine-grained PATs die silently otherwise
-//   - a single failing post never kills the run: keyword logging, the GitHub
-//     dispatch and the status report always execute
-//   - qwen3.5 is a THINKING model: every request sends think:false, otherwise
-//     reasoning tokens silently eat the num_predict budget and the JSON comes
-//     back truncated ("Unexpected EOF" — the 2026-07-05 incident)
-//
-// Run manually:  ~/.bun/bin/bun ~/blog-agent/blog-writer.ts
-// Force count :  FORCE_POSTS=1 ~/.bun/bin/bun ~/blog-agent/blog-writer.ts
-//                (FORCE_POSTS skips the already-published-today check)
-// ═══════════════════════════════════════════════════════════════════════════
+// Why v2: v1 picked topics from Google Autosuggest and wrote with a local
+// 27B model. After 269 posts the niche was exhausted (2026-11-15/16: "no
+// usable topics" two days in a row) and the corpus was full of duplicates and
+// brand junk. v2:
+//   1. EDITORIAL PLAN — Claude plans topics into `blog_topics` (queue ≥ 12)
+//      across content pillars × formats, seeing every existing title, so the
+//      writer never runs dry; admin "own topics" jump the queue.
+//   2. BUFFER — posts are written days ahead as `scheduled` (one per day,
+//      `scheduled_for`). Publication itself is cloud-side (pg_cron
+//      blog_publish_due() 06:00 UTC → rebuild; watchdog verifies live). A dead
+//      Mac costs nothing until the buffer (7 days) runs out — and the
+//      watchdog alerts long before.
+//   3. QUALITY — Claude Opus writes from real studio data (prices from
+//      `services`, case studies from `projects`, internal links only to pages
+//      that exist), code-level QA + one repair round, EN/RU translations that
+//      must keep the section structure.
+//   4. PHOTOS — one Unsplash search per post (50 req/h budget), Claude vision
+//      picks a beautiful cover + 2 inline photos, hotlinked with attribution.
+// Every run reports to site_settings.blog_agent_status (admin + watchdog
+// heartbeat); errors alert by email via edge report_status.
+import { CFG, db, log, sleep, claudeJson, reportStatus, searchPhotos, pickPhotos, trackDownload, imageRecord, slugify, h2Count, words, unsplashRemaining, type Photo } from './lib';
 
-import { readFileSync } from 'fs';
-
-const CONFIG = JSON.parse(readFileSync(new URL('./config.json', import.meta.url), 'utf8'));
-const UA = 'BarabashflowBlogBot/1.0 (+https://barabashflow.pl)';
-const TODAY = new Date().toISOString().slice(0, 10);
+const QUEUE_MIN = 12;
+const SITE = 'https://barabashflow.pl';
 const STARTED = Date.now();
 
-const DEFAULT_SEEDS = [
-  'strona internetowa dla firmy',
-  'tworzenie stron internetowych',
-  'ile kosztuje strona internetowa',
-  'sklep internetowy',
-  'strona wizytówka',
-  'aplikacja webowa dla firmy',
-  'panel administracyjny strony',
-  'landing page',
-  'pozycjonowanie strony',
-  'strona www cena',
-  'modernizacja strony internetowej',
-  'strona internetowa z CMS',
-];
-
-const log = (...a: unknown[]) => console.log(`[${new Date().toISOString()}]`, ...a);
-
-// ── Edge Function client ─────────────────────────────────────────────────────
-// Every call retries transient failures (network error, 5xx, edge-side
-// "vault error" when the get_secret RPC hiccups on a cold start). 2026-09-12:
-// the morning run died 7 s in on its FIRST call (`recent` → "vault error")
-// and the whole day shipped 0/2 — one retry would have saved it. 4xx
-// (unauthorized / bad payload) is deterministic and is not retried.
-const EDGE_RETRY_DELAYS_MS = [5_000, 20_000, 60_000];
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-async function edge(action: string, body: Record<string, unknown> = {}) {
-  let lastErr: unknown;
-  for (let attempt = 0; attempt <= EDGE_RETRY_DELAYS_MS.length; attempt++) {
-    try {
-      const r = await fetch(CONFIG.edgeUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-blog-secret': CONFIG.secret,
-        },
-        body: JSON.stringify({ action, ...body }),
-        signal: AbortSignal.timeout(120_000),
-      });
-      const text = await r.text();
-      let data: any = {};
-      try { data = text ? JSON.parse(text) : {}; }
-      catch { data = { error: `non-JSON response (${r.status}): ${text.slice(0, 120)}` }; }
-      if (r.ok && !data.error) return data;
-      const err = new Error(`edge ${action}: ${data.error || r.status}`);
-      const transient = r.status >= 500 || r.status === 429 || /vault error|non-JSON/i.test(String(data.error || ''));
-      if (!transient) throw err;
-      lastErr = err;
-    } catch (err) {
-      // fetch() itself failed (DNS/TLS/timeout) or a transient error above.
-      if (err instanceof Error && /^edge .*: (unauthorized|invalid json|method not allowed)/.test(err.message)) throw err;
-      lastErr = err;
-    }
-    if (attempt < EDGE_RETRY_DELAYS_MS.length) {
-      const wait = EDGE_RETRY_DELAYS_MS[attempt];
-      log(`edge ${action} failed (attempt ${attempt + 1}): ${String(lastErr)} — retrying in ${wait / 1000}s`);
-      await sleep(wait);
-    }
-  }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
-}
-
-// Status report → admin panel. Best-effort: must never throw (it runs in error
-// paths too) and must not depend on anything else having succeeded.
-async function reportStatus(status: Record<string, unknown>) {
-  try {
-    await edge('report_status', {
-      status: { day: TODAY, ts: new Date().toISOString(), duration_s: Math.round((Date.now() - STARTED) / 1000), ...status },
-    });
-  } catch (err) {
-    log('status report failed:', String(err));
-  }
-}
-
-// ── LLM (local Ollama) ───────────────────────────────────────────────────────
-// The model answers with JSON only. Salvage pass strips code fences / stray
-// prose around the object before giving up.
-function parseJsonLoose(text: string): any {
-  const candidates = [text.trim()];
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenced) candidates.push(fenced[1].trim());
-  const a = text.indexOf('{');
-  const b = text.lastIndexOf('}');
-  if (a >= 0 && b > a) candidates.push(text.slice(a, b + 1));
-  for (const c of candidates) {
-    try { return JSON.parse(c); } catch { /* next */ }
-  }
-  return undefined;
-}
-
-// JSON schemas passed as Ollama's `format` — constrains generation to valid,
-// correctly-shaped JSON. Plain format:'json' still let the model emit
-// unparseable output occasionally (2026-07-06: done_reason=stop, invalid JSON).
-const TOPICS_SCHEMA = {
-  type: 'object',
-  required: ['topics'],
-  properties: {
-    topics: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['primary_keyword', 'category', 'slug', 'image_query_en'],
-        properties: {
-          primary_keyword: { type: 'string' },
-          category: { type: 'string' },
-          supporting_keywords: { type: 'array', items: { type: 'string' } },
-          slug: { type: 'string' },
-          title_hint: { type: 'string' },
-          angle: { type: 'string' },
-          image_query_en: { type: 'string' },
-        },
-      },
-    },
-  },
+const PILLARS: Record<string, string> = {
+  koszty: 'Koszty i budżet — ile kosztuje, z czego wynika cena, jak nie przepłacić, utrzymanie',
+  proces: 'Proces i współpraca — etapy, brief, terminy, jak pracować z wykonawcą, umowy, odbiór',
+  technologia: 'Technologia po ludzku — CMS, WordPress vs dedykowane, Astro/Next.js, hosting, bezpieczeństwo, szybkość',
+  seo: 'Widoczność — SEO własnej strony, Google, AI Overviews/ChatGPT (GEO), lokalne SEO, treści',
+  konwersja: 'Konwersja i UX — jak strona ma sprzedawać, formularze, CTA, zaufanie, mobile',
+  ecommerce: 'E-commerce — sklepy internetowe, płatności, katalog, integracje, marketplace vs własny sklep',
+  branze: 'Strona dla konkretnej branży — co musi mieć strona firmy X (szkolenia, beauty, motoryzacja, gastronomia, prawnicy, medycyna, produkcja, nieruchomości…)',
+  case: 'Z praktyki studia — rozbiór realnej realizacji BarabashFlow: problem klienta → decyzje → efekt',
+  trendy: 'Trendy i AI — co się zmienia w stronach/aplikacjach w 2026–2027, AI w firmie, automatyzacja',
+};
+const FORMATS: Record<string, string> = {
+  przewodnik: 'przewodnik krok po kroku',
+  checklista: 'checklista do odhaczenia (z krótkim uzasadnieniem każdego punktu)',
+  porownanie: 'porównanie opcji z tabelą i jasną rekomendacją kiedy co',
+  'rozbicie-kosztow': 'rozbicie kosztów z tabelą widełek',
+  mity: 'mity kontra fakty',
+  bledy: 'najczęstsze błędy, które kosztują (i jak ich uniknąć)',
+  'case-study': 'case study realnego projektu (tylko z dostarczonych faktów)',
+  'pytania-eksperta': 'odpowiedzi na pytania, które klienci zadają na pierwszej rozmowie',
 };
 
-const ARTICLE_SCHEMA = {
-  type: 'object',
-  required: ['title_pl', 'excerpt_pl', 'body_pl', 'faq', 'tags', 'keywords'],
-  properties: {
-    title_pl: { type: 'string' },
-    excerpt_pl: { type: 'string' },
-    body_pl: { type: 'string' },
-    faq: {
-      type: 'array',
-      items: { type: 'object', required: ['q', 'a'], properties: { q: { type: 'string' }, a: { type: 'string' } } },
-    },
-    tags: { type: 'array', items: { type: 'string' } },
-    keywords: { type: 'array', items: { type: 'string' } },
-  },
-};
+const clamp = (v: unknown, lo: number, hi: number) => Math.min(Math.max(Math.round(Number(v) || lo), lo), hi);
 
-const TRANSLATION_SCHEMA = {
-  type: 'object',
-  required: ['title', 'excerpt', 'body'],
-  properties: {
-    title: { type: 'string' },
-    excerpt: { type: 'string' },
-    body: { type: 'string' },
-  },
-};
+// ── data ────────────────────────────────────────────────────────────────────
+type Post = { id: string; slug: string; title_pl: string; status: string; scheduled_for: string | null; published_at: string; pillar: string | null; format: string | null; images: any[]; cover_path: string | null; body_en: string | null; body_ru: string | null };
+type Topic = { id: string; title: string; slug: string; primary_keyword: string | null; pillar: string | null; format: string | null; angle: string | null; priority: number; source: string; notes: any };
 
-async function llmJson(system: string, user: string, temperature = 0.5, maxTokens = 8192, schema?: object): Promise<any> {
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    // The dominant failure mode is JSON truncated by the output budget
-    // (done_reason "length") — retries escalate num_predict instead of
-    // repeating the same doomed request.
-    const numPredict = Math.round(maxTokens * (1 + 0.5 * (attempt - 1)));
-    try {
-      // stream:true — generation takes minutes; a non-streaming response sends
-      // zero bytes until done, which trips the HTTP client's idle timeout.
-      const r = await fetch(`${CONFIG.ollamaUrl}/api/chat`, {
-        method: 'POST',
-        signal: AbortSignal.timeout(20 * 60 * 1000),
-        body: JSON.stringify({
-          model: CONFIG.model,
-          format: schema ?? 'json',
-          stream: true,
-          think: false,
-          keep_alive: '30m',
-          options: { temperature, num_ctx: 16384, num_predict: numPredict },
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-        }),
-      });
-      if (!r.ok || !r.body) throw new Error(`ollama HTTP ${r.status}`);
-      let text = '';
-      let buf = '';
-      let doneReason = '';
-      let evalCount = 0;
-      const reader = r.body.getReader();
-      const dec = new TextDecoder();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let nl;
-        while ((nl = buf.indexOf('\n')) >= 0) {
-          const line = buf.slice(0, nl).trim();
-          buf = buf.slice(nl + 1);
-          if (!line) continue;
-          try {
-            const chunk = JSON.parse(line);
-            text += chunk?.message?.content ?? '';
-            if (chunk?.done) {
-              doneReason = chunk.done_reason || '';
-              evalCount = chunk.eval_count || 0;
-            }
-          } catch { /* partial line */ }
-        }
-      }
-      const parsed = parseJsonLoose(text);
-      if (parsed === undefined) {
-        log(`unparseable output head: ${JSON.stringify(text.slice(0, 220))}`);
-        throw new Error(`unparseable JSON (done_reason=${doneReason || '?'}, ${evalCount} tok out, ${text.length} chars)`);
-      }
-      if (doneReason === 'length') log(`warning: output hit num_predict=${numPredict} but JSON still parsed`);
-      return parsed;
-    } catch (err) {
-      log(`llm attempt ${attempt} failed (num_predict=${numPredict}):`, String(err));
-      if (attempt === 3) throw err;
-    }
-  }
-}
-
-// ── Keyword research (Google Autosuggest, PL) ────────────────────────────────
-async function googleSuggest(q: string): Promise<string[]> {
-  try {
-    // ie/oe=utf-8 is mandatory: without oe Google answers in ISO-8859-1 and
-    // Polish diacritics decode to U+FFFD mojibake in the admin panel.
-    const url = `https://suggestqueries.google.com/complete/search?client=firefox&hl=pl&gl=pl&ie=utf-8&oe=utf-8&q=${encodeURIComponent(q)}`;
-    const r = await fetch(url, { headers: { 'User-Agent': UA } });
-    if (!r.ok) return [];
-    const data = await r.json();
-    return Array.isArray(data?.[1]) ? data[1].map(String) : [];
-  } catch {
-    return [];
-  }
-}
-
-async function research(seedExtra: string[]): Promise<string[]> {
-  const seeds = [...new Set([...seedExtra, ...DEFAULT_SEEDS])].slice(0, 16);
-  const found = new Map<string, number>();
-  const add = (s: string) => {
-    const k = s.toLowerCase().trim();
-    if (k.length < 8 || k.length > 90) return;
-    if (k.includes('\uFFFD')) return; // corrupted encoding — never log mojibake
-    if (!/stron|sklep|www|aplikacj|platform|landing|seo|internetow|web|cms|e-commerce|wizytówk/.test(k)) return;
-    found.set(k, (found.get(k) || 0) + 1);
+async function loadContext() {
+  const [posts, services, projects, settings, topics, redirects] = await Promise.all([
+    db<Post[]>('blog_posts?select=id,slug,title_pl,status,scheduled_for,published_at,pillar,format,images,cover_path,body_en,body_ru,meta&order=published_at.desc&limit=2000'),
+    db<any[]>('services?select=slug,title_pl,price_from,bullets_pl&is_published=eq.true&order=sort_order'),
+    db<any[]>('projects?select=slug,title_pl,client,challenge_pl,services,stack,results,url&is_published=eq.true&order=sort_order'),
+    db<any[]>('site_settings?select=key,value_meta&key=in.(blog_config)'),
+    db<Topic[]>('blog_topics?select=*&status=eq.queued&order=priority.desc,created_at'),
+    db<any[]>('blog_redirects?select=from_slug'),
+  ]);
+  const raw = settings.find((s) => s.key === 'blog_config')?.value_meta || {};
+  // Admin → Blog → "Ustawienia generatora" (all optional; sane defaults here).
+  const config = {
+    enabled: raw.enabled !== false,
+    seed_keywords: (raw.seed_keywords || []) as string[],
+    buffer_days: clamp(raw.buffer_days ?? CFG.bufferDays ?? 7, 2, 21),
+    max_per_run: clamp(raw.max_per_run ?? CFG.maxPerRun ?? 2, 1, 4),
+    words_min: clamp(raw.words_min ?? 1300, 600, 4000),
+    words_max: clamp(raw.words_max ?? 1900, 800, 5000),
+    inline_images: clamp(raw.inline_images ?? 2, 0, 3),
+    langs: (Array.isArray(raw.langs) ? raw.langs : ['en', 'ru']).filter((l: string) => l === 'en' || l === 'ru') as ('en' | 'ru')[],
+    pillars: Object.fromEntries(Object.keys(PILLARS).map((k) => [k, clamp(raw.pillars?.[k] ?? 2, 0, 3)])) as Record<string, number>,
+    formats: Object.fromEntries(Object.keys(FORMATS).map((k) => [k, raw.formats?.[k] !== false])) as Record<string, boolean>,
+    style_notes: String(raw.style_notes || '').slice(0, 2000),
+    photo_style: String(raw.photo_style || '').slice(0, 600),
+    banned_phrases: (raw.banned_phrases || []) as string[],
   };
-  for (const seed of seeds) {
-    (await googleSuggest(seed)).forEach(add);
-    await Bun.sleep(180);
+  if (!Object.values(config.pillars).some((w) => w > 0)) for (const k of Object.keys(config.pillars)) config.pillars[k] = 2;
+  if (!Object.values(config.formats).some(Boolean)) for (const k of Object.keys(config.formats)) config.formats[k] = true;
+  const recentQueries = posts.filter((p: any) => p.meta?.cover_query).sort((a: any, b: any) => String(b.scheduled_for || b.published_at).localeCompare(String(a.scheduled_for || a.published_at))).map((p: any) => p.meta.cover_query as string);
+  return { posts, services, projects, config, topics, recentQueries, archivedSlugs: new Set(redirects.map((r) => r.from_slug as string)) };
+}
+type Ctx = Awaited<ReturnType<typeof loadContext>>;
+
+const live = (ctx: Ctx) => ctx.posts.filter((p) => p.status === 'published' || p.status === 'scheduled');
+
+// ── topic dedup (code-level, on top of Claude seeing the full list) ─────────
+const STOP = new Set(['i', 'w', 'z', 'na', 'do', 'dla', 'jak', 'co', 'czy', 'to', 'o', 'od', 'po', 'sie', 'jest', 'ile', 'oraz', 'a', 'the', 'czym', 'jaka', 'jaki', 'jakie', 'twoja', 'twojej', 'twoj', 'firmy', 'firma', 'strona', 'strony', 'internetowa', 'internetowej', 'internetowe', 'stron', 'internetowych', '2026', '2027', 'przewodnik', 'poradnik', 'kompletny', 'praktyczny']);
+const toks = (slug: string) => new Set(slug.split('-').filter((t) => t.length > 2 && !STOP.has(t)).map((t) => t.slice(0, 6)));
+function nearDup(slug: string, against: string[]): string | null {
+  const a = toks(slug);
+  if (!a.size) return null;
+  for (const s of against) {
+    const b = toks(s);
+    if (!b.size) continue;
+    const inter = [...a].filter((x) => b.has(x)).length;
+    if (inter / Math.min(a.size, b.size) >= 0.8 && inter >= 2) return s;
   }
-  // Letter expansion on the strongest commercial seeds — surfaces long-tails.
-  for (const seed of ['strona internetowa ', 'ile kosztuje strona ', 'sklep internetowy ']) {
-    for (const ch of ['a', 'c', 'd', 'i', 'j', 'k', 'n', 'p', 's', 'w', 'z']) {
-      (await googleSuggest(seed + ch)).forEach(add);
-      await Bun.sleep(150);
-    }
-  }
-  const ranked = [...found.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
-  log(`research: ${ranked.length} unique suggestions`);
-  return ranked;
+  return null;
 }
 
-// ── Openverse cover (CC / commercial-use licensed) ───────────────────────────
-// Falls back through progressively broader queries — LLM-generated queries are
-// sometimes too specific and return zero results.
-//
-// usedCovers holds cover_source_url of recent posts + every pick made this
-// run (also failed downloads). Both 2026-07-05 posts fell back to the same
-// generic query and got the IDENTICAL first result — never reuse a photo,
-// and never re-pick one whose download already failed.
-//
-// The image is downloaded HERE, on the Mac — the Edge Function's Fly.io
-// egress 502s on many Flickr shards that respond 200 locally. A candidate
-// only wins after its bytes are actually in hand, so a published post can no
-// longer end up cover-less because of a remote fetch flake.
-const coverKey = (x: any) => String(x.foreign_landing_url || x.url);
-const MAX_COVER_BYTES = 6 * 1024 * 1024;
+// ── planner ─────────────────────────────────────────────────────────────────
+const PLAN_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['topics'],
+  properties: { topics: { type: 'array', items: {
+    type: 'object', additionalProperties: false,
+    required: ['title', 'slug', 'primary_keyword', 'pillar', 'format', 'angle'],
+    properties: {
+      title: { type: 'string' }, slug: { type: 'string' }, primary_keyword: { type: 'string' },
+      pillar: { type: 'string', enum: Object.keys(PILLARS) }, format: { type: 'string', enum: Object.keys(FORMATS) },
+      angle: { type: 'string' },
+    },
+  } } },
+};
 
-// Flickr's CDN answers 502 to fetch()-style clients whose User-Agent contains
-// "Bot" (curl with the same UA gets 200 — it keys on the whole fingerprint).
-// That was the source of ALL the cover 502s, worker- and edge-side alike. Use
-// a browser UA for image downloads only; API calls keep the honest bot UA.
-const IMG_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+async function refillTopics(ctx: Ctx) {
+  if (ctx.topics.filter((t) => t.priority > 0 || ((ctx.config.pillars[t.pillar || ''] ?? 2) > 0 && ctx.config.formats[t.format || ''] !== false)).length >= QUEUE_MIN) return;
+  const existing = live(ctx).map((p) => `${p.slug} — ${p.title_pl}`);
+  const queued = ctx.topics.map((t) => `${t.slug} — ${t.title}`);
+  const counts: Record<string, number> = {};
+  for (const p of live(ctx).slice(0, 40)) if (p.pillar) counts[p.pillar] = (counts[p.pillar] || 0) + 1;
+  const res = await claudeJson<{ topics: any[] }>({
+    label: 'plan', effort: 'medium', maxTokens: 24000, schema: PLAN_SCHEMA,
+    system: `Jesteś strategiem treści bloga studia BarabashFlow (Damian Barabash, Warszawa): strony internetowe, sklepy, platformy i aplikacje webowe, CMS, SEO, opieka. Blog ma przyciągać z Google i asystentów AI PRAWDZIWYCH klientów (właściciele firm, marketing, startupy w Polsce) i budować zaufanie.
+Filary (waga = jak często właściciel chce dany filar: 3 często, 2 normalnie, 1 rzadko): ${Object.entries(PILLARS).filter(([k]) => ctx.config.pillars[k] > 0).map(([k, v]) => `\n- ${k} (waga ${ctx.config.pillars[k]}): ${v}`).join('')}
+Formaty: ${Object.entries(FORMATS).filter(([k]) => ctx.config.formats[k]).map(([k, v]) => `\n- ${k}: ${v}`).join('')}
+Zasady:
+- Każdy temat to konkretny problem/pytanie klienta, którego realnie szuka po polsku (long-tail z intencją zakupową lub decyzyjną). Zero tematów pod cudze marki, zero tematów niezwiązanych z usługami studia.
+- Tytuł: do 60 znaków, główna fraza na początku, obiecuje konkretną wartość (liczby, porównanie, checklista). Bez "kompletny przewodnik 2026" i bez clickbaitu.
+- angle: 2 zdania — co dokładnie dostanie czytelnik i czym ten tekst różni się od istniejących (inny kąt, inna grupa odbiorców, świeże dane).
+- slug: tylko [a-z0-9-], bez polskich znaków, do 60 znaków.
+- NIE powtarzaj tematów ani kątów z listy istniejących i zaplanowanych — ani dosłownie, ani "tym samym tekstem innymi słowami".
+- Rozłóż tematy po filarach proporcjonalnie do wag (i preferuj te rzadko używane ostatnio) oraz po formatach (różnorodność). Używaj WYŁĄCZNIE filarów i formatów z listy. Case study tylko o projektach studia (lista projektów w danych).`,
+    content: `Projekty studia (do case study): ${ctx.projects.map((p) => `${p.slug} (${p.client || p.title_pl}): ${String(p.challenge_pl || '').slice(0, 140)}`).join(' | ')}
+Ostatnio użyte filary (40 wpisów): ${JSON.stringify(counts)}
+Tematy priorytetowe od właściciela (jeśli są — uwzględnij je najpierw): ${(ctx.config.seed_keywords || []).join('; ') || 'brak'}
 
-async function downloadImage(url: string): Promise<{ b64: string; contentType: string; kb: number }> {
-  const r = await fetch(url, {
-    headers: { 'User-Agent': IMG_UA },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(25000),
+ISTNIEJĄCE WPISY (${existing.length}):
+${existing.join('\n')}
+
+ZAPLANOWANE W KOLEJCE (${queued.length}):
+${queued.join('\n') || '—'}
+
+Zaplanuj 16 nowych tematów.`,
   });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const contentType = (r.headers.get('content-type') || '').split(';')[0].trim();
-  if (!/^image\/(jpeg|png|webp|avif|gif)$/.test(contentType)) throw new Error(`not an image: ${contentType}`);
-  const buf = await r.arrayBuffer();
-  if (buf.byteLength > MAX_COVER_BYTES) throw new Error(`too big: ${buf.byteLength}`);
-  if (buf.byteLength < 1024) throw new Error(`suspiciously small: ${buf.byteLength}`);
-  return { b64: Buffer.from(buf).toString('base64'), contentType, kb: Math.round(buf.byteLength / 1024) };
+  const allSlugs = [...ctx.posts.map((p) => p.slug), ...ctx.archivedSlugs, ...ctx.topics.map((t) => t.slug)];
+  const againstLive = [...live(ctx).map((p) => p.slug), ...ctx.topics.map((t) => t.slug)];
+  const seeds = new Set((ctx.config.seed_keywords || []).map((s: string) => s.toLowerCase()));
+  const rows: any[] = [];
+  for (const t of res.topics || []) {
+    const slug = slugify(t.slug || t.title);
+    if (slug.length < 3) continue;
+    if (!(ctx.config.pillars[t.pillar] > 0) || !ctx.config.formats[t.format]) { log(`plan: drop (pillar/format off) ${slug}`); continue; }
+    if (allSlugs.includes(slug)) { log(`plan: drop (slug exists) ${slug}`); continue; }
+    const dup = nearDup(slug, [...againstLive, ...rows.map((r) => r.slug)]);
+    if (dup) { log(`plan: drop (near-dup of ${dup}) ${slug}`); continue; }
+    const fromSeed = [...seeds].some((s) => t.title.toLowerCase().includes(s) || t.primary_keyword.toLowerCase().includes(s));
+    rows.push({ title: t.title.slice(0, 120), slug, primary_keyword: t.primary_keyword, pillar: t.pillar, format: t.format, angle: t.angle, source: fromSeed ? 'admin' : 'planner', priority: fromSeed ? 10 : 0 });
+  }
+  if (!rows.length) throw new Error('planner produced no usable topics');
+  const inserted = await db<Topic[]>('blog_topics', { method: 'POST', body: JSON.stringify(rows), prefer: 'return=representation,resolution=ignore-duplicates' });
+  log(`plan: +${inserted.length} topics`);
+  ctx.topics.push(...inserted);
 }
 
-async function findCover(query: string, usedCovers: Set<string>) {
-  const attempts = [
-    query,
-    query.split(/\s+/).slice(0, 2).join(' '),
-    'modern website laptop',
-    'laptop office desk',
-  ].filter((q, i, a) => q && a.indexOf(q) === i);
+function pickTopic(ctx: Ctx): Topic | null {
+  const ok = (t: Topic) => t.priority > 0 || ((!t.pillar || ctx.config.pillars[t.pillar] > 0) && (!t.format || ctx.config.formats[t.format]));
+  const pool = ctx.topics.filter((t) => t.status !== 'rejected' && ok(t));
+  if (!pool.length) return null;
+  const recent = live(ctx).sort((a, b) => String(b.scheduled_for || b.published_at).localeCompare(String(a.scheduled_for || a.published_at))).slice(0, 8);
+  const recentPillars = recent.map((p) => p.pillar);
+  const lastFormats = recent.slice(0, 3).map((p) => p.format);
+  const score = (t: Topic) => t.priority * 100 + (ctx.config.pillars[t.pillar || ''] ?? 2) * 6 - recentPillars.filter((x) => x === t.pillar).length * 10 - (lastFormats.includes(t.format) ? 5 : 0) - (recentPillars[0] === t.pillar ? 20 : 0);
+  return [...pool].sort((a, b) => score(b) - score(a))[0];
+}
 
-  for (const q of attempts) {
+// ── writer ──────────────────────────────────────────────────────────────────
+const ARTICLE_SCHEMA = {
+  type: 'object', additionalProperties: false,
+  required: ['title', 'excerpt', 'body', 'faq', 'tags', 'keywords', 'estimator_after_h2', 'cover', 'inline_images'],
+  properties: {
+    title: { type: 'string' }, excerpt: { type: 'string' }, body: { type: 'string' },
+    faq: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['q', 'a'], properties: { q: { type: 'string' }, a: { type: 'string' } } } },
+    tags: { type: 'array', items: { type: 'string' } }, keywords: { type: 'array', items: { type: 'string' } },
+    estimator_after_h2: { type: 'integer' },
+    cover: { type: 'object', additionalProperties: false, required: ['query', 'idea', 'alt'], properties: { query: { type: 'string' }, idea: { type: 'string' }, alt: { type: 'string' } } },
+    inline_images: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['after_h2', 'idea', 'alt'], properties: { after_h2: { type: 'integer' }, idea: { type: 'string' }, alt: { type: 'string' } } } },
+  },
+};
+
+function writerSystem(ctx: Ctx) {
+  return `Jesteś Damianem Barabashem — właścicielem studia BarabashFlow (Warszawa). Sam projektujesz i wdrażasz strony, sklepy, platformy i aplikacje webowe (Astro, Next.js, Supabase, własny CMS, SEO), bez agencyjnych pośredników. Piszesz bloga dla właścicieli firm i marketerów w Polsce.
+
+GŁOS: ekspert-praktyk, który tłumaczy jak dobremu klientowi przy kawie. Konkret, liczby, przykłady, własne zdanie i rekomendacje ("ja bym…", "u klientów widzę…"). Krótkie akapity (2–4 zdania). Zero lania wody, zero ogólników typu "W dzisiejszych czasach", "W erze cyfrowej", "Podsumowując", "Kluczowe jest", "Warto zauważyć". Nie zaczynaj akapitów od "Pamiętaj". Polszczyzna naturalna, poprawna, bez kalk z angielskiego.
+
+STRUKTURA (markdown, BEZ nagłówka H1):
+- Lead: 2–3 zdania przed pierwszym H2 — od razu problem czytelnika i obietnica konkretu.
+- 5–7 sekcji "## " (nagłówki jak pytania lub konkretne tezy, nie "Wprowadzenie"/"Podsumowanie"), w razie potrzeby "### ".
+- Co najmniej JEDNA tabela markdown (porównanie, widełki, harmonogram) i JEDNA lista punktowana lub numerowana.
+- 1–2 ramki "> **Z praktyki:** …" — obserwacje z projektów studia. Jeśli wspominasz konkretny projekt, używaj WYŁĄCZNIE faktów z listy projektów i linkuj do jego strony. Nie wymyślaj klientów, liczb, wyników ani cytatów.
+- 3–5 linków wewnętrznych w naturalnym tekście — TYLKO adresy z listy (usługi, projekty, wpisy). Max 2 linki zewnętrzne, tylko do autorytetów (Google Search Central, web.dev, UODO, MDN).
+- Ostatnia sekcja: praktyczny następny krok (co zrobić jutro rano). W środku artykułu (po sekcji estimator_after_h2) będzie interaktywny kalkulator wyceny — możesz raz naturalnie do niego odesłać ("policz swój przypadek w kalkulatorze powyżej").
+- Długość: ${ctx.config.words_min}–${ctx.config.words_max} słów.
+- Ceny: posługuj się cennikiem studia (poniżej) i uczciwymi widełkami rynkowymi; typowy czas realizacji strony firmowej w studiu to 2–3 tygodnie.
+
+SEO/AEO: główna fraza w tytule (na początku), w leadzie i w jednym H2; tytuł max 60 znaków; excerpt = meta description 130–155 znaków z frazą i obietnicą. FAQ: 4 pytania, które ludzie wpisują w Google/ChatGPT, odpowiedzi 1–3 zdania, samodzielne (do featured snippets).
+
+ZDJĘCIA (Unsplash, estetyka editorial/minimal, naturalne światło). Blog ma wyglądać jak magazyn — NIE kolejne biurko z laptopem i kawą, jeśli temat tego nie wymaga; szukaj motywu oddającego temat (architektura, wnętrza, faktury, ludzie w swoim fachu, przedmioty z branży, miasto, światło), wyraźnie innego niż ostatnio użyte zapytania (lista w briefie). cover.query = 2–5 słów PO ANGIELSKU pod wyszukiwarkę Unsplash, nastrojowe i konkretne (np. "architect desk morning light", "minimal ceramic studio"), NIE dosłowne "website cost". Ta sama wyszukiwarka zasili też 2 zdjęcia w treści — więc query ma dawać spójną serię. cover.idea / inline_images[].idea = co ma być na zdjęciu (1 zdanie). alt = opis po polsku (do 120 znaków). inline_images: dokładnie ${ctx.config.inline_images}${ctx.config.inline_images ? ', after_h2 = numer sekcji (1-based), różne, nie w tej samej sekcji co kalkulator' : ' (pusta lista)'}.${ctx.config.photo_style ? `\nSTYL ZDJĘĆ WG WŁAŚCICIELA: ${ctx.config.photo_style}` : ''} estimator_after_h2: numer sekcji (2..liczba sekcji−1), po której pasuje kalkulator (najlepiej po sekcji o kosztach/zakresie).
+
+USŁUGI I CENNIK STUDIA:
+${ctx.services.map((s) => `- ${s.title_pl} (${SITE}/uslugi/${s.slug}/): ${s.price_from}; ${(s.bullets_pl || []).slice(0, 4).join('; ')}`).join('\n')}
+
+PROJEKTY STUDIA (fakty do "Z praktyki" i linkowania):
+${ctx.projects.map((p) => `- ${p.client || p.title_pl} — ${SITE}/projekty/${p.slug}/ — zadanie: ${String(p.challenge_pl || '').slice(0, 220)}${p.stack?.length ? ` — stack: ${p.stack.slice(0, 5).join(', ')}` : ''}`).join('\n')}
+
+INNE STRONY: ${SITE}/kontakt/ (wycena), ${SITE}/o-mnie/, ${SITE}/projekty/, ${SITE}/uslugi/${ctx.config.style_notes ? `\n\nDODATKOWE WSKAZÓWKI WŁAŚCICIELA (mają pierwszeństwo przed powyższymi, o ile nie każą wymyślać faktów):\n${ctx.config.style_notes}` : ''}${ctx.config.banned_phrases.length ? `\n\nNIE UŻYWAJ FRAZ: ${ctx.config.banned_phrases.join('; ')}` : ''}`;
+}
+
+function allowedLinks(ctx: Ctx) {
+  const set = new Set<string>(['/', '/kontakt/', '/o-mnie/', '/projekty/', '/uslugi/', '/blog/']);
+  ctx.services.forEach((s) => set.add(`/uslugi/${s.slug}/`));
+  ctx.projects.forEach((p) => set.add(`/projekty/${p.slug}/`));
+  ctx.posts.filter((p) => p.status === 'published').forEach((p) => set.add(`/blog/${p.slug}/`));
+  return set;
+}
+
+// Internal links → relative, unknown ones unwrapped; external only to an allowlist.
+const EXT_OK = /^(https?:\/\/)?(developers\.google\.com|web\.dev|uodo\.gov\.pl|developer\.mozilla\.org|support\.google\.com|search\.google\.com|schema\.org|www\.w3\.org|pagespeed\.web\.dev)\b/;
+function fixLinks(md: string, allowed: Set<string>): { md: string; internal: number; removed: string[] } {
+  let internal = 0;
+  const removed: string[] = [];
+  const out = md.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text, href) => {
+    let h = String(href).replace(/^https?:\/\/(www\.)?barabashflow\.pl/, '');
+    if (h.startsWith('/')) {
+      if (!h.endsWith('/') && !h.includes('#') && !h.includes('?')) h += '/';
+      if (allowed.has(h.split('#')[0])) { internal++; return `[${text}](${h})`; }
+      removed.push(h); return text;
+    }
+    if (EXT_OK.test(h)) return `[${text}](${h})`;
+    removed.push(h); return text;
+  });
+  return { md: out, internal, removed };
+}
+
+function qa(a: any, cfg: Ctx['config']): string[] {
+  const issues: string[] = [];
+  const n = h2Count(a.body);
+  const w = words(a.body);
+  if (/^# /m.test(a.body)) issues.push('usuń nagłówek H1 (# ) z treści');
+  if (n < 5 || n > 8) issues.push(`liczba sekcji H2 = ${n}, wymagane 5–7`);
+  if (w < cfg.words_min * 0.88) issues.push(`za krótko: ${w} słów, wymagane ${cfg.words_min}–${cfg.words_max}`);
+  if (w > cfg.words_max * 1.25) issues.push(`za długo: ${w} słów, max ${cfg.words_max}`);
+  if (!/^\|.+\|\s*$/m.test(a.body)) issues.push('brak tabeli markdown');
+  if (!/^>\s*\*\*Z praktyki/m.test(a.body)) issues.push('brak ramki "> **Z praktyki:**"');
+  if (a.title.length > 62) issues.push(`tytuł ma ${a.title.length} znaków (max 60)`);
+  if (a.excerpt.length < 110 || a.excerpt.length > 160) issues.push(`excerpt ma ${a.excerpt.length} znaków (130–155)`);
+  if ((a.faq || []).length < 3) issues.push('FAQ: wymagane 4 pytania');
+  if ((a.inline_images || []).length !== cfg.inline_images) issues.push(`inline_images: wymagane dokładnie ${cfg.inline_images}`);
+  const banned = ['W dzisiejszych czasach', 'W erze cyfrowej', 'Podsumowując', 'Warto zauważyć', 'nie ulega wątpliwości', ...cfg.banned_phrases];
+  for (const b of banned) if (a.body.toLowerCase().includes(b.toLowerCase())) issues.push(`usuń frazę "${b}"`);
+  return issues;
+}
+
+async function writeArticle(ctx: Ctx, topic: Topic) {
+  const allowed = allowedLinks(ctx);
+  const postsList = ctx.posts.filter((p) => p.status === 'published').slice(0, 150).map((p) => `- ${SITE}/blog/${p.slug}/ — ${p.title_pl}`).join('\n');
+  const system = writerSystem(ctx);
+  const brief = `TEMAT: ${topic.title}
+Główna fraza: ${topic.primary_keyword || topic.title}
+Filar: ${topic.pillar} — ${PILLARS[topic.pillar || ''] || ''}
+Format: ${topic.format} — ${FORMATS[topic.format || ''] || ''}
+Kąt / czym ma się wyróżniać: ${topic.angle || '—'}
+
+OSTATNIO UŻYTE ZAPYTANIA ZDJĘĆ (unikaj podobnych motywów): ${ctx.recentQueries.slice(0, 25).join(' · ') || '—'}
+
+WPISY NA BLOGU (do linkowania; nie powtarzaj ich treści):
+${postsList}`;
+  let art = await claudeJson<any>({ label: 'write', effort: 'high', maxTokens: 48000, schema: ARTICLE_SCHEMA, system, content: brief });
+  let issues = qa(art, ctx.config);
+  if (issues.length) {
+    log(`qa round 1: ${issues.join(' | ')}`);
+    art = await claudeJson<any>({
+      label: 'repair', effort: 'medium', maxTokens: 48000, schema: ARTICLE_SCHEMA, system,
+      content: `${brief}\n\nTwoja poprzednia wersja (JSON):\n${JSON.stringify(art)}\n\nPopraw TYLKO te problemy, resztę zachowaj:\n- ${issues.join('\n- ')}`,
+    });
+    issues = qa(art, ctx.config);
+    if (issues.length) log(`qa round 2 (accepted with warnings): ${issues.join(' | ')}`);
+  }
+  const links = fixLinks(art.body, allowed);
+  if (links.removed.length) log(`links unwrapped: ${links.removed.join(', ')}`);
+  art.body = links.md;
+  art.title = art.title.trim().replace(/\.$/, '');
+  art.qa = { warnings: issues, internal_links: links.internal, words: words(art.body), h2: h2Count(art.body) };
+  return art;
+}
+
+// ── translation ─────────────────────────────────────────────────────────────
+const TR_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['title', 'excerpt', 'body', 'faq', 'alts'],
+  properties: {
+    title: { type: 'string' }, excerpt: { type: 'string' }, body: { type: 'string' },
+    faq: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['q', 'a'], properties: { q: { type: 'string' }, a: { type: 'string' } } } },
+    alts: { type: 'array', items: { type: 'string' } },
+  },
+};
+
+async function translate(art: { title: string; excerpt: string; body: string; faq: any[]; alts: string[] }, lang: 'en' | 'ru') {
+  const name = lang === 'en' ? 'English (international business reader)' : 'Russian (русскоязычный предприниматель в Польше/ЕС)';
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const tr = await claudeJson<any>({
+      label: `translate-${lang}`, effort: 'low', maxTokens: 32000, schema: TR_SCHEMA,
+      system: `You are a senior editor translating a Polish blog article of a web studio into ${name}. Write natural, idiomatic copy (not literal), keep the author's voice and all facts. Keep markdown EXACTLY structured: same number of "## " and "### " headings in the same order, same tables, lists and blockquotes, the same link URLs (translate only link text). Keep prices in PLN/zł as numbers (write "PLN" in English, "злотых"/"zł" in Russian). Keep "> **Z praktyki:**" callouts translated as "> **From practice:**" / "> **Из практики:**". Translate faq items and the image alt texts in the same order.`,
+      content: JSON.stringify(art),
+    });
+    if (h2Count(tr.body) === h2Count(art.body) && tr.faq?.length === art.faq.length) return tr;
+    log(`translate-${lang}: structure mismatch (h2 ${h2Count(tr.body)} vs ${h2Count(art.body)}) attempt ${attempt}`);
+  }
+  return null;
+}
+
+// ── photos ──────────────────────────────────────────────────────────────────
+function usedPhotoIds(ctx: Ctx): Set<string> {
+  const s = new Set<string>();
+  for (const p of ctx.posts) for (const i of p.images || []) if (i?.id) s.add(i.id);
+  return s;
+}
+
+async function photosFor(ctx: Ctx, title: string, cover: { query: string; idea: string }, inlineIdeas: string[]): Promise<{ cover: Photo; inline: Photo[] }> {
+  const used = usedPhotoIds(ctx);
+  let cands = await searchPhotos(cover.query, used);
+  if (cands.length < 6) {
+    log(`photos: only ${cands.length} for "${cover.query}", widening`);
+    const wide = cover.query.split(/\s+/).slice(0, 2).join(' ');
+    cands = [...cands, ...(await searchPhotos(`${wide} minimal`, used))].filter((p, i, a) => a.findIndex((x) => x.id === p.id) === i);
+  }
+  const pick = await pickPhotos(cands, { title, coverIdea: cover.idea, inline: inlineIdeas, style: ctx.config.photo_style });
+  for (const p of [pick.cover, ...pick.inline]) await trackDownload(p);
+  return pick;
+}
+
+// ── scheduling ──────────────────────────────────────────────────────────────
+const dayOf = (iso: string) => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' });
+function nextFreeSlot(ctx: Ctx): string {
+  const taken = new Set(live(ctx).map((p) => dayOf(p.scheduled_for || p.published_at)));
+  const now = new Date();
+  // Today is still fillable before the 06:00 UTC publish run.
+  const start = now.getUTCHours() < 5 ? 0 : 1;
+  for (let d = start; d < 400; d++) {
+    const day = new Date(now.getTime() + d * 86400000).toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' });
+    if (!taken.has(day)) return `${day}T05:00:00Z`;
+  }
+  throw new Error('no free slot');
+}
+function bufferDepth(ctx: Ctx) {
+  return ctx.posts.filter((p) => p.status === 'scheduled' && p.scheduled_for && new Date(p.scheduled_for) > new Date()).length;
+}
+
+// ── one post end-to-end ─────────────────────────────────────────────────────
+async function produce(ctx: Ctx): Promise<string> {
+  await refillTopics(ctx);
+  const topic = pickTopic(ctx);
+  if (!topic) throw new Error('topic queue empty');
+  log(`topic: ${topic.title} [${topic.pillar}/${topic.format}]`);
+  await db(`blog_topics?id=eq.${topic.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'writing' }) });
+  try {
+    const art = await writeArticle(ctx, topic);
+    const slugBase = slugify(topic.slug || art.title);
+    const taken = new Set([...ctx.posts.map((p) => p.slug), ...ctx.archivedSlugs]);
+    const slug = taken.has(slugBase) ? `${slugBase.slice(0, 66)}-${Date.now().toString(36).slice(-4)}` : slugBase;
+
+    const alts = [art.cover.alt, ...art.inline_images.map((i: any) => i.alt)];
+    const src = { title: art.title, excerpt: art.excerpt, body: art.body, faq: art.faq, alts };
+    const tr = (l: 'en' | 'ru') => (ctx.config.langs.includes(l) ? translate(src, l).catch((e) => (log(`translate ${l} failed`, String(e)), null)) : Promise.resolve(null));
+    const [en, ru] = await Promise.all([tr('en'), tr('ru')]);
+
+    let images: any[] = [];
+    let coverPath: string | null = null;
+    if (unsplashRemaining >= 6) {
+      try {
+        const pick = await photosFor(ctx, art.title, art.cover, (art.inline_images || []).slice(0, ctx.config.inline_images).map((i: any) => i.idea));
+        const altFor = (i: number) => ({ alt_pl: alts[i], alt_en: en?.alts?.[i] || null, alt_ru: ru?.alts?.[i] || null });
+        images = [
+          imageRecord(pick.cover, 'cover', altFor(0)),
+          ...pick.inline.map((p, i) => imageRecord(p, 'inline', { slot: i + 1, after_h2: art.inline_images[i].after_h2, ...altFor(i + 1) })),
+        ];
+        coverPath = pick.cover.url;
+      } catch (e) { log('photos failed (repair pass will retry):', String(e)); }
+    } else log(`photos deferred: unsplash budget ${unsplashRemaining}`);
+
+    const slot = nextFreeSlot(ctx);
+    const faq = art.faq.map((f: any, i: number) => ({ q: f.q, a: f.a, q_en: en?.faq?.[i]?.q, a_en: en?.faq?.[i]?.a, q_ru: ru?.faq?.[i]?.q, a_ru: ru?.faq?.[i]?.a }));
+    const row = {
+      slug, status: 'scheduled', scheduled_for: slot, published_at: slot,
+      title_pl: art.title, excerpt_pl: art.excerpt, body_pl: art.body,
+      title_en: en?.title ?? null, excerpt_en: en?.excerpt ?? null, body_en: en?.body ?? null,
+      title_ru: ru?.title ?? null, excerpt_ru: ru?.excerpt ?? null, body_ru: ru?.body ?? null,
+      faq, tags: art.tags.slice(0, 5), keywords: art.keywords.slice(0, 10),
+      cover_path: coverPath, cover_alt: art.cover.alt, cover_credit: images[0] ? `Fot. ${images[0].author} / Unsplash` : null, cover_source_url: images[0]?.page_url ?? null,
+      images, estimator_after_h2: art.estimator_after_h2, pillar: topic.pillar, format: topic.format, topic_id: topic.id,
+      meta: { agent: 'blog-writer-v2', model: 'claude-opus-5-5', primary_keyword: topic.primary_keyword, cover_query: art.cover.query, angle: topic.angle, qa: art.qa, day: slot.slice(0, 10) },
+    };
+    const [ins] = await db<any[]>('blog_posts', { method: 'POST', body: JSON.stringify(row), prefer: 'return=representation' });
+    await db(`blog_topics?id=eq.${topic.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'used', used_at: new Date().toISOString(), post_id: ins.id }) });
+    ctx.posts.unshift(ins);
+    ctx.recentQueries.unshift(art.cover.query);
+    ctx.topics = ctx.topics.filter((t) => t.id !== topic.id);
+    log(`scheduled ${slug} for ${slot} (${art.qa.words} words, ${art.qa.h2} sections, ${images.length} photos, en:${!!en} ru:${!!ru})`);
+    return slug;
+  } catch (e) {
+    await db(`blog_topics?id=eq.${topic.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'queued' }) }).catch(() => {});
+    throw e;
+  }
+}
+
+// Scheduled posts missing photos or a translation get fixed before their day.
+async function repair(ctx: Ctx, errors: string[]) {
+  const due = ctx.posts.filter((p) => p.status === 'scheduled' && (!p.cover_path || ctx.config.langs.some((l) => !(p as any)[`body_${l}`])));
+  for (const p of due.slice(0, 2)) {
     try {
-      const url = `https://api.openverse.org/v1/images/?q=${encodeURIComponent(q)}&license_type=commercial&page_size=20`;
-      const r = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } });
-      if (!r.ok) throw new Error(`openverse ${r.status}`);
-      const data = await r.json();
-      const results = (data?.results ?? []).filter((x: any) =>
-        x.url && (x.width ?? 0) >= 900 && /jpe?g|png|webp/i.test(x.filetype || x.url),
-      );
-      // Walk the fresh candidates and take the first whose bytes download.
-      for (const pick of results) {
-        if (usedCovers.has(coverKey(pick))) continue;
-        usedCovers.add(coverKey(pick));
-        try {
-          const img = await downloadImage(String(pick.url));
-          log(`openverse: cover for "${q}" (${pick.width}px, ${pick.license}, ${img.kb} KB downloaded locally)`);
-          return {
-            cover_b64: img.b64,
-            cover_content_type: img.contentType,
-            cover_credit: `Foto: ${pick.creator || 'autor nieznany'} · ${String(pick.license || 'cc').toUpperCase()} · Openverse`,
-            cover_source_url: pick.foreign_landing_url || pick.url,
-          };
-        } catch (err) {
-          log(`cover download failed for "${q}" (${pick.url}):`, String(err));
-        }
+      const [full] = await db<any[]>(`blog_posts?id=eq.${p.id}&select=*`);
+      const patch: Record<string, unknown> = {};
+      const inline = (full.images || []).filter((i: any) => i.role === 'inline');
+      const alts = [full.cover_alt || full.title_pl, ...inline.map((i: any) => i.alt_pl || '')];
+      const src = { title: full.title_pl, excerpt: full.excerpt_pl, body: full.body_pl, faq: (full.faq || []).map((f: any) => ({ q: f.q, a: f.a })), alts };
+      for (const l of ctx.config.langs) {
+        if (full[`body_${l}`]) continue;
+        const tr = await translate(src, l);
+        if (!tr) continue;
+        Object.assign(patch, { [`title_${l}`]: tr.title, [`excerpt_${l}`]: tr.excerpt, [`body_${l}`]: tr.body });
+        patch.faq = (patch.faq as any[] || full.faq || []).map((f: any, i: number) => ({ ...f, [`q_${l}`]: tr.faq[i]?.q, [`a_${l}`]: tr.faq[i]?.a }));
       }
-      log(`openverse: no downloadable fresh results for "${q}"`);
-    } catch (err) {
-      log(`openverse failed for "${q}":`, String(err));
-    }
-  }
-  return null;
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function slugify(s: string): string {
-  const map: Record<string, string> = { ą: 'a', ć: 'c', ę: 'e', ł: 'l', ń: 'n', ó: 'o', ś: 's', ź: 'z', ż: 'z' };
-  return s.toLowerCase()
-    .replace(/[ąćęłńóśźż]/g, (c) => map[c] || c)
-    .normalize('NFKD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-    .slice(0, 70) || `wpis-${TODAY}`;
-}
-// Stable within a day, varied across days. Both daily runs derive the same
-// number, so the 13:40 catch-up always finishes what the morning planned.
-function dailyTarget(min: number, max: number): number {
-  let h = 2166136261;
-  for (const c of TODAY) h = ((h ^ c.charCodeAt(0)) * 16777619) >>> 0;
-  return min + (h % (Math.max(min, max) - min + 1));
-}
-
-// ── Topic dedup against the full post corpus ─────────────────────────────────
-// Slug tokens that appear in nearly every post and carry no topical signal.
-// Price words and city names are modifiers, not subjects: on 2026-08-06 the
-// stem "koszt" (shared with the previous day's shop-pricing post) and "warsz"
-// (shared with an unrelated Warsaw-jobs post) rejected perfectly fresh topics
-// — together with other false positives that killed the whole day (0 topics).
-const SLUG_STOP = new Set([
-  'strona', 'strony', 'stronie', 'stron', 'internetowa', 'internetowe', 'internetowej', 'internetowy', 'internetowych',
-  'www', 'dla', 'firmy', 'firma', 'firm', 'jak', 'czy', 'co', 'ile', 'gdzie', 'kiedy', 'warto', 'jest', 'sie',
-  'na', 'w', 'z', 'i', 'o', 'u', 'do', 'od', 'po', 'za', 'ze', 'przy', 'oraz', 'czym', 'czego', 'ktora', 'ktory', 'ktore',
-  'wybrac', 'zrobic', 'stworzyc', 'tworzenie', 'tworzeniu', 'musi', 'moze', 'trzeba', 'wiedziec', 'zawierac',
-  'potrzebuje', 'krok', 'kroku', 'krokow', 'poradnik', 'przewodnik', 'praktyce', 'przyklady', 'przyklad',
-  'analiza', 'rozwiazania', 'wymagania', 'wszystko', 'kompletny', 'prawdziwy', 'najlepszy', 'najlepsze',
-  'koszt', 'koszty', 'kosztuje', 'kosztow', 'cena', 'ceny', 'cennik', 'cenowa', 'cenowy', 'kosztach',
-  'warszawa', 'warszawie', 'polsce', 'polska',
-  String(new Date().getFullYear()), String(new Date().getFullYear() + 1),
-]);
-
-// First 5 chars ≈ a Polish stem: transportowej/transportowa → "trans",
-// sklepem/sklepu → "sklep". Coarse on purpose — it occasionally over-rejects
-// (wizyt/wizytówka share a stem), which is the safe direction: a rejected
-// topic just gets re-picked, an under-rejected one dies on the DB constraint.
-function slugStems(slug: string): Set<string> {
-  const out = new Set<string>();
-  for (const tok of slug.split('-')) {
-    if (tok.length < 3 || SLUG_STOP.has(tok)) continue;
-    out.add(tok.slice(0, 5));
-  }
-  return out;
-}
-
-// Why a candidate topic must be rejected, or null if it is fresh.
-// Hard rules: exact slug exists; ≥2 topical stems shared with ANY existing
-// post (near-duplicate content); ≥1 stem shared with a post ≤10 days old
-// (same subject back-to-back — the transportowa/transportowa case). The
-// window was 21 days but at 2 posts/day that meant ~40 posts each banning a
-// stem — combined they rejected everything the LLM could think of
-// (2026-08-06: 8/8 rejected, day shipped 0 posts). 10 days still kills
-// back-to-back repeats while leaving the topic space breathable.
-const SAME_SUBJECT_DAYS = 10;
-function topicConflict(candSlug: string, allSlugs: Set<string>, recentDays: Map<string, number>): string | null {
-  if (allSlugs.has(candSlug)) return `slug already exists: ${candSlug}`;
-  const cand = slugStems(candSlug);
-  if (!cand.size) return null;
-  for (const existing of allSlugs) {
-    const shared = [...slugStems(existing)].filter((s) => cand.has(s));
-    if (!shared.length) continue;
-    if (shared.length >= 2) return `near-duplicate of "${existing}" (shared: ${shared.join(', ')})`;
-    // Every topical stem of the candidate already lives in this post — the
-    // topic adds nothing new, whatever its age ("firma budowlana" a third
-    // time a month later is still the same article).
-    if (shared.length === cand.size) return `adds nothing vs "${existing}" (${shared.join(', ')})`;
-    const days = recentDays.get(existing);
-    if (days !== undefined && days <= SAME_SUBJECT_DAYS) return `same subject as ${days}d-old "${existing}" (${shared[0]})`;
-  }
-  return null;
-}
-
-// Every published post, straight from the live sitemap — survives even if the
-// edge still runs an older version that only returns the last 60 posts.
-async function fetchSitemapSlugs(): Promise<string[]> {
-  try {
-    const idx = await (await fetch('https://barabashflow.pl/sitemap-index.xml', {
-      headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000),
-    })).text();
-    const maps = [...idx.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-    const slugs = new Set<string>();
-    for (const url of maps.slice(0, 10)) {
-      const xml = await (await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000) })).text();
-      for (const m of xml.matchAll(/\/blog\/([a-z0-9-]+)\//g)) slugs.add(m[1]);
-    }
-    return [...slugs];
-  } catch (err) {
-    log('sitemap slug fetch failed (continuing with edge data only):', String(err));
-    return [];
-  }
-}
-
-// One language per call — the combined EN+RU response was the biggest output
-// of the whole pipeline and the first thing to truncate.
-async function translateInto(art: any, lang: { code: 'en' | 'ru'; name: string }) {
-  const out = await llmJson(
-    `Jesteś tłumaczem. Odpowiadasz WYŁĄCZNIE poprawnym JSON-em.`,
-    `Przetłumacz ten wpis blogowy na ${lang.name} (markdown zachowaj, linki zostaw bez zmian). Zwróć JSON {"title":"...","excerpt":"...","body":"..."}.\n\nTYTUŁ: ${art.title_pl}\nEXCERPT: ${art.excerpt_pl}\nTREŚĆ:\n${art.body_pl}`,
-    0.3,
-    8192,
-    TRANSLATION_SCHEMA,
-  );
-  if (!out?.title || !out?.body) throw new Error(`empty ${lang.code} translation`);
-  return out;
-}
-
-async function githubDispatch(): Promise<number> {
-  try {
-    const r = await fetch(`https://api.github.com/repos/${CONFIG.github.repo}/dispatches`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${CONFIG.github.pat}`,
-        Accept: 'application/vnd.github+json',
-        'User-Agent': UA,
-      },
-      body: JSON.stringify({ event_type: 'blog-publish' }),
-    });
-    log(`github dispatch: ${r.status}`);
-    return r.status;
-  } catch (err) {
-    log('github dispatch failed:', String(err));
-    return 0;
-  }
-}
-
-// The PAT is the single credential the whole publish→rebuild chain hangs on,
-// and fine-grained tokens expire SILENTLY — on 2026-08-03 the dispatch got 401
-// and the day's posts sat DB-only while the site served yesterday's build.
-// Validate on every run and start alerting a week before expiry, not the
-// morning after.
-async function checkGithubToken(): Promise<string | null> {
-  if (!CONFIG.github?.pat) {
-    return 'GitHub PAT nie jest ustawiony w config.json — strona nie przebuduje się po publikacji';
-  }
-  try {
-    const r = await fetch(`https://api.github.com/repos/${CONFIG.github.repo}`, {
-      headers: {
-        Authorization: `Bearer ${CONFIG.github.pat}`,
-        Accept: 'application/vnd.github+json',
-        'User-Agent': UA,
-      },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (r.status === 401 || r.status === 403) {
-      return `GitHub PAT niewazny/wygasl (HTTP ${r.status}) — wygeneruj nowy fine-grained token (repo ${CONFIG.github.repo}, Contents: Read+Write) i wpisz go w ~/blog-agent/config.json na Mac Studio`;
-    }
-    if (!r.ok) return `GitHub PAT check: HTTP ${r.status}`;
-    // Header format: "2026-09-02 11:44:31 UTC" (absent on non-expiring tokens).
-    const exp = r.headers.get('github-authentication-token-expiration');
-    if (exp) {
-      const ms = Date.parse(exp.replace(' UTC', '').replace(' ', 'T') + 'Z');
-      if (Number.isFinite(ms)) {
-        const daysLeft = Math.floor((ms - Date.now()) / 864e5);
-        if (daysLeft <= 7) {
-          return `GitHub PAT wygasa za ${Math.max(0, daysLeft)} dni (${exp}) — wygeneruj nowy token ZAWCZASU i podmien w ~/blog-agent/config.json`;
-        }
+      if (!full.cover_path && unsplashRemaining >= 6) {
+        const meta = full.meta || {};
+        const q = meta.cover_query || 'minimal workspace natural light';
+        const pick = await photosFor(ctx, full.title_pl, { query: q, idea: full.cover_alt || full.title_pl }, Array.from({ length: ctx.config.inline_images }, () => 'zdjęcie pasujące do treści'));
+        const n = h2Count(full.body_pl);
+        patch.images = [imageRecord(pick.cover, 'cover', { alt_pl: full.cover_alt || full.title_pl }), ...pick.inline.map((ph, i) => imageRecord(ph, 'inline', { slot: i + 1, after_h2: Math.max(1, Math.round(((i + 1) * n) / 3)), alt_pl: full.title_pl }))];
+        patch.cover_path = pick.cover.url;
+        patch.cover_credit = `Fot. ${pick.cover.author} / Unsplash`;
+        patch.cover_source_url = pick.cover.page_url;
       }
-    }
-    return null;
-  } catch (err) {
-    return `GitHub PAT check failed: ${String(err)}`;
+      if (Object.keys(patch).length) {
+        await db(`blog_posts?id=eq.${p.id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+        log(`repaired ${p.slug}: ${Object.keys(patch).join(', ')}`);
+      }
+    } catch (e) { errors.push(`repair ${p.slug}: ${String((e as any)?.message || e)}`); }
   }
 }
 
-// Poll the live site until every slug serves 200 (or the deadline passes).
-// Returns the slugs that are still missing. The cache-buster query matters:
-// GH Pages sits behind Fastly with max-age=600, and a stale cached 404 would
-// make a freshly deployed page look missing for another 10 minutes.
-async function probeLive(slug: string): Promise<boolean> {
-  try {
-    const r = await fetch(`https://barabashflow.pl/blog/${slug}/?live=${Date.now()}`, {
-      headers: { 'User-Agent': UA },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(15000),
-    });
-    return r.status === 200;
-  } catch {
-    return false;
-  }
-}
-
-async function verifyLive(slugs: string[], timeoutMs: number): Promise<string[]> {
-  const deadline = Date.now() + timeoutMs;
-  let missing = [...slugs];
-  while (missing.length && Date.now() < deadline) {
-    await Bun.sleep(30_000);
-    const still: string[] = [];
-    for (const slug of missing) {
-      if (!(await probeLive(slug))) still.push(slug);
-    }
-    missing = still;
-  }
-  return missing;
-}
-
-// Dispatch a rebuild and poll until every slug serves 200. Appends to errors
-// instead of throwing — callers always continue to the status report.
-async function rebuildAndVerify(slugs: string[], errors: string[]) {
-  const status = await githubDispatch();
-  if (status === 0 || status >= 300) {
-    const patHint = status === 401 || status === 403 ? ' (PAT niewazny/wygasl?)' : '';
-    errors.push(`github dispatch failed (HTTP ${status || 'network'})${patHint} — site not rebuilt`);
-    return;
-  }
-  log('verifying new posts on the live site (build usually takes ~2 min)…');
-  let missing = await verifyLive(slugs, 10 * 60_000);
-  if (missing.length) {
-    log(`still missing after 10 min: ${missing.join(', ')} — re-dispatching once`);
-    await githubDispatch();
-    missing = await verifyLive(missing, 12 * 60_000);
-  }
-  if (missing.length) {
-    errors.push(`live verification failed: ${missing.map((s) => `/blog/${s}/`).join(', ')} not on the site after rebuild + retry`);
-  } else {
-    log('live verification OK — all new posts are on the site');
-  }
-}
-
-// ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
-  log('blog agent start');
-  const { posts: recentPosts, keywords: recentKw, config, all_slugs } = await edge('recent');
-  if (!config.enabled) { log('autopilot disabled in admin — exiting'); return; }
-
-  // A dead/dying PAT must surface in EVERY run's status (alert email), not
-  // only when there is something to publish.
-  const tokenIssue = await checkGithubToken();
-  if (tokenIssue) log('github token:', tokenIssue);
-
-  // Idempotency: launchd fires at 08:40 and again at 13:40 (catch-up). Count
-  // what today already has and only write the difference.
-  const postsToday = recentPosts.filter((p: any) => String(p.published_at || '').slice(0, 10) === TODAY).length;
-  const forced = Number(process.env.FORCE_POSTS);
-  const target = Number.isFinite(forced) && forced > 0
-    ? forced
-    : dailyTarget(config.posts_min ?? 1, config.posts_max ?? 2);
-  const n = Number.isFinite(forced) && forced > 0 ? forced : target - postsToday;
-  if (n <= 0) {
-    // Nothing to write — but "published in the DB" is not "done". Verify
-    // today's posts actually serve on the live site and self-heal with a
-    // rebuild if any are missing (a failed morning dispatch used to leave
-    // them invisible all day while this branch reported ok:true).
-    log(`already ${postsToday} post(s) published today (target ${target}) — verifying they are live`);
-    const errors: string[] = tokenIssue ? [tokenIssue] : [];
-    const todaySlugs: string[] = recentPosts
-      .filter((p: any) => String(p.published_at || '').slice(0, 10) === TODAY && (p.status ?? 'published') === 'published')
-      .map((p: any) => String(p.slug));
-    const missing: string[] = [];
-    for (const slug of todaySlugs) {
-      if (!(await probeLive(slug))) missing.push(slug);
-    }
-    if (missing.length) {
-      log(`published in DB but missing on the site: ${missing.join(', ')} — self-healing rebuild`);
-      if (CONFIG.github?.pat) {
-        await rebuildAndVerify(missing, errors);
-      } else {
-        errors.push(`posts missing on the site and no PAT to rebuild: ${missing.map((s) => `/blog/${s}/`).join(', ')}`);
-      }
-    } else {
-      log(`all ${todaySlugs.length} of today's post(s) are live — nothing to do`);
-    }
-    await reportStatus({
-      ok: errors.length === 0,
-      planned: 0,
-      published: [],
-      errors: errors.slice(0, 6),
-      note: `already ${postsToday}/${target} today${missing.length ? '; self-heal rebuild' : '; live-check OK'}`,
-    });
-    return;
-  }
-  log(`plan: ${n} post(s) (${postsToday} already today); ${recentPosts.length} recent posts known`);
-
-  const suggestions = await research(config.seed_keywords ?? []);
-
-  // The full slug corpus: edge all_slugs (v9+, includes hidden drafts) ∪ live
-  // sitemap (every published post, even on an older edge) ∪ the recent window.
-  const usedSlugs = new Set<string>(recentPosts.map((p: any) => String(p.slug)));
-  (Array.isArray(all_slugs) ? all_slugs : []).forEach((s: unknown) => usedSlugs.add(String(s)));
-  (await fetchSitemapSlugs()).forEach((s) => usedSlugs.add(s));
-  const recentDays = new Map<string, number>();
-  for (const p of recentPosts) {
-    const ms = Date.parse(String(p.published_at || ''));
-    if (Number.isFinite(ms)) recentDays.set(String(p.slug), Math.floor((Date.now() - ms) / 864e5));
-  }
-  log(`dedup corpus: ${usedSlugs.size} known slugs`);
-
-  const usedCovers = new Set<string>(recentPosts.map((p: any) => String(p.cover_source_url || '')).filter(Boolean));
-  const recentTitles = recentPosts.map((p: any) => p.title_pl);
-  const recentPicked = recentKw.filter((k: any) => k.picked).map((k: any) => k.keyword);
-
-  // Mniej wiecej co trzeci run: jeden temat popularny (head/mid-tail) —
-  // wysoki wolumen buduje topical authority; reszta zostaje long-tail.
-  const includePopular = Math.random() < 0.35;
-  const popularHint = includePopular
-    ? 'DZISIAJ DODATKOWO: dokladnie JEDEN z tematow zrob POPULARNY zamiast long-tail — krotka, wysokowolumenowa fraza, ktora ludzie wpisuja najczesciej (np. "tworzenie stron internetowych", "strona internetowa dla firmy", "jak zalozyc sklep internetowy"). Mimo wiekszej konkurencji taki wpis buduje topical authority. Zasady roznorodnosci i zakaz powtorki ceny obowiazuja takze dla niego. Pozostale tematy nadal long-tail.\n\n'
-    : '';
-
-  // 1) Topic selection — over-ask (n+2), then hard-filter every candidate
-  // against the full slug corpus. The LLM prompt asks for freshness too, but
-  // prompts are advisory; the filter is the guarantee. One re-ask with the
-  // rejected topics listed as forbidden if the first round leaves a shortfall.
-  // The prompt carries the FULL slug corpus, not just the recent titles — with
-  // only 60 titles visible the LLM kept re-proposing old favourites ("firma
-  // budowlana" twice in one run on 2026-08-06) and burned both rounds.
-  const corpusForPrompt = [...usedSlugs].sort();
-  const topics: any[] = [];
-  const rejected: string[] = [];
-  for (let round = 1; round <= 2 && topics.length < n; round++) {
-    const askFor = n - topics.length + 2;
-    const bannedBlock = rejected.length
-      ? `\n\nTe tematy własnie ODRZUCONO jako powtórki istniejących wpisów — NIE proponuj ich ani niczego zbliżonego:\n${rejected.join('\n')}\n`
-      : '';
-    const topicsResp = await llmJson(
-      `Jesteś strategiem SEO polskiego studia web-developmentu BarabashFlow (Damian Barabash, Warszawa; barabashflow.pl; usługi: strony internetowe, platformy/aplikacje webowe, panele CMS, sklepy internetowe). Odpowiadasz WYŁĄCZNIE poprawnym JSON-em.`,
-      `Świeże podpowiedzi z Google (co ludzie realnie wpisują dzisiaj):\n${suggestions.slice(0, 90).join('\n')}\n\n` +
-      (config.seed_keywords?.length ? `Tematy wskazane przez właściciela (PRIORYTET):\n${config.seed_keywords.join('\n')}\n\n` : '') +
-      `WSZYSTKIE istniejące wpisy bloga (każdy slug = opublikowany artykuł; NIE proponuj tematu pokrywającego się z KTÓRYMKOLWIEK z nich):\n${corpusForPrompt.join('\n') || '(brak)'}\n\n` +
-      `Ostatnie wpisy bloga (unikaj też ich kategorii dominującej):\n${recentTitles.slice(0, 15).join('\n') || '(brak)'}\n\n` +
-      `Słowa już użyte:\n${recentPicked.slice(0, 60).join(', ') || '(brak)'}\n${bannedBlock}\n` +
-      `Wybierz ${askFor} tematów na dzisiejsze wpisy blogowe. Kryteria: intencja komercyjna lub pytanie potencjalnego klienta, długi ogon (mniejsza konkurencja), brak powtórek z ostatnich wpisów.\n\nRÓŻNORODNOŚĆ (najważniejsze kryterium): każdy z dzisiejszych tematów MUSI należeć do INNEJ kategorii intencji, a żaden nie może powtarzać kategorii dominującej w 5 ostatnich wpisach bloga (rozpoznasz ją po tytułach wyżej). Kategorie: (1) cena — "ile kosztuje…"; (2) porównanie — "X czy Y", "co lepsze"; (3) proces — "jak długo trwa", "jak wygląda", "etapy"; (4) wybór wykonawcy — "jak wybrać", "na co uważać"; (5) błędy i checklisty — "najczęstsze błędy", "o czym pamiętać przed…"; (6) technologia prosto wyjaśniona — "co to jest…", "czym różni się…"; (7) SEO i widoczność w Google/AI; (8) strona dla konkretnej branży — "strona internetowa dla <branża>". Tematu o cenie NIE wybieraj, jeśli którykolwiek z 5 ostatnich wpisów był o cenie.\n\n${popularHint}Zwróć JSON:\n` +
-      `{"topics":[{"primary_keyword":"...","category":"nazwa kategorii z listy","supporting_keywords":["..."],"slug":"kebab-case-po-polsku-bez-znakow","title_hint":"...","angle":"jedna linia o ujęciu tematu","image_query_en":"2-4 English words for a stock photo"}]}`,
-      round === 1 ? 0.4 : 0.7,
-      2048,
-      TOPICS_SCHEMA,
-    );
-    for (const t of topicsResp?.topics ?? []) {
-      if (topics.length >= n) break;
-      const candSlug = slugify(t.slug || t.primary_keyword || '');
-      const intraRun = topics.some((a) => {
-        const shared = [...slugStems(slugify(a.slug || a.primary_keyword || ''))].filter((s) => slugStems(candSlug).has(s));
-        return shared.length >= 1;
-      });
-      const conflict = intraRun
-        ? 'same subject as another topic picked today'
-        : topicConflict(candSlug, usedSlugs, recentDays);
-      if (conflict) {
-        log(`topic rejected: "${t.primary_keyword}" — ${conflict}`);
-        rejected.push(String(t.primary_keyword || candSlug));
-        continue;
-      }
-      topics.push(t);
-    }
-  }
-  // 1b) Deterministic fallback — the day must NEVER die on topic selection
-  // (2026-08-06: both LLM rounds produced only duplicates, the script threw
-  // and shipped 0 posts while 318 live Google suggestions sat unused). Walk
-  // the ranked research suggestions, keep the ones that pass the very same
-  // corpus filter, and hand them to the LLM as FIXED topics to structure —
-  // it no longer gets to choose, only to fill in the supporting fields.
-  if (topics.length < n) {
-    const takenStems = () => topics.map((a) => slugStems(slugify(a.slug || a.primary_keyword || '')));
-    const fallbackKw: { kw: string; slug: string }[] = [];
-    for (const sug of suggestions) {
-      if (topics.length + fallbackKw.length >= n) break;
-      if (recentPicked.some((k: string) => String(k).toLowerCase() === sug)) continue;
-      const candSlug = slugify(sug);
-      if (candSlug.length < 12) continue;
-      const cand = slugStems(candSlug);
-      const intra = [...takenStems(), ...fallbackKw.map((f) => slugStems(f.slug))]
-        .some((set) => [...set].some((s) => cand.has(s)));
-      if (intra || topicConflict(candSlug, usedSlugs, recentDays)) continue;
-      fallbackKw.push({ kw: sug, slug: candSlug });
-    }
-    if (fallbackKw.length) {
-      log(`fallback topics from research suggestions: ${fallbackKw.map((f) => `"${f.kw}"`).join(', ')}`);
-      // One best-effort enrichment call; on any failure the raw keyword still
-      // becomes a topic — findCover degrades to generic queries on its own.
-      let enriched: any[] = [];
-      try {
-        const resp = await llmJson(
-          `Jesteś strategiem SEO studia BarabashFlow. Odpowiadasz WYŁĄCZNIE poprawnym JSON-em.`,
-          `Dla KAŻDEJ z poniższych fraz przygotuj wpis blogowy. primary_keyword MUSI być dokładnie podaną frazą (nie zmieniaj jej). Frazy:\n${fallbackKw.map((f) => f.kw).join('\n')}\n\nZwróć JSON:\n{"topics":[{"primary_keyword":"...","category":"...","supporting_keywords":["..."],"slug":"kebab-case-po-polsku-bez-znakow","title_hint":"...","angle":"jedna linia o ujęciu tematu","image_query_en":"2-4 English words for a stock photo"}]}`,
-          0.4,
-          2048,
-          TOPICS_SCHEMA,
-        );
-        enriched = resp?.topics ?? [];
-      } catch (err) {
-        log('fallback enrichment failed — using raw keywords:', String(err));
-      }
-      for (const f of fallbackKw) {
-        const e = enriched.find((t: any) => slugify(String(t?.primary_keyword || '')) === f.slug);
-        topics.push({
-          primary_keyword: f.kw,
-          category: e?.category || 'fallback',
-          supporting_keywords: e?.supporting_keywords || [],
-          // The slug stays OURS (already filter-cleared) — the enrichment call
-          // must not be able to reintroduce a duplicate.
-          slug: f.slug,
-          title_hint: e?.title_hint || '',
-          angle: e?.angle || '',
-          image_query_en: e?.image_query_en || '',
-        });
-      }
-    }
-  }
-  if (!topics.length) throw new Error(`no usable topics from LLM (${rejected.length} rejected as duplicates) and no fresh research suggestions either`);
-  if (topics.length < n) log(`warning: only ${topics.length}/${n} fresh topics survived dedup — writing what we have`);
-
-  const published: string[] = [];
+  log('blog agent v2 start');
   const errors: string[] = [];
-  const pickedKw = new Set<string>();
-  if (topics.length < n) {
-    errors.push(`topic dedup shortfall: only ${topics.length}/${n} fresh topics (rejected: ${rejected.slice(0, 6).join('; ')})`);
-  }
-
-  // Each topic is isolated: one failed post must not kill the others, the
-  // keyword log, the rebuild dispatch or the status report.
-  for (const t of topics) {
-    try {
-      let slug = slugify(t.slug || t.primary_keyword || 'wpis');
-      if (usedSlugs.has(slug)) slug = `${slug}-${TODAY.replace(/-/g, '')}`.slice(0, 78);
-
-      log(`writing: ${t.primary_keyword} -> ${slug}`);
-      usedSlugs.add(slug);
-
-      // 2) Polish article
-      const YEAR = new Date().getFullYear();
-      const art = await llmJson(
-        `Piszesz blog firmowy studia BarabashFlow (Damian Barabash, Warszawa). Mamy rok ${YEAR} — jeśli podajesz rok, używaj ${YEAR}. Piszesz po polsku, pierwsza osoba liczby pojedynczej, konkretnie, bez lania wody i bez żargonu. Nie wymyślaj nazw klientów ani statystyk. Odpowiadasz WYŁĄCZNIE poprawnym JSON-em.`,
-        `Napisz wpis blogowy pod frazę kluczową: "${t.primary_keyword}".\nFrazy wspierające: ${(t.supporting_keywords || []).join(', ')}.\nUjęcie: ${t.angle || '-'}.\n\nWymagania SEO:\n- title_pl: maks. 58 znaki, fraza kluczowa blisko początku, bez clickbaitu\n- excerpt_pl: 120-150 znaków, zachęca do kliknięcia, zawiera frazę (to meta description)\n- body_pl: markdown, MINIMUM 800 słów (docelowo 800-1100). BEZ nagłówka H1 (strona doda tytuł sama). Struktura: krótki lead (2-3 zdania z frazą kluczową), potem 4-6 sekcji H2 sformułowanych jak pytania które ludzie wpisują w Google, listy punktowane, konkretne przedziały cen w PLN gdy temat o kosztach, przykłady. Frazy wspierające wplataj NATURALNIE i gramatycznie — odmieniaj je przez przypadki, nigdy nie wklejaj surowej frazy łamiącej składnię zdania. Dodaj DOKŁADNIE dwa linki wewnętrzne w treści: [strony internetowe — BarabashFlow](https://barabashflow.pl/) oraz [blog BarabashFlow](https://barabashflow.pl/blog/). Zakończ krótkim akapitem-CTA zapraszającym do kontaktu przez formularz na barabashflow.pl.\n- faq: 3 pytania i zwięzłe odpowiedzi (2-3 zdania), sformułowane jak realne zapytania\n- tags: 3-5 krótkich tagów po polsku\n- keywords: 5-10 fraz (primary + supporting + odmiany)\n\nZwróć JSON: {"title_pl":"...","excerpt_pl":"...","body_pl":"...","faq":[{"q":"...","a":"..."}],"tags":["..."],"keywords":["..."]}`,
-        0.6,
-        8192,
-        ARTICLE_SCHEMA,
-      );
-      if (!art?.title_pl || !art?.body_pl) { log('article missing fields — skipping topic'); errors.push(`${t.primary_keyword}: article missing fields`); continue; }
-
-      // 3) EN/RU translations — independent calls, each optional.
-      const tr: Record<string, string> = {};
-      for (const lang of [{ code: 'en', name: 'angielski' }, { code: 'ru', name: 'rosyjski' }] as const) {
-        try {
-          const out = await translateInto(art, lang);
-          tr[`title_${lang.code}`] = out.title;
-          tr[`excerpt_${lang.code}`] = out.excerpt ?? '';
-          tr[`body_${lang.code}`] = out.body;
-        } catch (err) {
-          log(`translation ${lang.code} failed — publishing without it:`, String(err));
-        }
-      }
-
-      // 4) Cover from Openverse
-      const cover = await findCover(t.image_query_en || 'modern website design laptop', usedCovers);
-
-      // 5) Publish. A slug collision on INSERT should be impossible after the
-      // corpus-wide dedup above, but the DB constraint is the last line of
-      // defense — losing a fully written post to it is not acceptable, so
-      // retry once with a random suffix instead of dying (2026-08-05).
-      const buildPost = (postSlug: string) => ({
-        post: {
-          slug: postSlug,
-          title_pl: art.title_pl,
-          excerpt_pl: art.excerpt_pl,
-          body_pl: art.body_pl,
-          title_en: tr.title_en ?? null,
-          excerpt_en: tr.excerpt_en ?? null,
-          body_en: tr.body_en ?? null,
-          title_ru: tr.title_ru ?? null,
-          excerpt_ru: tr.excerpt_ru ?? null,
-          body_ru: tr.body_ru ?? null,
-          cover_alt: art.title_pl,
-          ...(cover ?? {}),
-          tags: art.tags ?? [],
-          keywords: art.keywords ?? [],
-          faq: art.faq ?? [],
-          meta: { agent: 'mac-studio', model: CONFIG.model, primary_keyword: t.primary_keyword, day: TODAY },
-        },
-      });
-      let res: any;
-      try {
-        res = await edge('ingest_post', buildPost(slug));
-      } catch (err) {
-        if (!/duplicate key/i.test(String(err))) throw err;
-        const alt = `${slug.slice(0, 70)}-${crypto.randomUUID().slice(0, 4)}`;
-        log(`slug collision on insert ("${slug}") — retrying once as "${alt}"`);
-        slug = alt;
-        usedSlugs.add(slug);
-        res = await edge('ingest_post', buildPost(slug));
-      }
-      log(`published: /blog/${res.slug}/ (cover: ${res.cover_path || 'none'})`);
-
-      // Every post must have a photo — if the cover still didn't make it
-      // (upload-side failure; download flakes are already handled locally),
-      // retry with progressively generic queries.
-      if (!res.cover_path) {
-        for (const q of ['modern website laptop', 'laptop office desk', 'computer work desk']) {
-          const c2 = await findCover(q, usedCovers);
-          if (!c2) continue;
-          try {
-            const fix = await edge('set_cover', { slug: res.slug, cover_alt: art.title_pl, ...c2 });
-            log(`cover attached retroactively: ${fix.cover_path}`);
-            break;
-          } catch (err) {
-            log('set_cover retry failed:', String(err));
-          }
-        }
-      }
-
-      published.push(res.slug);
-      usedSlugs.add(slug);
-      [t.primary_keyword, ...(t.supporting_keywords || [])].forEach((k: string) => k && pickedKw.add(k.toLowerCase()));
-    } catch (err) {
-      log(`post "${t.primary_keyword}" failed:`, String(err));
-      errors.push(`${t.primary_keyword}: ${String(err)}`);
-    }
-  }
-
-  // 6) Log the research (runs even when a post failed — the admin panel shows
-  // the day's research either way).
+  const generated: string[] = [];
+  let ctx: Ctx | null = null;
   try {
-    const items = [
-      ...[...pickedKw].map((k) => ({ keyword: k, picked: true, source: 'llm-pick' })),
-      ...suggestions.slice(0, 120).map((k) => ({ keyword: k, picked: pickedKw.has(k), source: 'google-suggest' })),
-    ];
-    await edge('log_keywords', { day: TODAY, items });
-    log(`keywords logged: ${items.length}`);
-  } catch (err) {
-    log('keyword logging failed:', String(err));
-    errors.push(`log_keywords: ${String(err)}`);
+    ctx = await loadContext();
+    if (!ctx.config.enabled) { log('disabled in admin — exit'); await reportStatus({ ok: true, ts: new Date().toISOString(), day: new Date().toISOString().slice(0, 10), disabled: true, buffer: bufferDepth(ctx) }); return; }
+    await repair(ctx, errors);
+    let made = 0;
+    while (bufferDepth(ctx) < ctx.config.buffer_days && made < ctx.config.max_per_run) {
+      try { generated.push(await produce(ctx)); }
+      catch (e) { errors.push(`produce: ${String((e as any)?.message || e)}`); log('produce failed:', e); break; }
+      made++;
+    }
+    log(`buffer: ${bufferDepth(ctx)}/${ctx.config.buffer_days} scheduled, queue: ${ctx.topics.length} topics`);
+  } catch (e) {
+    errors.push(String((e as any)?.message || e));
+    log('FATAL', e);
   }
-
-  // 7) Rebuild the static site so new posts get real pages — and VERIFY they
-  // actually serve. On 2026-07-06 the dispatched build + Pages deployment both
-  // reported success while the CDN kept serving the previous day's content;
-  // nothing noticed until the owner did. Published-in-DB is not done —
-  // reachable-on-the-site is done.
-  if (published.length && CONFIG.github?.pat) {
-    await rebuildAndVerify(published, errors);
-  } else if (published.length) {
-    errors.push('no GitHub PAT configured — site not rebuilt, posts stay invisible until the fallback build');
-  }
-
-  // A PAT that is about to expire (or already dead) must page the owner even
-  // on a day when everything else worked.
-  if (tokenIssue && !errors.some((e) => e.includes('PAT'))) errors.push(tokenIssue);
-
-  // 8) Status → admin panel (+ alert email from the Edge Function on failure)
+  const buffer = ctx ? bufferDepth(ctx) : null;
+  // A failed generation is only an incident when the buffer is getting thin;
+  // otherwise it is logged and retried in 3 h (no alert spam).
+  const ok = errors.length === 0 || (buffer !== null && buffer >= 4);
   await reportStatus({
-    ok: errors.length === 0 && published.length >= Math.min(n, 1),
-    planned: n,
-    published,
-    errors: errors.slice(0, 6),
+    ok,
+    ts: new Date().toISOString(), day: new Date().toISOString().slice(0, 10), agent: 'v2',
+    generated, buffer, queue: ctx?.topics.length ?? null, errors, unsplash_remaining: unsplashRemaining,
+    duration_s: Math.round((Date.now() - STARTED) / 1000),
   });
-
-  log(`done: ${published.length}/${n} post(s): ${published.join(', ') || '—'}${errors.length ? ` · ${errors.length} error(s)` : ''}`);
+  log('done', { generated, buffer, errors: errors.length });
 }
 
-main().catch(async (err) => {
-  console.error('[blog-agent] FAILED:', err);
-  await reportStatus({ ok: false, planned: null, published: [], errors: [String(err?.message || err)] });
-  process.exit(1);
-});
+await main();

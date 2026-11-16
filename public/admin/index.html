@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/assets/css/admin.css?v=2026-11-10a" />
+  <link rel="stylesheet" href="/assets/css/admin.css?v=2026-11-16a" />
 </head>
 <body>
 
@@ -174,21 +174,30 @@
     <section class="panel-page" data-panel="blog">
       <div class="settings-card">
         <div class="section">
-          <div class="section-head"><span class="section-title">Autopilot bloga</span><span class="section-aside">agent na Mac Studio · przebiegi 8:40 i 13:40</span></div>
+          <div class="section-head"><span class="section-title">Autopilot bloga</span><span class="section-aside">1 wpis dziennie o 7:00 z bufora · generator (Claude) na Mac Studio co 3 h · strażnik 7:40 i 10:30</span></div>
           <div class="blog-agent-status" id="blog-agent-status"></div>
-          <div class="row-2">
-            <div class="field"><label class="field-label">Publikowanie</label><select id="blog-enabled"><option value="true">Włączone</option><option value="false">Wstrzymane</option></select></div>
-            <div class="field"><label class="field-label">Wpisów dziennie</label><select id="blog-count-sel"><option value="1|1">1</option><option value="1|2">1–2</option><option value="2|2">2</option><option value="2|3">2–3</option><option value="3|3">3</option></select></div>
-          </div>
-          <div class="field"><label class="field-label">Własne tematy / słowa kluczowe (po jednym w linii — agent bierze je w pierwszej kolejności)</label><textarea id="blog-seeds" rows="3" placeholder="np. strona internetowa dla warsztatu samochodowego&#10;ile kosztuje sklep internetowy 2026"></textarea></div>
-          <div class="button-row"><span class="coords">Nowe wpisy pojawiają się na stronie po najbliższej przebudowie (agent sam ją uruchamia po publikacji).</span><span class="spread"></span><button class="btn primary" id="blog-save-config">Zapisz ustawienia</button></div>
+          <div class="blog-agent-status" id="blog-watchdog-status"></div>
         </div>
         <div class="section">
-          <div class="section-head"><span class="section-title">Research słów kluczowych</span><span class="section-aside" id="blog-kw-aside">dziś</span></div>
-          <div id="blog-keywords" class="blog-kw-list"></div>
+          <div class="section-head"><span class="section-title">Ustawienia generatora</span><span class="section-aside">tematy, długość, zdjęcia, języki, styl</span></div>
+          <div id="blog-gen-form" class="blog-form"></div>
         </div>
         <div class="section">
-          <div class="section-head"><span class="section-title">Wpisy</span><span class="section-aside" id="blog-posts-aside"></span></div>
+          <div class="section-head"><span class="section-title">Kolejka publikacji</span><span class="section-aside" id="blog-sched-aside"></span></div>
+          <div id="blog-scheduled" class="blog-admin-list"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><span class="section-title">Plan tematów</span><span class="section-aside" id="blog-topics-aside"></span></div>
+          <div class="button-row blog-topic-add"><input id="blog-topic-new" placeholder="Dodaj temat — np. Strona dla salonu fryzjerskiego: co musi mieć" /><button class="btn" data-act="add-topic">Dodaj na początek</button></div>
+          <div id="blog-topics" class="blog-admin-list"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><span class="section-title">Kalkulator wyceny we wpisach</span><span class="section-aside">ceny, czasy, komentarz AI</span></div>
+          <div id="est-form" class="blog-form"></div>
+          <div class="blog-agent-status" id="blog-rebuild-hint" hidden>Zapisane zmiany kalkulatora pojawią się po przebudowie strony. <button class="btn small primary" data-act="rebuild">Przebuduj teraz</button></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><span class="section-title">Opublikowane</span><span class="section-aside" id="blog-posts-aside"></span><button class="btn small" data-act="rebuild">Przebuduj stronę</button></div>
           <div id="blog-posts" class="blog-admin-list"></div>
         </div>
       </div>
@@ -260,6 +269,6 @@
   </div>
 
   <div class="banner" id="banner"></div>
-  <script type="module" src="/assets/js/admin.js?v=2026-11-10a"></script>
+  <script type="module" src="/assets/js/admin.js?v=2026-11-16a"></script>
 </body>
 </html>

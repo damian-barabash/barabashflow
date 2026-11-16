@@ -1,0 +1,92 @@
+---
+// Project brief + estimator embedded in every blog post (between article
+// sections). Static markup (all labels via data-i18n → PL/EN/RU switch), logic
+// in src/lib/estimator.ts. Pricing model: src/lib/estimate-model.ts.
+import type { EstimatorConfig } from '../lib/estimate-model';
+import { t } from '../lib/i18n';
+export interface Props { config: EstimatorConfig; topic?: string }
+const { config, topic = '' } = Astro.props;
+const single = (q: string, key: string, items: { id: string }[], hints = false) => ({ q, key, items, hints });
+const steps = [
+  single('est.q1', 'type', config.types, true),
+  single('est.q2', 'pages', config.pages),
+  { q: 'est.q3', key: 'features', items: config.features, multi: true },
+  single('est.q4', 'content', config.content),
+  single('est.q5', 'start', config.start),
+];
+const prefix: Record<string, string> = { type: 'est.type.', pages: 'est.page.', features: 'est.feat.', content: 'est.content.', start: 'est.start.' };
+const arrow = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+---
+<section class="est" data-estimator data-config={JSON.stringify(config)} data-topic={topic} aria-labelledby="est-title">
+  <div class="est-head">
+    <span class="est-k"><span class="est-dot" aria-hidden="true"></span><span data-i18n="est.k">{t('est.k')}</span></span>
+    <h2 class="est-title" id="est-title" data-i18n="est.t">{t('est.t')}</h2>
+    <p class="est-sub" data-i18n="est.s">{t('est.s')}</p>
+    <div class="est-progress" aria-hidden="true"><span class="est-bar"></span></div>
+  </div>
+
+  <form class="est-form" novalidate>
+    {steps.map((s, i) => (
+      <fieldset class="est-step" data-step={i} data-key={s.key} data-multi={(s as any).multi ? '1' : undefined} hidden={i !== 0}>
+        <legend class="est-q"><span class="est-n">{String(i + 1).padStart(2, '0')}/05</span> <span data-i18n={s.q}>{t(s.q)}</span></legend>
+        {(s as any).multi && <p class="est-hint" data-i18n="est.q3.h">{t('est.q3.h')}</p>}
+        <div class={`est-opts${(s as any).multi ? ' is-multi' : ''}${s.key === 'type' ? ' is-types' : ''}`}>
+          {s.items.map((it) => (
+            <label class="est-opt">
+              <input type={(s as any).multi ? 'checkbox' : 'radio'} name={s.key} value={it.id} />
+              <span class="est-opt-box">
+                <span class="est-opt-t" data-i18n={prefix[s.key] + it.id}>{t(prefix[s.key] + it.id)}</span>
+                {(s as any).hints && <span class="est-opt-h" data-i18n={prefix[s.key] + it.id + '.h'}>{t(prefix[s.key] + it.id + '.h')}</span>}
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    ))}
+    <div class="est-nav">
+      <button type="button" class="est-back" data-est-back hidden data-i18n="est.back">{t('est.back')}</button>
+      <button type="button" class="btn btn-lime with-icon est-next" data-est-next hidden><span class="btn-ico" set:html={arrow} /><span data-est-next-label data-i18n="est.next">{t('est.next')}</span></button>
+    </div>
+  </form>
+
+  <div class="est-loading" hidden aria-live="polite">
+    <div class="est-scan" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <ol class="est-load-steps">
+      <li data-i18n="est.l1">{t('est.l1')}</li>
+      <li data-i18n="est.l2">{t('est.l2')}</li>
+      <li data-i18n="est.l3">{t('est.l3')}</li>
+    </ol>
+  </div>
+
+  <div class="est-result" hidden aria-live="polite">
+    <span class="est-k is-result" data-i18n="est.r.k">{t('est.r.k')}</span>
+    <div class="est-nums">
+      <div class="est-num"><span class="est-num-l" data-i18n="est.r.price">{t('est.r.price')}</span><strong class="est-num-v" data-est-price>—</strong><span class="est-num-s" data-i18n="est.r.net">{t('est.r.net')}</span></div>
+      <div class="est-num"><span class="est-num-l" data-i18n="est.r.time">{t('est.r.time')}</span><strong class="est-num-v" data-est-weeks>—</strong><span class="est-num-s" data-i18n="est.r.time.s">{t('est.r.time.s')}</span></div>
+    </div>
+    <div class="est-ai">
+      <span class="est-ai-k"><span class="est-spark" aria-hidden="true">✦</span><span data-i18n="est.r.ai">{t('est.r.ai')}</span></span>
+      <p class="est-ai-text" data-est-ai></p>
+    </div>
+    <details class="est-lines">
+      <summary data-i18n="est.r.lines">{t('est.r.lines')}</summary>
+      <ul data-est-lines></ul>
+    </details>
+    <p class="est-note" data-i18n="est.r.note">{t('est.r.note')}</p>
+
+    <form class="est-lead" novalidate>
+      <p class="est-lead-t" data-i18n="est.f.t">{t('est.f.t')}</p>
+      <div class="est-lead-row">
+        <input name="name" autocomplete="name" required data-i18n-placeholder="est.f.name" placeholder={t('est.f.name')} />
+        <input name="email" type="email" autocomplete="email" required data-i18n-placeholder="est.f.email" placeholder={t('est.f.email')} />
+      </div>
+      <textarea name="note" rows="2" data-i18n-placeholder="est.f.msg" placeholder={t('est.f.msg')}></textarea>
+      <label class="f-hp" aria-hidden="true">www<input type="text" name="website_url" tabindex="-1" autocomplete="off" /></label>
+      <div class="est-lead-actions">
+        <button type="submit" class="btn btn-lime with-icon"><span class="btn-ico" set:html={arrow} /><span data-i18n="est.f.send">{t('est.f.send')}</span></button>
+        <button type="button" class="est-back" data-est-again data-i18n="est.again">{t('est.again')}</button>
+      </div>
+      <p class="est-status" role="status"></p>
+    </form>
+  </div>
+</section>

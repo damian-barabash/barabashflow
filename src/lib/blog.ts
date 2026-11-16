@@ -1,6 +1,6 @@
 // Blog data helpers — used at BUILD TIME by the /blog pages (SSG: every post
 // becomes a real static HTML page, which is the whole SEO point).
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, mediaUrl } from './supabase';
 import { marked } from 'marked';
 
 export interface BlogPost {
@@ -23,10 +23,95 @@ export interface BlogPost {
   faq: { q: string; a: string }[];
   published_at: string;
   updated_at?: string | null;
+  images?: PostImage[] | null;
+  estimator_after_h2?: number | null;
+}
+
+// Unsplash photos are hotlinked (API guidelines) — `url` is the raw
+// images.unsplash.com URL, sized per use via imgix params (see imgUrl()).
+export interface PostImage {
+  role: 'cover' | 'inline';
+  slot?: number;
+  after_h2?: number;       // inline: inserted at the end of this H2 section (1-based)
+  id?: string;
+  url: string;
+  width?: number;
+  height?: number;
+  color?: string | null;
+  alt_pl?: string | null;
+  alt_en?: string | null;
+  alt_ru?: string | null;
+  author?: string | null;
+  author_url?: string | null;
+  page_url?: string | null;
+}
+
+const UTM = 'utm_source=barabashflow&utm_medium=referral';
+const isUnsplash = (u?: string | null) => !!u && /^https:\/\/images\.unsplash\.com\//.test(u);
+
+// Sized image URL: Unsplash → imgix params (webp/avif via auto=format, crop to
+// the box); anything else → Supabase public media URL untouched.
+export function imgUrl(path: string | null | undefined, w: number, h?: number, q = 72): string | null {
+  if (!path) return null;
+  if (isUnsplash(path)) {
+    const u = new URL(path);
+    for (const k of ['w', 'h', 'q', 'fit', 'crop', 'auto', 'fm', 'dpr']) u.searchParams.delete(k);
+    u.searchParams.set('auto', 'format');
+    u.searchParams.set('q', String(q));
+    u.searchParams.set('w', String(w));
+    if (h) { u.searchParams.set('h', String(h)); u.searchParams.set('fit', 'crop'); u.searchParams.set('crop', 'entropy'); }
+    return u.toString();
+  }
+  return mediaUrl(path);
+}
+export function imgSrcset(path: string | null | undefined, widths: number[], ratio?: number): string | undefined {
+  if (!isUnsplash(path)) return undefined;
+  return widths.map((w) => `${imgUrl(path, w, ratio ? Math.round(w / ratio) : undefined)} ${w}w`).join(', ');
+}
+export const withUtm = (u?: string | null) => (u ? `${u}${u.includes('?') ? '&' : '?'}${UTM}` : 'https://unsplash.com/?' + UTM);
+
+function figureHtml(img: PostImage, locale: 'pl' | 'en' | 'ru'): string {
+  const alt = escapeXml((img as any)[`alt_${locale}`] || img.alt_pl || '');
+  const ratio = img.width && img.height ? img.width / img.height : 1.5;
+  const h = Math.round(1200 / Math.max(1.2, Math.min(ratio, 1.8)));
+  const src = imgUrl(img.url, 1200, h)!;
+  const set = imgSrcset(img.url, [640, 960, 1200, 1600], 1200 / h);
+  const by = { pl: 'Fot.', en: 'Photo:', ru: 'Фото:' }[locale];
+  const credit = img.author
+    ? `<figcaption class="post-credit">${by} <a href="${escapeXml(withUtm(img.author_url))}" rel="noopener nofollow" target="_blank">${escapeXml(img.author)}</a> / <a href="${escapeXml(withUtm('https://unsplash.com/'))}" rel="noopener nofollow" target="_blank">Unsplash</a></figcaption>`
+    : '';
+  const bg = img.color ? ` style="background:${escapeXml(img.color)}"` : '';
+  return `<figure class="post-figure"><img src="${escapeXml(src)}"${set ? ` srcset="${escapeXml(set)}" sizes="(max-width: 900px) 100vw, 820px"` : ''} alt="${alt}" width="1200" height="${h}" loading="lazy" decoding="async"${bg} />${credit}</figure>`;
+}
+
+// Splits rendered HTML into H2 sections: [intro, h2#1 section, h2#2 section, …].
+function splitSections(html: string): string[] {
+  const parts = html.split(/(?=<h2[\s>])/i);
+  return parts.length ? parts : [html];
+}
+
+// Article body → two halves around the estimator, with inline photos placed at
+// the end of their H2 section. Positions live in data (not as markers inside
+// the markdown) so the text stays clean for RSS, translations and old builds.
+export function renderPostBody(
+  md: string | null | undefined,
+  images: PostImage[] | null | undefined,
+  estimatorAfter: number | null | undefined,
+  locale: 'pl' | 'en' | 'ru',
+): { before: string; after: string } {
+  const sections = splitSections(renderMarkdown(md || ''));
+  const h2count = sections.length - 1;
+  for (const img of (images || []).filter((i) => i.role === 'inline' && i.url)) {
+    const at = Math.min(Math.max(1, img.after_h2 || 1), Math.max(h2count, 0));
+    sections[at] = (sections[at] || '') + figureHtml(img, locale);
+  }
+  if (h2count < 2) return { before: sections.join(''), after: '' };
+  const split = Math.min(Math.max(1, estimatorAfter ?? Math.ceil(h2count / 2)), h2count - 1);
+  return { before: sections.slice(0, split + 1).join(''), after: sections.slice(split + 1).join('') };
 }
 
 const LIST_FIELDS =
-  'slug,title_pl,title_en,title_ru,excerpt_pl,excerpt_en,excerpt_ru,cover_path,cover_alt,tags,published_at,updated_at';
+  'slug,title_pl,title_en,title_ru,excerpt_pl,excerpt_en,excerpt_ru,cover_path,cover_alt,tags,published_at,updated_at,images';
 
 // Strict fetch: THROWS on any failure so the whole build goes red. The public
 // graph uses the forgiving restGet (page still renders without data), but for
@@ -42,13 +127,13 @@ async function restGetStrict<T>(path: string): Promise<T[]> {
 
 export async function fetchPostList(): Promise<BlogPost[]> {
   return restGetStrict<BlogPost>(
-    `blog_posts?select=${LIST_FIELDS}&status=eq.published&order=published_at.desc&limit=200`,
+    `blog_posts?select=${LIST_FIELDS}&status=eq.published&order=published_at.desc&limit=1000`,
   );
 }
 
 export async function fetchAllPosts(): Promise<BlogPost[]> {
   return restGetStrict<BlogPost>(
-    'blog_posts?select=*&status=eq.published&order=published_at.desc&limit=500',
+    'blog_posts?select=*&status=eq.published&order=published_at.desc&limit=1000',
   );
 }
 

@@ -2,8 +2,9 @@
 import Base from '../../layouts/Base.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
-import { mediaUrl } from '../../lib/supabase';
-import { fetchAllPosts, formatDatePl, isoDate, wasUpdated, relatedPosts, renderMarkdown, clampTitle, clampDescription, type BlogPost } from '../../lib/blog';
+import { fetchAllPosts, formatDatePl, isoDate, wasUpdated, relatedPosts, renderPostBody, imgUrl, imgSrcset, withUtm, clampTitle, clampDescription, type BlogPost } from '../../lib/blog';
+import Estimator from '../../components/Estimator.astro';
+import { buildConfig } from '../../lib/estimate-model';
 import { fetchSettings, fetchServices, fetchProjects, type Service, type Settings } from '../../lib/content';
 import OfferCta from '../../components/OfferCta.astro';
 import { offerForPost, type Offer } from '../../lib/offer';
@@ -17,8 +18,16 @@ export async function getStaticPaths() {
 const { post, related, settings, services, offer } = Astro.props as { post: BlogPost; related: BlogPost[]; settings: Settings; services: Service[]; offer: Offer | null };
 const site = SITE;
 const url = `${site}/blog/${post.slug}/`;
-const coverUrl = post.cover_path ? mediaUrl(post.cover_path) : `${site}/assets/img/og.png`;
-const bodyHtml = renderMarkdown(post.body_pl);
+const coverImg = (post.images || []).find((i) => i.role === 'cover');
+const coverUrl = post.cover_path ? imgUrl(post.cover_path, 1200, 630)! : `${site}/assets/img/og.png`;
+const coverSrc = post.cover_path ? imgUrl(post.cover_path, 1400, 788) : null;
+const coverSet = imgSrcset(post.cover_path, [640, 960, 1400, 1920], 16 / 9);
+const estimatorOn = (settings as any).estimator_config?.value_meta?.enabled !== false;
+const estimatorConfig = buildConfig((settings as any).estimator_config?.value_meta, services);
+const bodies = (['pl', 'en', 'ru'] as const)
+  .filter((l) => l === 'pl' || (post as any)[`body_${l}`])
+  .map((l) => ({ l, ...renderPostBody((post as any)[`body_${l}`], post.images, post.estimator_after_h2, l) }));
+const hasAfter = bodies.some((b) => b.after.trim());
 const title = clampTitle(post.title_pl.length > 42 ? post.title_pl : `${post.title_pl} | Blog BarabashFlow`);
 const description = clampDescription(post.excerpt_pl || post.title_pl);
 const faq = Array.isArray(post.faq) ? post.faq.filter((f) => f?.q && f?.a) : [];
@@ -63,22 +72,30 @@ const jsonLd = [postLd, crumbsLd, ...(faqLd ? [faqLd] : [])];
 
         {post.cover_path && (
           <figure class="post-cover-wrap">
-            <img class="post-cover" src={coverUrl} alt={post.cover_alt || post.title_pl} loading="eager" decoding="async" width="1200" height="675" />
-            {post.cover_credit && <figcaption class="post-credit">{post.cover_source_url ? <a href={post.cover_source_url} rel="noopener nofollow" target="_blank">{post.cover_credit}</a> : post.cover_credit}</figcaption>}
+            <img class="post-cover" src={coverSrc} srcset={coverSet} sizes="(max-width: 900px) 100vw, 900px" alt={coverImg?.alt_pl || post.cover_alt || post.title_pl} data-lm-attr="alt" data-lm-pl={coverImg?.alt_pl || post.cover_alt || post.title_pl} data-lm-en={coverImg?.alt_en || coverImg?.alt_pl || post.cover_alt || post.title_pl} data-lm-ru={coverImg?.alt_ru || coverImg?.alt_pl || post.cover_alt || post.title_pl} loading="eager" fetchpriority="high" decoding="async" width="1400" height="788" style={coverImg?.color ? `background:${coverImg.color}` : undefined} />
+            {coverImg?.author
+              ? <figcaption class="post-credit"><span data-i18n="blog.photo">Fot.</span> <a href={withUtm(coverImg.author_url)} rel="noopener nofollow" target="_blank">{coverImg.author}</a> / <a href={withUtm('https://unsplash.com/')} rel="noopener nofollow" target="_blank">Unsplash</a></figcaption>
+              : post.cover_credit && <figcaption class="post-credit">{post.cover_source_url ? <a href={post.cover_source_url} rel="noopener nofollow" target="_blank">{post.cover_credit}</a> : post.cover_credit}</figcaption>}
           </figure>
         )}
 
         <div class="post-body">
-          <div data-locale="pl" set:html={bodyHtml} />
-          {post.body_en && <div data-locale="en" hidden set:html={renderMarkdown(post.body_en)} />}
-          {post.body_ru && <div data-locale="ru" hidden set:html={renderMarkdown(post.body_ru)} />}
+          {bodies.map((b) => <div data-locale={b.l} hidden={b.l !== 'pl'} set:html={b.before} />)}
         </div>
+
+        {estimatorOn && <Estimator config={estimatorConfig} topic={post.title_pl} />}
+
+        {hasAfter && (
+          <div class="post-body">
+            {bodies.map((b) => <div data-locale={b.l} hidden={b.l !== 'pl'} set:html={b.after} />)}
+          </div>
+        )}
 
         {faq.length > 0 && (
           <section class="post-faq">
             <h2 class="h-sub" data-i18n="blog.faq">Częste pytania</h2>
             <div class="faq-list">
-              {faq.map((f) => <details class="faq-item"><summary><span>{f.q}</span><span class="faq-plus" aria-hidden="true"></span></summary><p>{f.a}</p></details>)}
+              {faq.map((f: any) => <details class="faq-item"><summary><span data-lm-pl={f.q} data-lm-en={f.q_en || f.q} data-lm-ru={f.q_ru || f.q}>{f.q}</span><span class="faq-plus" aria-hidden="true"></span></summary><p data-lm-pl={f.a} data-lm-en={f.a_en || f.a} data-lm-ru={f.a_ru || f.a}>{f.a}</p></details>)}
             </div>
           </section>
         )}

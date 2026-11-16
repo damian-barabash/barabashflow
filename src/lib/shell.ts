@@ -4,6 +4,7 @@
 // No framework — a few hundred lines of vanilla TS bundled by Astro.
 import { LOCALES, getLocale, setLocale, onLocaleChange, applyDom, t, type Locale } from './i18n';
 import { restInsert } from './supabase';
+import { setupEstimators } from './estimator';
 import { setupPageTransitions, setMenuOrigin, setupServices, setupDotTiles, setupProjectCards, setupCaseMedia } from './fx';
 
 export function mountShell() {
@@ -22,6 +23,7 @@ export function mountShell() {
   setupCaseMedia();
   bindContactForms();
   setupOfferLinks();
+  setupEstimators();
   setupCookieNotice();
   setupScrollTop();
   setupMascot();
@@ -170,7 +172,7 @@ function setupProjectFilter() {
 // and the form is replaced by a sequential success state. Esc / click skip.
 const PRINT_MS = 1700, HOLD_MS = 2300, FLY_MS = 900;
 
-function makeRef(): string {
+export function makeRef(): string {
   const t = Date.now().toString(36).toUpperCase().slice(-5);
   const r = Math.floor(Math.random() * 36).toString(36).toUpperCase();
   return `BF-${t}${r}`;
@@ -182,7 +184,7 @@ function barsFor(seed: string): number[] {
 }
 const esc = (v: string) => v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
-function openReceipt() {
+export function openReceipt() {
   const el = document.createElement('div');
   el.className = 'rcp';
   el.dataset.phase = 'wait';

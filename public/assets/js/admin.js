@@ -1,11 +1,12 @@
 // BarabashFlow admin — entry point. Auth, tabs, Strona (site settings +
 // stats + FAQ), Blog (AI autopilot), Statystyki; the collection editors live
 // in admin-projects / admin-services / admin-inbox / admin-crm.
-import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, MEDIA_BUCKET, uploadImage, removeMedia, pickFile, translateItems, readForm } from './admin-core.js?v=2026-11-10a';
+import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, MEDIA_BUCKET, uploadImage, removeMedia, pickFile, translateItems, readForm, slugify } from './admin-core.js?v=2026-11-10a';
 import { loadProjects, bindProjectsUI, renderProjectList } from './admin-projects.js?v=2026-11-10a';
 import { loadServices, loadFaq, bindServicesUI, renderServiceList, renderFaq } from './admin-services.js?v=2026-11-10a';
 import { loadInbox, bindInboxUI, renderInbox } from './admin-inbox.js?v=2026-11-10a';
 import { loadCrm, bindCrmUI, renderCrm, openClient } from './admin-crm.js?v=2026-11-10a';
+import { loadBlog, renderBlog, bindBlogUI } from './admin-blog.js?v=2026-11-16a';
 
 init().catch((err) => console.error('[admin] init failed', err));
 
@@ -206,89 +207,6 @@ async function autoTranslateSettings(overwrite = false) {
     if (ru && t.ru && (overwrite || !ru.value.trim())) { ru.value = t.ru; filled++; }
   }
   return filled;
-}
-
-// ── Blog (AI autopilot) ─────────────────────────────────────────────────────
-state.blogPosts = []; state.blogKeywords = [];
-async function loadBlog() {
-  const [{ data: posts }, { data: kws }] = await Promise.all([
-    sb.from('blog_posts').select('id,slug,title_pl,cover_path,status,published_at,keywords,tags').order('published_at', { ascending: false }).limit(300),
-    sb.from('seo_keywords').select('day,keyword,picked,source').gte('day', new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10)).order('day', { ascending: false }).order('picked', { ascending: false }).limit(160),
-  ]);
-  state.blogPosts = posts || []; state.blogKeywords = kws || [];
-}
-function blogConfig() { return { enabled: true, posts_min: 1, posts_max: 2, seed_keywords: [], ...(state.settings.blog_config?.value_meta || {}) }; }
-function renderBlog() {
-  $('#blog-count').textContent = state.blogPosts.length ? String(state.blogPosts.length) : '';
-  const statusEl = $('#blog-agent-status');
-  const st = state.settings.blog_agent_status?.value_meta;
-  if (!st || !st.ts) { statusEl.textContent = 'Agent jeszcze nie raportował przebiegu.'; statusEl.classList.remove('is-err'); }
-  else {
-    const when = new Date(st.ts).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    if (st.ok) { statusEl.textContent = `Ostatni przebieg: ${when} — OK · ${st.note ? st.note : `wpisy: ${(st.published || []).length}/${st.planned ?? '?'}`}`; statusEl.classList.remove('is-err'); }
-    else { statusEl.textContent = `⚠ Ostatni przebieg: ${when} — BŁĄD: ${(st.errors || []).join(' · ') || 'nieznany'} (alert poszedł na office@)`; statusEl.classList.add('is-err'); }
-  }
-  const cfg = blogConfig();
-  $('#blog-enabled').value = String(!!cfg.enabled);
-  const countSel = $('#blog-count-sel'); const v = `${cfg.posts_min}|${cfg.posts_max}`;
-  countSel.value = [...countSel.options].some((o) => o.value === v) ? v : '1|2';
-  const seeds = $('#blog-seeds'); if (document.activeElement !== seeds) seeds.value = (cfg.seed_keywords || []).join('\n');
-  const kwWrap = $('#blog-keywords');
-  if (!state.blogKeywords.length) kwWrap.innerHTML = '<span class="coords">Brak danych — agent loguje research przy każdym uruchomieniu.</span>';
-  else {
-    const days = {}; for (const k of state.blogKeywords) (days[k.day] ||= []).push(k);
-    kwWrap.innerHTML = Object.entries(days).slice(0, 3).map(([day, items]) => `<div class="blog-kw-day"><span class="blog-kw-date">${escapeHtml(day)}</span><div class="blog-kw-chips">${items.slice(0, 40).map((k) => `<span class="conn-chip${k.picked ? ' is-on' : ''}" title="${escapeHtml(k.source || '')}">${escapeHtml(k.keyword)}</span>`).join('')}</div></div>`).join('');
-  }
-  $('#blog-kw-aside').textContent = 'ostatnie 7 dni · na ciemno = wybrane na wpis';
-  const list = $('#blog-posts');
-  $('#blog-posts-aside').textContent = state.blogPosts.length ? `${state.blogPosts.length} wpisów` : '';
-  if (!state.blogPosts.length) { list.innerHTML = '<div class="empty-state">Jeszcze nie ma wpisów</div>'; return; }
-  list.innerHTML = state.blogPosts.map((p) => `
-    <div class="blog-row${p.status !== 'published' ? ' is-draft' : ''}" data-id="${p.id}">
-      <div class="blog-row-thumb" style="${p.cover_path ? `background-image:url('${mediaUrl(p.cover_path)}')` : ''}"></div>
-      <div class="blog-row-main">
-        <div class="blog-row-title">${escapeHtml(p.title_pl)}</div>
-        <div class="blog-row-meta">${new Date(p.published_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' })} · /blog/${escapeHtml(p.slug)}/${p.status !== 'published' ? ' · <strong>ukryty</strong>' : ''}</div>
-      </div>
-      <div class="blog-row-actions">
-        <a class="btn small" href="/blog/${encodeURIComponent(p.slug)}/" target="_blank" rel="noopener">Otwórz</a>
-        <button class="btn small" data-blog-toggle="${p.id}">${p.status === 'published' ? 'Ukryj' : 'Pokaż'}</button>
-        <button class="btn small danger" data-blog-delete="${p.id}">Usuń</button>
-      </div>
-    </div>`).join('');
-}
-async function saveBlogConfig() {
-  banner('Zapisywanie…', null);
-  try {
-    const [min, max] = ($('#blog-count-sel').value || '1|2').split('|').map(Number);
-    const seeds = $('#blog-seeds').value.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 30);
-    const value_meta = { ...(state.settings.blog_config?.value_meta || {}), enabled: $('#blog-enabled').value === 'true', posts_min: min || 1, posts_max: max || 2, seed_keywords: seeds };
-    const { error } = await sb.from('site_settings').upsert({ key: 'blog_config', value_meta }, { onConflict: 'key' });
-    if (error) throw error;
-    await loadSettings(); banner('Zapisano — agent użyje ustawień przy następnym uruchomieniu', 'ok');
-  } catch (err) { banner(err.message || 'Błąd zapisu', 'error'); }
-}
-async function toggleBlogPost(id) {
-  const post = state.blogPosts.find((p) => p.id === id); if (!post) return;
-  const next = post.status === 'published' ? 'draft' : 'published';
-  const { error } = await sb.from('blog_posts').update({ status: next }).eq('id', id);
-  if (error) { banner(error.message, 'error'); return; }
-  post.status = next; renderBlog(); banner(next === 'draft' ? 'Ukryto (zniknie ze strony po przebudowie)' : 'Opublikowano ponownie', 'ok');
-}
-async function deleteBlogPost(id) {
-  const post = state.blogPosts.find((p) => p.id === id); if (!post) return;
-  if (!confirm(`Usunąć wpis "${post.title_pl}"? Tego nie da się cofnąć.`)) return;
-  const { error } = await sb.from('blog_posts').delete().eq('id', id);
-  if (error) { banner(error.message, 'error'); return; }
-  if (post.cover_path) await sb.storage.from(MEDIA_BUCKET).remove([post.cover_path]).catch(() => {});
-  state.blogPosts = state.blogPosts.filter((p) => p.id !== id); renderBlog(); banner('Usunięto', 'ok');
-}
-function bindBlogUI() {
-  $('#blog-save-config')?.addEventListener('click', saveBlogConfig);
-  $('#blog-posts')?.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-blog-toggle], [data-blog-delete]'); if (!t) return;
-    if (t.dataset.blogToggle) toggleBlogPost(t.dataset.blogToggle); else if (t.dataset.blogDelete) deleteBlogPost(t.dataset.blogDelete);
-  });
 }
 
 // ── Statystyki (first-party page views) ─────────────────────────────────────

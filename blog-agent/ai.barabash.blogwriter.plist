@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Blog agent v2: every 3 h + at load/wake. Idempotent: writes only while the
+     scheduled buffer is below bufferDays (max maxPerRun posts per run). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>ai.barabash.blogwriter</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/work/.bun/bin/bun</string>
+    <string>/Users/work/blog-agent/blog-writer.ts</string>
+  </array>
+  <key>StartInterval</key><integer>10800</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/Users/work/blog-agent/logs/blog-writer.log</string>
+  <key>StandardErrorPath</key><string>/Users/work/blog-agent/logs/blog-writer.log</string>
+  <key>WorkingDirectory</key><string>/Users/work/blog-agent</string>
+</dict>
+</plist>
