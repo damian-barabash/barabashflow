@@ -1,0 +1,69 @@
+---
+// Personal offer page for outbound leads: /oferta/?l=<token> (noindex, not in
+// the sitemap). Static shell; src/lib/oferta.ts fetches the lead's public data
+// from edge `leads` (action "view"), fills the copy, presets the estimator for
+// them and reports the brief (action "brief" → e-mail to the owner).
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import Estimator from '../../components/Estimator.astro';
+import { fetchSettings, fetchServices } from '../../lib/content';
+import { buildConfig } from '../../lib/estimate-model';
+
+const [settings, services] = await Promise.all([fetchSettings(), fetchServices()]);
+const estimatorConfig = buildConfig((settings as any).estimator_config?.value_meta, services);
+const arrow = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 13 13 3M13 3H6M13 3v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+---
+<Base title="Propozycja dla Twojej firmy | BarabashFlow" description="Indywidualna propozycja strony internetowej przygotowana przez BarabashFlow." noindex>
+  <SiteHeader />
+  <main class="container" data-oferta>
+    <section class="sec">
+      <div class="sec-inner page-head of-hero is-loading">
+        <span class="kicker">Propozycja przygotowana dla</span>
+        <h1 class="of-company" data-of="company"><span class="of-skel"></span></h1>
+        <p class="of-headline" data-of="headline"><span class="of-skel is-wide"></span></p>
+        <p class="lead of-intro" data-of="intro"></p>
+        <p class="of-meta" data-of="meta"></p>
+        <div class="of-actions">
+          <a class="btn btn-dark with-icon" href="#kalkulator"><span class="btn-ico" set:html={arrow} /><span>Policz wycenę dla siebie</span></a>
+          <a class="btn btn-white" href="#kalkulator" data-of-brief>Zostaw krótki brief</a>
+        </div>
+        <p class="of-error" hidden>Tej propozycji nie udało się wczytać — link mógł wygasnąć. Poniżej możesz od razu policzyć wycenę albo napisać do mnie.</p>
+      </div>
+    </section>
+    <div class="divider" aria-hidden="true"></div>
+
+    <section class="sec of-plan-sec" hidden>
+      <div class="sec-inner sec-pad of-grid">
+        <div>
+          <span class="kicker">Plan · <span data-of="company-short"></span></span>
+          <h2 class="of-h2">Co zbuduję dla Państwa</h2>
+          <ol class="of-bullets" data-of="bullets"></ol>
+          <div class="of-price"><span>Cena</span><b data-of="price">od 3 500 zł netto</b><span>Czas</span><b>zwykle 2–3 tygodnie</b></div>
+        </div>
+        <a class="of-case" data-of="case" href="/projekty/" hidden>
+          <img data-of="case-cover" alt="" loading="lazy" decoding="async" width="640" height="400" />
+          <span class="of-case-body">
+            <span class="hc-k">Podobna realizacja · <span data-of="case-title"></span></span>
+            <span class="hc-t" data-of="case-challenge"></span>
+            <span class="hc-more">Zobacz, jak to rozwiązałem <Fragment set:html={arrow} /></span>
+          </span>
+        </a>
+      </div>
+    </section>
+    <div class="divider of-plan-sec" aria-hidden="true" hidden></div>
+
+    <section class="sec" id="kalkulator">
+      <div class="sec-inner home-est">
+        <Estimator config={estimatorConfig} topic="Oferta" variant="home" source="oferta" />
+      </div>
+    </section>
+  </main>
+  <SiteFooter services={services} settings={settings} />
+  <script>
+    import { mountShell } from '../../lib/shell';
+    import { mountOferta } from '../../lib/oferta';
+    mountShell();
+    mountOferta();
+  </script>
+</Base>

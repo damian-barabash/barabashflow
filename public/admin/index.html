@@ -42,6 +42,7 @@
             <button class="tab-btn" data-tab="settings"><span>Strona</span></button>
             <button class="tab-btn" data-tab="blog"><span>Blog</span><span class="count" id="blog-count"></span></button>
             <button class="tab-btn" data-tab="inbox"><span>Wiadomości</span><span class="badge" id="inbox-badge" style="display:none">0</span></button>
+            <button class="tab-btn" data-tab="leads"><span>Leady</span><span class="badge" id="leads-badge" style="display:none">0</span></button>
             <button class="tab-btn" data-tab="crm"><span>CRM</span><span class="count" id="crm-count"></span></button>
             <button class="tab-btn" data-tab="stats"><span>Statystyki</span></button>
           </nav>
@@ -171,12 +172,33 @@
     </section>
 
     <!-- ── BLOG ─────────────────────────────────────────────────────── -->
+    <section class="panel-page" data-panel="leads">
+      <div class="settings-card">
+        <div class="section">
+          <div class="section-head"><span class="section-title">Nowe firmy do oferty</span><span class="section-aside">KRS · AI ocenia i pisze ofertę · Ty decydujesz</span></div>
+          <div class="blog-agent-status" id="leads-status"></div>
+          <div class="button-row">
+            <div class="conn-chips" id="leads-filters"></div>
+            <span class="spread"></span>
+            <button class="btn small" data-lact="harvest">Szukaj teraz</button>
+            <button class="btn small" data-lact="toggle-settings">Ustawienia</button>
+          </div>
+          <div id="leads-settings-wrap" hidden><div id="leads-settings" class="blog-form leads-settings"></div></div>
+          <div id="leads-list" class="leads-list"></div>
+        </div>
+      </div>
+    </section>
+
     <section class="panel-page" data-panel="blog">
       <div class="settings-card">
         <div class="section">
           <div class="section-head"><span class="section-title">Autopilot bloga</span><span class="section-aside">1 wpis dziennie o 7:00 z bufora · generator (Claude) na Mac Studio co 3 h · strażnik 7:40 i 10:30</span></div>
           <div class="blog-agent-status" id="blog-agent-status"></div>
           <div class="blog-agent-status" id="blog-watchdog-status"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><span class="section-title">Budżet AI</span><span class="section-aside">blog + leady + kalkulator · liczone co do wywołania</span></div>
+          <div id="ai-budget" class="blog-form"></div>
         </div>
         <div class="section">
           <div class="section-head"><span class="section-title">Ustawienia generatora</span><span class="section-aside">tematy, długość, zdjęcia, języki, styl</span></div>

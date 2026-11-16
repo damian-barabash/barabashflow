@@ -63,6 +63,8 @@ Deno.serve(async (req) => {
   // Admin → Blog → Kalkulator: AI on/off + limits (site_settings.estimator_config.ai).
   const { data: cfgRow } = await svc.from('site_settings').select('value_meta').eq('key', 'estimator_config').maybeSingle();
   const ai = { enabled: true, per_ip_hour: PER_IP_PER_HOUR, per_day: GLOBAL_PER_DAY, ...(cfgRow?.value_meta?.ai || {}) };
+  const [{ data: spent }, { data: bud }] = await Promise.all([svc.rpc('ai_month_spend'), svc.from('site_settings').select('value_meta').eq('key', 'ai_budget').maybeSingle()]);
+  if (Number(spent || 0) >= (Number(bud?.value_meta?.monthly_usd) || 15)) return new Response(JSON.stringify({ text: '', budget: true }), { headers });
   if (!ai.enabled) return new Response(JSON.stringify({ text: '', disabled: true }), { headers });
   if ((perIp ?? 0) >= Number(ai.per_ip_hour) || (global ?? 0) >= Number(ai.per_day)) {
     return new Response(JSON.stringify({ text: '', limited: true }), { headers });
@@ -79,13 +81,17 @@ Deno.serve(async (req) => {
   let ok = true;
   try {
     const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')!, timeout: 10500, maxRetries: 0 });
+    // Haiku 5.5, thinking off: ~$0.0003 per comment (budget-safe even at the daily cap).
     const msg = await client.messages.create({
-      model: 'claude-opus-5-5',
-      max_tokens: 1200,
+      model: 'claude-haiku-5-5',
+      max_tokens: 400,
+      thinking: { type: 'disabled' },
       output_config: { effort: 'low' },
       system: SYSTEM,
       messages: [{ role: 'user', content: brief }],
     } as any);
+    const u: any = msg.usage || {};
+    await svc.from('ai_usage').insert({ feature: 'estimate', model: 'claude-haiku-5-5', input_tokens: u.input_tokens || 0, output_tokens: u.output_tokens || 0, cost_usd: Number((((u.input_tokens || 0) * 0.1 + (u.output_tokens || 0) * 0.5) / 1e6).toFixed(5)) });
     if (msg.stop_reason !== 'refusal') {
       text = msg.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join(' ').replace(/\s+/g, ' ').trim().slice(0, 600);
     }

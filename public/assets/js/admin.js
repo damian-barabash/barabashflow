@@ -7,6 +7,7 @@ import { loadServices, loadFaq, bindServicesUI, renderServiceList, renderFaq } f
 import { loadInbox, bindInboxUI, renderInbox } from './admin-inbox.js?v=2026-11-10a';
 import { loadCrm, bindCrmUI, renderCrm, openClient } from './admin-crm.js?v=2026-11-10a';
 import { loadBlog, renderBlog, bindBlogUI } from './admin-blog.js?v=2026-11-16a';
+import { loadLeads, renderLeads, bindLeadsUI } from './admin-leads.js?v=2026-11-16a';
 
 init().catch((err) => console.error('[admin] init failed', err));
 
@@ -37,9 +38,9 @@ async function onSignedIn(user) {
 }
 
 async function refreshAll() {
-  await Promise.all([loadSettings(), loadServices(), loadProjects(), loadFaq(), loadInbox(), loadCrm(), loadBlog(), loadStats()]);
+  await Promise.all([loadSettings(), loadServices(), loadProjects(), loadFaq(), loadInbox(), loadCrm(), loadBlog(), loadLeads(), loadStats()]);
   renderSettings(); renderStatsEditor(); renderFaq();
-  renderProjectList(); renderServiceList(); renderInbox(); renderCrm(); renderBlog(); renderStats();
+  renderProjectList(); renderServiceList(); renderInbox(); renderCrm(); renderBlog(); renderLeads(); renderStats();
 }
 
 function bindAuthUI() {
@@ -85,7 +86,7 @@ function bindShellUI() {
   });
   $('#stats-add')?.addEventListener('click', () => { statsDraft().push({ value: '', label_pl: '' }); renderStatsEditor(); });
   $('#stats-editor')?.addEventListener('click', (e) => { const rm = e.target.closest('[data-rm-stat]'); if (!rm) return; syncStats(); statsDraft().splice(Number(rm.dataset.rmStat), 1); renderStatsEditor(); });
-  bindProjectsUI(); bindServicesUI(); bindInboxUI(); bindCrmUI(); bindBlogUI();
+  bindProjectsUI(); bindServicesUI(); bindInboxUI(); bindCrmUI(); bindBlogUI(); bindLeadsUI();
 }
 
 function setupTabAway() {

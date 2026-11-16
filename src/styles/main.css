@@ -1542,3 +1542,29 @@ html.pt-cover #pt { visibility: visible; background: var(--dark); }
   .est.is-home .est-opts.is-multi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) { .est.is-home { margin: 0; border-radius: 0; } }
+
+/* /oferta/?l=… — personal offer page for outbound leads */
+.of-hero .of-company { font-size: clamp(34px, 5.4vw, 72px); line-height: 1.02; letter-spacing: -.03em; margin: 12px 0 10px; }
+.of-headline { font: 600 clamp(19px, 2.2vw, 26px)/1.3 var(--font-head); color: var(--ink); max-width: 34ch; margin: 0 auto 14px; }
+.of-intro { max-width: 62ch; margin-left: auto; margin-right: auto; }
+.of-meta { font: 500 12px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 14px 0 0; min-height: 1em; }
+.of-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 26px; }
+.of-error { margin-top: 18px; color: var(--muted); }
+.of-hero.is-loading .of-actions, .of-hero.is-loading .of-intro { opacity: .35; }
+.of-skel { display: inline-block; width: min(60%, 520px); height: .8em; border-radius: 8px; background: linear-gradient(90deg, var(--bg-2), var(--bg), var(--bg-2)); background-size: 200% 100%; animation: ofSkel 1.2s infinite; }
+.of-skel.is-wide { width: min(80%, 640px); height: 1em; }
+@keyframes ofSkel { to { background-position: -200% 0; } }
+.of-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: clamp(20px, 4vw, 56px); align-items: start; }
+.of-h2 { font-size: clamp(26px, 3vw, 40px); margin: 12px 0 18px; }
+.of-bullets { list-style: none; counter-reset: ofb; padding: 0; margin: 0 0 22px; display: grid; gap: 12px; }
+.of-bullets li { counter-increment: ofb; position: relative; padding: 14px 16px 14px 58px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--white); font-size: 16px; line-height: 1.5; color: var(--ink-2); }
+.of-bullets li::before { content: counter(ofb, decimal-leading-zero); position: absolute; left: 16px; top: 14px; font: 600 13px/1.6 var(--font-mono); color: var(--ink); background: var(--lime); padding: 0 6px; border-radius: 4px; }
+.of-price { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; padding: 16px 18px; border-radius: var(--r-md); background: var(--dark); color: #fff; }
+.of-price span { font: 500 11px/1.8 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.55); }
+.of-price b { font: 600 16px/1.6 var(--font-head); color: var(--lime); }
+.of-case { display: grid; border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; background: var(--white); box-shadow: var(--sh-card); text-decoration: none; color: inherit; }
+.of-case img { width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; background: var(--bg-2); }
+.of-case-body { display: grid; gap: 8px; padding: 18px; }
+.of-case .hc-more { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; color: var(--ink); }
+.of-case .hc-more svg { width: 14px; height: 14px; }
+@media (max-width: 900px) { .of-grid { grid-template-columns: minmax(0, 1fr); } }

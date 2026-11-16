@@ -39,7 +39,7 @@ export default defineConfig({
     react(),
     sitemap({
       // admin is private (behind auth) — keep it out of the sitemap.
-      filter: (page) => !redirectPaths.has(page) && !/\/(admin|404|about|about-us|contact|privacy|privacy-policy|terms|terms-of-service|editorial-policy|services|projects|mail)\/?$/.test(page),
+      filter: (page) => !redirectPaths.has(page) && !/\/(admin|oferta|404|about|about-us|contact|privacy|privacy-policy|terms|terms-of-service|editorial-policy|services|projects|mail)\/?$/.test(page),
     }),
   ],
   build: {

@@ -16,7 +16,6 @@ export const CFG: {
   maxPerRun?: number;
 } = JSON.parse(readFileSync(new URL('./config.json', import.meta.url), 'utf8'));
 
-export const MODEL = 'claude-opus-5-5';
 export const log = (...a: unknown[]) => console.log(`[${new Date().toISOString()}]`, ...a);
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -89,32 +88,58 @@ export const claude = new Anthropic({ apiKey: CFG.anthropicKey, maxRetries: 4, t
 
 type Content = Anthropic.Messages.ContentBlockParam[] | string;
 
-// Structured JSON call. Streams (long outputs), validates stop_reason, parses.
-// One extra attempt on a truncated/unparseable answer with a bigger budget.
+// ── cost control ────────────────────────────────────────────────────────────
+// Budget (admin → Blog → "Budżet AI", site_settings.ai_budget.monthly_usd)
+// covers blog + leads + estimator. Every call is logged to ai_usage.
+export const MODELS = { opus: 'claude-opus-5-5', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-5-5' } as const;
+type ModelKey = keyof typeof MODELS;
+const PRICE: Record<ModelKey, [number, number]> = { opus: [4, 20], sonnet: [2, 10], haiku: [0.1, 0.5] }; // $/1M in, out
+
+export async function monthSpend(): Promise<{ spent: number; cap: number }> {
+  const [spent, rows] = await Promise.all([
+    db<number>('rpc/ai_month_spend', { method: 'POST', body: '{}' }),
+    db<any[]>('site_settings?select=value_meta&key=eq.ai_budget'),
+  ]);
+  return { spent: Number(spent) || 0, cap: Number(rows?.[0]?.value_meta?.monthly_usd) || 15 };
+}
+async function logUsage(feature: string, model: ModelKey, usage: any) {
+  const i = usage?.input_tokens || 0, o = usage?.output_tokens || 0;
+  const cost = (i * PRICE[model][0] + o * PRICE[model][1]) / 1e6;
+  await db('ai_usage', { method: 'POST', body: JSON.stringify({ feature, model: MODELS[model], input_tokens: i, output_tokens: o, cost_usd: Number(cost.toFixed(5)) }) }).catch((e) => log('usage log failed', String(e)));
+}
+
+// Structured JSON call. Opus = adaptive thinking (can't be disabled; effort
+// controls depth); Sonnet 5.5 = thinking off via `between_tools`; Haiku 5.5 =
+// thinking disabled. Streams, validates stop_reason, logs cost, one retry.
 export async function claudeJson<T = any>(opts: {
   system: string;
   content: Content;
   schema: Record<string, unknown>;
+  model?: ModelKey;
   effort?: 'low' | 'medium' | 'high';
   maxTokens?: number;
   label: string;
 }): Promise<T> {
+  const model = opts.model ?? 'opus';
   let maxTokens = opts.maxTokens ?? 32000;
+  const thinking = model === 'haiku' ? { thinking: { type: 'disabled' } } : model === 'sonnet' ? { thinking: { type: 'between_tools' } } : {};
   for (let attempt = 1; attempt <= 2; attempt++) {
     const t0 = Date.now();
     const stream = claude.messages.stream({
-      model: MODEL,
+      model: MODELS[model],
       max_tokens: maxTokens,
       system: opts.system,
-      output_config: { effort: opts.effort ?? 'medium', format: { type: 'json_schema', schema: opts.schema } },
+      ...thinking,
+      output_config: { effort: opts.effort ?? (model === 'opus' ? 'medium' : 'low'), format: { type: 'json_schema', schema: opts.schema } },
       messages: [{ role: 'user', content: opts.content }],
     } as any);
     const msg = await stream.finalMessage();
     const u = msg.usage as any;
-    log(`claude ${opts.label}: ${msg.stop_reason}, in ${u.input_tokens} out ${u.output_tokens} (${Math.round((Date.now() - t0) / 1000)}s)`);
+    await logUsage(opts.label.split(' ')[0], model, u);
+    log(`claude[${model}] ${opts.label}: ${msg.stop_reason}, in ${u.input_tokens} out ${u.output_tokens} (${Math.round((Date.now() - t0) / 1000)}s)`);
     if (msg.stop_reason === 'refusal') throw new Error(`claude ${opts.label}: refusal`);
     const text = msg.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
-    if (msg.stop_reason === 'max_tokens') { maxTokens = Math.min(maxTokens * 2, 128000); continue; }
+    if (msg.stop_reason === 'max_tokens') { maxTokens = Math.min(maxTokens * 2, 64000); continue; }
     try { return JSON.parse(text) as T; }
     catch { log(`claude ${opts.label}: unparseable JSON (${text.slice(0, 160)})`); }
   }
@@ -194,6 +219,7 @@ Wybierz numer zdjęcia na okładkę i ${brief.inline.length} RÓŻNE numery do t
   try {
     const r = await claudeJson<{ cover: number; inline: number[]; why: string }>({
       label: 'photo-pick',
+      model: 'haiku',
       effort: 'low',
       maxTokens: 4000,
       schema: PICK_SCHEMA,

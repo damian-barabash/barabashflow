@@ -399,3 +399,38 @@ details[open].adv > summary::before { content: '▾ '; }
 #est-preview b { color: var(--ink); }
 #blog-rebuild-hint .btn { margin-left: 8px; }
 @media (max-width: 760px) { .blog-row-actions .btn { padding: 8px 10px; } }
+
+/* ── Leady (2026-11-16) ─────────────────────────────────────────────────── */
+.leads-list { display: grid; gap: 14px; margin-top: 6px; }
+.leads-settings { padding: 16px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); margin: 8px 0; }
+.lead { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr); gap: 18px; padding: 18px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
+.lead.is-sent { opacity: .75; }
+.lead-top { display: flex; gap: 12px; align-items: flex-start; }
+.lead-fit { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; font: 700 16px/1 var(--font-mono); }
+.lead-fit.is-hi { background: var(--lime); color: var(--ink); }
+.lead-fit.is-mid { background: #fff4c2; color: #6b5300; }
+.lead-fit.is-lo { background: var(--surface-2); color: var(--muted); }
+.lead-name { margin: 0; font-size: 17px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.lead-meta { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 4px; }
+.lead-reason { margin: 12px 0; padding: 10px 12px; border-left: 3px solid var(--lime); background: var(--surface-2); font-size: 13px; color: var(--ink-2); border-radius: 0 8px 8px 0; }
+.lead-facts { display: grid; gap: 6px; margin: 0; font-size: 13px; }
+.lead-facts > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; }
+.lead-facts dt { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+.lead-facts dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.lead-facts dd em { font-style: normal; color: var(--muted); }
+.lead-facts details summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.lead-mail { display: grid; gap: 7px; align-content: start; min-width: 0; }
+.lead-mail textarea { resize: vertical; font-size: 14px; line-height: 1.5; min-height: 160px; }
+.lead-foot { font-size: 12px; line-height: 1.5; color: var(--muted); white-space: pre-line; padding: 8px 10px; border: 1px dashed var(--border-2); border-radius: 8px; }
+.lead-ai { display: flex; gap: 8px; }
+.lead-ai input { flex: 1; min-width: 0; font-size: 13px; }
+.lead-actions { margin-top: 4px; }
+.btn.is-busy { opacity: .6; pointer-events: none; }
+@media (max-width: 900px) { .lead { grid-template-columns: minmax(0, 1fr); } .lead-facts > div { grid-template-columns: 84px minmax(0, 1fr); } }
+
+.ai-meter { height: 8px; border-radius: 8px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--border); }
+.ai-meter span { display: block; height: 100%; background: var(--lime); }
+.ai-meter span.is-hot { background: var(--danger); }
+
+.lead-signal { margin-top: 10px; padding: 7px 10px; border-radius: 8px; background: var(--surface-2); font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); }
+.lead-signal.is-hot { background: var(--lime); color: var(--ink); font-weight: 600; }

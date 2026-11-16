@@ -20,7 +20,7 @@
 //      picks a beautiful cover + 2 inline photos, hotlinked with attribution.
 // Every run reports to site_settings.blog_agent_status (admin + watchdog
 // heartbeat); errors alert by email via edge report_status.
-import { CFG, db, log, sleep, claudeJson, reportStatus, searchPhotos, pickPhotos, trackDownload, imageRecord, slugify, h2Count, words, unsplashRemaining, type Photo } from './lib';
+import { CFG, db, log, monthSpend, sleep, claudeJson, reportStatus, searchPhotos, pickPhotos, trackDownload, imageRecord, slugify, h2Count, words, unsplashRemaining, type Photo } from './lib';
 
 const QUEUE_MIN = 12;
 const SITE = 'https://barabashflow.pl';
@@ -125,7 +125,7 @@ async function refillTopics(ctx: Ctx) {
   const counts: Record<string, number> = {};
   for (const p of live(ctx).slice(0, 40)) if (p.pillar) counts[p.pillar] = (counts[p.pillar] || 0) + 1;
   const res = await claudeJson<{ topics: any[] }>({
-    label: 'plan', effort: 'medium', maxTokens: 24000, schema: PLAN_SCHEMA,
+    label: 'blog-plan', model: 'sonnet', effort: 'medium', maxTokens: 16000, schema: PLAN_SCHEMA,
     system: `Jesteś strategiem treści bloga studia BarabashFlow (Damian Barabash, Warszawa): strony internetowe, sklepy, platformy i aplikacje webowe, CMS, SEO, opieka. Blog ma przyciągać z Google i asystentów AI PRAWDZIWYCH klientów (właściciele firm, marketing, startupy w Polsce) i budować zaufanie.
 Filary (waga = jak często właściciel chce dany filar: 3 często, 2 normalnie, 1 rzadko): ${Object.entries(PILLARS).filter(([k]) => ctx.config.pillars[k] > 0).map(([k, v]) => `\n- ${k} (waga ${ctx.config.pillars[k]}): ${v}`).join('')}
 Formaty: ${Object.entries(FORMATS).filter(([k]) => ctx.config.formats[k]).map(([k, v]) => `\n- ${k}: ${v}`).join('')}
@@ -280,12 +280,12 @@ OSTATNIO UŻYTE ZAPYTANIA ZDJĘĆ (unikaj podobnych motywów): ${ctx.recentQueri
 
 WPISY NA BLOGU (do linkowania; nie powtarzaj ich treści):
 ${postsList}`;
-  let art = await claudeJson<any>({ label: 'write', effort: 'high', maxTokens: 48000, schema: ARTICLE_SCHEMA, system, content: brief });
+  let art = await claudeJson<any>({ label: 'blog-write', model: 'opus', effort: 'medium', maxTokens: 32000, schema: ARTICLE_SCHEMA, system, content: brief });
   let issues = qa(art, ctx.config);
   if (issues.length) {
     log(`qa round 1: ${issues.join(' | ')}`);
     art = await claudeJson<any>({
-      label: 'repair', effort: 'medium', maxTokens: 48000, schema: ARTICLE_SCHEMA, system,
+      label: 'blog-repair', model: 'sonnet', effort: 'medium', maxTokens: 24000, schema: ARTICLE_SCHEMA, system,
       content: `${brief}\n\nTwoja poprzednia wersja (JSON):\n${JSON.stringify(art)}\n\nPopraw TYLKO te problemy, resztę zachowaj:\n- ${issues.join('\n- ')}`,
     });
     issues = qa(art, ctx.config);
@@ -311,9 +311,9 @@ const TR_SCHEMA = {
 
 async function translate(art: { title: string; excerpt: string; body: string; faq: any[]; alts: string[] }, lang: 'en' | 'ru') {
   const name = lang === 'en' ? 'English (international business reader)' : 'Russian (русскоязычный предприниматель в Польше/ЕС)';
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (const [attempt, model] of [[1, 'haiku'], [2, 'sonnet']] as const) {
     const tr = await claudeJson<any>({
-      label: `translate-${lang}`, effort: 'low', maxTokens: 32000, schema: TR_SCHEMA,
+      label: `blog-translate ${lang}`, model, effort: 'low', maxTokens: 16000, schema: TR_SCHEMA,
       system: `You are a senior editor translating a Polish blog article of a web studio into ${name}. Write natural, idiomatic copy (not literal), keep the author's voice and all facts. Keep markdown EXACTLY structured: same number of "## " and "### " headings in the same order, same tables, lists and blockquotes, the same link URLs (translate only link text). Keep prices in PLN/zł as numbers (write "PLN" in English, "злотых"/"zł" in Russian). Keep "> **Z praktyki:**" callouts translated as "> **From practice:**" / "> **Из практики:**". Translate faq items and the image alt texts in the same order.`,
       content: JSON.stringify(art),
     });
@@ -462,7 +462,14 @@ async function main() {
     if (!ctx.config.enabled) { log('disabled in admin — exit'); await reportStatus({ ok: true, ts: new Date().toISOString(), day: new Date().toISOString().slice(0, 10), disabled: true, buffer: bufferDepth(ctx) }); return; }
     await repair(ctx, errors);
     let made = 0;
-    while (bufferDepth(ctx) < ctx.config.buffer_days && made < ctx.config.max_per_run) {
+    const budget = await monthSpend();
+    const ARTICLE_COST = 0.3; // measured ≈ $0.2–0.3 (Opus write + Haiku translations)
+    if (budget.spent + ARTICLE_COST > budget.cap) {
+      const msg = `budżet AI wyczerpany: $${budget.spent.toFixed(2)} / $${budget.cap} — generator czeka (publikacje idą z bufora)`;
+      log(msg);
+      if (bufferDepth(ctx) < 3) errors.push(msg);
+    }
+    while (budget.spent + ARTICLE_COST * (made + 1) <= budget.cap && bufferDepth(ctx) < ctx.config.buffer_days && made < ctx.config.max_per_run) {
       try { generated.push(await produce(ctx)); }
       catch (e) { errors.push(`produce: ${String((e as any)?.message || e)}`); log('produce failed:', e); break; }
       made++;

@@ -153,7 +153,7 @@ function mount(root: HTMLElement) {
     const { error } = await restInsert('contact_submissions', {
       name, email, ref,
       message: lines.join('\n').slice(0, 4000),
-      source: 'blog-kalkulator',
+      source: root.dataset.source || 'blog-kalkulator',
       service: b.type,
       budget: `${est.lo}–${est.hi} zł`,
       page: location.pathname.slice(0, 200),
@@ -161,11 +161,29 @@ function mount(root: HTMLElement) {
     });
     btn.disabled = false;
     if (error) { receipt.fail(); status.textContent = t('contact.error'); return; }
+    // Outbound lead page: tell the owner right away (e-mail via edge `leads`).
+    if (root.dataset.leadToken) {
+      fetch(`${SUPABASE_URL}/functions/v1/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ action: 'brief', token: root.dataset.leadToken, name, email, summary: lines.join('\n') }),
+      }).catch(() => {});
+    }
     receipt.print({ ref, name, email, message: lines.slice(1, 5).join(' · ') }, () => {
       f.reset();
       status.textContent = t('est.f.ok');
       f.classList.add('is-sent');
     });
+  });
+
+  // Personal offer page (/oferta/) presets the project type + features for the
+  // lead and jumps to the next unanswered step.
+  root.addEventListener('est:preset', (e) => {
+    const { type, features } = (e as CustomEvent).detail || {};
+    const t = form.querySelector<HTMLInputElement>(`input[name="type"][value="${type}"]`);
+    if (t) t.checked = true;
+    for (const f of features || []) { const c = form.querySelector<HTMLInputElement>(`input[name="features"][value="${f}"]`); if (c) c.checked = true; }
+    show(t ? 1 : 0);
   });
 
   show(0);

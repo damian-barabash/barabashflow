@@ -7,7 +7,7 @@
 // daily writer; when below it, sleeps until the hourly window resets.
 // Safe to kill and re-run: posts that already have photos are skipped.
 //   nohup ~/.bun/bin/bun backfill-images.ts >> logs/backfill.log 2>&1 &
-import { db, removeMedia, log, sleep, claudeJson, searchPhotos, pickPhotos, trackDownload, imageRecord, h2Count, unsplashRemaining } from './lib';
+import { db, removeMedia, monthSpend, log, sleep, claudeJson, searchPhotos, pickPhotos, trackDownload, imageRecord, h2Count, unsplashRemaining } from './lib';
 
 const RESERVE = 10;
 
@@ -27,7 +27,7 @@ async function one(p: any) {
   const heads = String(p.body_pl || '').split('\n').filter((l: string) => l.startsWith('## ')).map((l: string, i: number) => `${i + 1}. ${l.slice(3)}`);
   const n = heads.length;
   const plan = await claudeJson<any>({
-    label: `plan-photos ${p.slug}`, effort: 'low', maxTokens: 6000, schema: PLAN_SCHEMA,
+    label: `blog-photos ${p.slug}`, model: 'haiku', effort: 'low', maxTokens: 3000, schema: PLAN_SCHEMA,
     system: `Jesteś photo-editorem bloga premium studia webowego. Estetyka: editorial, minimal, naturalne światło, spokojne kolory, nowoczesne wnętrza/detale/ludzie przy pracy — bez kiczowatych stocków. Zaproponuj zdjęcia z Unsplash do artykułu.
 ${VARIETY}
 cover.query: 2–5 słów PO ANGIELSKU do wyszukiwarki Unsplash — nastrojowe i konkretne, NIE dosłowne ("website cost" źle; "architect desk morning light" dobrze). Ta jedna wyszukiwarka zasili też zdjęcia w treści, więc query ma dawać spójną serię pasującą do tematu.
@@ -64,6 +64,7 @@ async function main() {
   log(`backfill: ${todo.length} posts without Unsplash photos`);
   let done = 0;
   for (const p of todo) {
+    const b = await monthSpend(); if (b.spent > b.cap) { log(`budżet AI wyczerpany ($${b.spent.toFixed(2)}/$${b.cap}) — stop`); break; }
     if (unsplashRemaining < RESERVE + 6) { log(`unsplash budget ${unsplashRemaining} — sleeping 61 min`); await sleep(61 * 60_000); }
     try { await one(p); done++; }
     catch (e) {

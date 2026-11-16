@@ -67,13 +67,14 @@ const servicePrice = (slug) => {
 };
 
 // ── data ────────────────────────────────────────────────────────────────────
-state.blogPosts = []; state.blogTopics = [];
+state.blogPosts = []; state.blogTopics = []; state.aiUsage = [];
 export async function loadBlog() {
-  const [{ data: posts }, { data: topics }] = await Promise.all([
+  const [{ data: posts }, { data: topics }, { data: usage }] = await Promise.all([
     sb.from('blog_posts').select('id,slug,title_pl,cover_path,status,published_at,scheduled_for,pillar,format,body_en,body_ru').neq('status', 'archived').order('published_at', { ascending: false }).limit(1000),
     sb.from('blog_topics').select('id,title,slug,pillar,format,angle,priority,source,status,created_at').in('status', ['queued', 'writing']).order('priority', { ascending: false }).order('created_at').limit(200),
+    sb.from('ai_usage').select('feature,cost_usd,ts').gte('ts', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()).limit(5000),
   ]);
-  state.blogPosts = posts || []; state.blogTopics = topics || [];
+  state.blogPosts = posts || []; state.blogTopics = topics || []; state.aiUsage = usage || [];
 }
 
 const fmtWhen = (iso) => new Date(iso).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -82,10 +83,35 @@ const thumb = (p) => p ? (/^https:\/\/images\.unsplash\.com\//.test(p) ? `${p}&w
 const scheduledPosts = () => state.blogPosts.filter((p) => p.status === 'scheduled').sort((a, b) => String(a.scheduled_for).localeCompare(String(b.scheduled_for)));
 
 // ── render ──────────────────────────────────────────────────────────────────
+const FEATURE_L = { 'blog-write': 'Blog — pisanie', 'blog-translate': 'Blog — tłumaczenia', 'blog-plan': 'Blog — plan tematów', 'blog-repair': 'Blog — poprawki', 'blog-photos': 'Blog — zdjęcia (stare wpisy)', 'photo-pick': 'Wybór zdjęć', 'leads-compose': 'Leady — oferty', 'leads-score': 'Leady — ocena', estimate: 'Kalkulator — komentarz AI' };
+function renderBudget() {
+  const box = $('#ai-budget'); if (!box || box.contains(document.activeElement)) return;
+  const cap = Number(state.settings.ai_budget?.value_meta?.monthly_usd) || 15;
+  const rows = state.aiUsage.filter((r) => !String(r.feature).startsWith('setup'));
+  const setup = state.aiUsage.filter((r) => String(r.feature).startsWith('setup')).reduce((a, r) => a + Number(r.cost_usd), 0);
+  const spent = rows.reduce((a, r) => a + Number(r.cost_usd), 0);
+  const day = new Date().getDate(), days = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const proj = day > 2 ? (spent / day) * days : null;
+  const by = {}; for (const r of rows) by[r.feature] = (by[r.feature] || 0) + Number(r.cost_usd);
+  const pct = Math.min(100, (spent / cap) * 100);
+  box.innerHTML = `
+    <div class="ai-meter"><span style="width:${pct}%" class="${pct > 90 ? 'is-hot' : ''}"></span></div>
+    <div class="coords">Ten miesiąc: <b>$${spent.toFixed(2)}</b> z $${cap}${proj ? ` · prognoza na koniec miesiąca ≈ $${proj.toFixed(2)}` : ''}${setup ? ` · jednorazowe wdrożenie $${setup.toFixed(2)} (poza limitem)` : ''}</div>
+    <div class="coords">${Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${escapeHtml(FEATURE_L[k] || k)}: $${v.toFixed(2)}`).join(' · ') || 'brak wywołań w tym miesiącu'}</div>
+    <div class="button-row"><label class="field-label" for="ai-cap">Limit miesięczny ($)</label><input id="ai-cap" type="number" min="1" max="200" step="1" value="${cap}" style="max-width:110px" /><span class="coords">Po przekroczeniu: blog publikuje z bufora (nie pisze nowych), leady i komentarz AI w kalkulatorze czekają do 1. dnia miesiąca.</span><span class="spread"></span><button class="btn" data-act="save-budget">Zapisz limit</button></div>`;
+}
+async function saveBudget() {
+  const v = Math.min(Math.max(Math.round(Number($('#ai-cap').value) || 15), 1), 200);
+  const { error } = await sb.from('site_settings').upsert({ key: 'ai_budget', value_meta: { monthly_usd: v } }, { onConflict: 'key' });
+  if (error) { banner(error.message, 'error'); return; }
+  state.settings.ai_budget = { key: 'ai_budget', value_meta: { monthly_usd: v } }; renderBudget(); banner(`Limit: $${v} / miesiąc`, 'ok');
+}
+
 export function renderBlog() {
   const published = state.blogPosts.filter((p) => p.status === 'published' || p.status === 'draft');
   const scheduled = scheduledPosts();
   $('#blog-count').textContent = published.length ? String(published.length) : '';
+  renderBudget();
   renderGenForm();
   renderStatus(scheduled);
   renderQueue(scheduled);
@@ -393,7 +419,7 @@ export function bindBlogUI() {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const id = b.dataset.id;
     ({
-      'save-gen': saveGen, 'save-est': () => saveEst(false), 'est-reset': () => confirm('Przywrócić domyślne ceny i czasy kalkulatora?') && saveEst(true),
+      'save-gen': saveGen, 'save-budget': saveBudget, 'save-est': () => saveEst(false), 'est-reset': () => confirm('Przywrócić domyślne ceny i czasy kalkulatora?') && saveEst(true),
       rebuild, 'publish-now': () => publishNow(id), up: () => moveUp(id), toggle: () => togglePost(id), delete: () => deletePost(id),
       prio: () => topicPrio(id), reject: () => topicReject(id), 'add-topic': addTopic,
     })[b.dataset.act]?.();
