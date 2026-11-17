@@ -1,7 +1,7 @@
 // Admin → Leady (2026-11-16): daily new companies from public registries with
 // an AI fit score and a personalised offer draft (edge `leads`, pg_cron every
 // 10 min). The owner reviews each card: edit subject/body, rewrite with AI,
-// send (Resend from leads_config.from_email, reply-to + bcc to Gmail), skip.
+// send (Resend from leads_config.from_email, replies land in the CRM card via edge mail-in), skip.
 // Undecided leads simply stay in "Do decyzji". Settings → site_settings.leads_config.
 import { sb, $, state, banner, escapeHtml } from './admin-core.js?v=2026-11-10a';
 
@@ -13,7 +13,7 @@ const INDUSTRIES = {
 const VOIV = ['DOLNOŚLĄSKIE', 'KUJAWSKO-POMORSKIE', 'LUBELSKIE', 'LUBUSKIE', 'ŁÓDZKIE', 'MAŁOPOLSKIE', 'MAZOWIECKIE', 'OPOLSKIE', 'PODKARPACKIE', 'PODLASKIE', 'POMORSKIE', 'ŚLĄSKIE', 'ŚWIĘTOKRZYSKIE', 'WARMIŃSKO-MAZURSKIE', 'WIELKOPOLSKIE', 'ZACHODNIOPOMORSKIE'];
 const DEFAULTS = {
   enabled: true, per_day: 10, max_age_days: 21, min_fit: 45, industries: Object.keys(INDUSTRIES), voivodeships: [],
-  from_name: 'Damian Barabash', from_email: 'office@barabashflow.pl', reply_to: 'dmytrii.barabash@gmail.com', bcc: 'dmytrii.barabash@gmail.com',
+  from_name: 'Damian Barabash', from_email: 'office@barabashflow.pl', notify_email: 'dmytrii.barabash@gmail.com',
   signature: 'Damian Barabash\nBarabashFlow · strony, sklepy i platformy na zamówienie\nbarabashflow.pl', instructions: '', test_mode: false,
 };
 const FILTERS = { ready: 'Do decyzji', sent: 'Wysłane', skipped: 'Pominięte', rejected: 'Odrzucone przez AI', failed: 'Błędy' };
@@ -100,7 +100,7 @@ function card(l) {
         <div class="button-row lead-actions">
           <button class="btn primary" data-lact="send">Wyślij${c.test_mode ? ' (test)' : ''}</button>
           <button class="btn" data-lact="save">Zapisz</button>
-          <button class="btn" data-lact="test" title="Wyślij tę wersję do siebie (${escapeHtml(c.reply_to)})">Test do mnie</button>
+          <button class="btn" data-lact="test" title="Wyślij tę wersję do siebie (${escapeHtml(c.notify_email)})">Test do mnie</button>
           <span class="spread"></span>
           ${l.status === 'skipped' || l.status === 'rejected' || l.status === 'scored' ? '<button class="btn small" data-lact="restore">Przywróć do decyzji</button>' : '<button class="btn small danger" data-lact="skip">Pomiń</button>'}
         </div>`}
@@ -131,8 +131,7 @@ function renderLeadSettings() {
       <div class="field"><label class="field-label">Nadawca — e-mail (domena barabashflow.pl)</label><input data-c="from_email" value="${escapeHtml(c.from_email)}" /></div>
     </div>
     <div class="row-2">
-      <div class="field"><label class="field-label">Odpowiedzi trafiają na (Reply-To)</label><input data-c="reply_to" value="${escapeHtml(c.reply_to)}" /></div>
-      <div class="field"><label class="field-label">Kopia wysłanych (BCC)</label><input data-c="bcc" value="${escapeHtml(c.bcc)}" /></div>
+      <div class="field"><label class="field-label">Powiadomienia o odpowiedziach i testy na</label><input data-c="notify_email" value="${escapeHtml(c.notify_email)}" placeholder="puste = bez powiadomień" /><small class="soft">Odpowiedzi klientów trafiają do karty w CRM (zakładka Korespondencja). Kopii wysłanych nie ma.</small></div>
     </div>
     <div class="field"><label class="field-label">Podpis</label><textarea data-c="signature" rows="3">${escapeHtml(c.signature)}</textarea></div>
     <div class="field"><label class="field-label">Wskazówki dla AI do ofert</label><textarea data-c="instructions" rows="3" placeholder="np. zawsze proponuj bezpłatną konsultację 15 min; dla gastronomii wspominaj o menu online">${escapeHtml(c.instructions)}</textarea></div>

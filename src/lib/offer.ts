@@ -8,7 +8,7 @@ export interface Offer { kind: OfferKind; service: Service; project: Project | n
 
 // Case shown per service; falls back to the first project of the service with a client task.
 const PREFERRED_CASE: Record<string, string> = {
-  'strony-internetowe': 'wellbeauty-b2b',
+  'strony-internetowe': 'dbdc-studio',
 };
 const TRAINING_CASE = 'aino-pottery-club';
 

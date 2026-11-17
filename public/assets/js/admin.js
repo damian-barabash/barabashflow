@@ -5,9 +5,9 @@ import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, MEDIA_BUCKET, upl
 import { loadProjects, bindProjectsUI, renderProjectList } from './admin-projects.js?v=2026-11-10a';
 import { loadServices, loadFaq, bindServicesUI, renderServiceList, renderFaq } from './admin-services.js?v=2026-11-10a';
 import { loadInbox, bindInboxUI, renderInbox } from './admin-inbox.js?v=2026-11-10a';
-import { loadCrm, bindCrmUI, renderCrm, openClient } from './admin-crm.js?v=2026-11-10a';
+import { loadCrm, bindCrmUI, renderCrm, openClient } from './admin-crm.js?v=2026-11-17a';
 import { loadBlog, renderBlog, bindBlogUI } from './admin-blog.js?v=2026-11-16a';
-import { loadLeads, renderLeads, bindLeadsUI } from './admin-leads.js?v=2026-11-16a';
+import { loadLeads, renderLeads, bindLeadsUI } from './admin-leads.js?v=2026-11-17a';
 
 init().catch((err) => console.error('[admin] init failed', err));
 

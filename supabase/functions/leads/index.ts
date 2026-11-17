@@ -8,7 +8,8 @@
 //                public KRS API (daily bulletin → current extract). Idempotent;
 //                a failed step is simply retried by the next tick.
 // action "send"     (admin JWT) — sends the (edited) letter via Resend from
-//                   from_email, reply-to + bcc = owner's Gmail, adds the address
+//                   from_email, no BCC; Reply-To = office+<mail_tag>@reply.barabashflow.pl
+//                   so the answer lands in the CRM card (edge mail-in); adds the address
 //                   to lead_suppression (never twice) and creates a CRM client.
 // action "compose"  (admin JWT) — rewrite one letter, optional instruction.
 // action "harvest_now" (admin JWT) — run one tick right away.
@@ -51,7 +52,7 @@ const DEFAULTS = {
   enabled: true, per_day: 10, max_age_days: 21, min_fit: 45,
   industries: Object.keys(INDUSTRIES), voivodeships: [] as string[],
   from_name: 'Damian Barabash', from_email: 'office@barabashflow.pl',
-  reply_to: 'dmytrii.barabash@gmail.com', bcc: 'dmytrii.barabash@gmail.com',
+  notify_email: 'dmytrii.barabash@gmail.com', // test sends + brief / reply notifications
   signature: 'Damian Barabash\nBarabashFlow · strony, sklepy i platformy na zamówienie\nbarabashflow.pl',
   instructions: '', test_mode: false,
 };
@@ -451,42 +452,63 @@ async function send(svc: any, cfg: Cfg, b: any) {
     if (sup) throw new Error(`adres zablokowany (${sup.reason})`);
   }
   const text = noDash(`${withLink(text0, lead.public_token)}\n\n${footer(cfg, lead.source)}`);
+  // CRM client first: its mail_tag is the reply address, so the answer lands
+  // in the client's card (edge mail-in). A client created here is removed if
+  // Resend refuses the e-mail.
+  let client: any = null, created = false;
+  if (!test) {
+    client = (await svc.from('crm_clients').select('id,mail_tag').ilike('email', lead.email).maybeSingle()).data;
+    if (!client) {
+      const { data: c, error } = await svc.from('crm_clients').insert({ name: lead.name, email: lead.email.toLowerCase(), company: lead.name, website: lead.website, source: 'other', status: 'contact', tags: ['lead-' + lead.source], notes: `${lead.pkd_desc || ''} · ${lead.city || ''} · zarej. ${lead.registered_at}\n${lead.fit_reason || ''}`.trim(), next_action: 'Sprawdzić odpowiedź na ofertę', next_action_at: new Date(Date.now() + 4 * 86400000).toISOString() }).select('id,mail_tag').single();
+      if (error) throw error;
+      client = c; created = true;
+    }
+  }
+  const inbox = client && (await inboxReady(svc));
+  const replyTo = inbox ? `${cfg.from_name} <office+${client.mail_tag}@${REPLY_DOMAIN}>` : cfg.from_email;
+  const messageId = `<${crypto.randomUUID()}@barabashflow.pl>`;
   const { data: rkey } = await svc.rpc('get_secret', { p_name: 'resend_api_key' });
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${rkey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: `${cfg.from_name} <${cfg.from_email}>`,
-      to: [test ? cfg.reply_to : lead.email],
-      reply_to: cfg.reply_to,
-      ...(test || !cfg.bcc ? {} : { bcc: [cfg.bcc] }),
+      to: [test ? (cfg.notify_email || cfg.from_email) : lead.email],
+      reply_to: replyTo,
+      // no BCC: the whole thread lives in the CRM card
       subject: test ? `[TEST] ${subject}` : subject,
       text, html: toHtml(text, lead.name),
-      headers: { 'List-Unsubscribe': `<mailto:${cfg.reply_to}?subject=NIE>` },
+      headers: { 'Message-ID': messageId, 'List-Unsubscribe': `<mailto:${inbox ? `office+${client.mail_tag}@${REPLY_DOMAIN}` : cfg.from_email}?subject=NIE>` },
       tags: [{ name: 'kind', value: 'lead' }],
     }),
   });
   const res = await r.json().catch(() => ({}));
   if (!r.ok) {
+    if (created) await svc.from('crm_clients').delete().eq('id', client.id);
     if (!test) await svc.from('leads').update({ status: 'failed', error: JSON.stringify(res).slice(0, 300), subject, body: text0 }).eq('id', lead.id);
     throw new Error(`Resend HTTP ${r.status}: ${res?.message || ''}`);
   }
-  if (test) return { ok: true, test: true, to: cfg.reply_to };
-  await svc.from('leads').update({ status: 'sent', sent_at: new Date().toISOString(), decided_at: new Date().toISOString(), resend_id: res.id, subject, body: text0, error: null }).eq('id', lead.id);
+  if (test) return { ok: true, test: true, to: cfg.notify_email || cfg.from_email };
+  await svc.from('leads').update({ status: 'sent', sent_at: new Date().toISOString(), decided_at: new Date().toISOString(), resend_id: res.id, subject, body: text0, error: null, crm_client_id: client.id }).eq('id', lead.id);
   await svc.from('lead_suppression').upsert({ email: lead.email.toLowerCase(), reason: 'contacted' }, { onConflict: 'email', ignoreDuplicates: true });
-  // CRM: client + activity with exactly what was offered
-  let clientId: string | null = null;
-  const { data: existing } = await svc.from('crm_clients').select('id').eq('email', lead.email).maybeSingle();
-  if (existing) clientId = existing.id;
-  else {
-    const { data: c } = await svc.from('crm_clients').insert({ name: lead.name, email: lead.email, company: lead.name, website: lead.website, source: 'other', status: 'contact', tags: ['lead-' + lead.source], notes: `${lead.pkd_desc || ''} · ${lead.city || ''} · zarej. ${lead.registered_at}\n${lead.fit_reason || ''}`.trim(), next_action: 'Sprawdzić odpowiedź na ofertę', next_action_at: new Date(Date.now() + 4 * 86400000).toISOString() }).select('id').single();
-    clientId = c?.id ?? null;
-  }
-  if (clientId) {
-    await svc.from('crm_activities').insert({ client_id: clientId, kind: 'email', body: `Wysłano ofertę: ${subject}\n\n${text0}`, meta: { lead_id: lead.id, resend_id: res.id } });
-    await svc.from('leads').update({ crm_client_id: clientId }).eq('id', lead.id);
-  }
-  return { ok: true, resend_id: res.id, crm_client_id: clientId };
+  // CRM: exactly what was offered, as the first message of the thread
+  await svc.from('crm_activities').insert({ client_id: client.id, kind: 'email', body: text0, meta: { dir: 'out', label: 'Oferta', subject, to: lead.email, message_id: messageId, resend_id: res.id, reply_to: replyTo, lead_id: lead.id } });
+  return { ok: true, resend_id: res.id, crm_client_id: client.id, reply_to: replyTo };
+}
+
+// Reply domain (Resend Receiving on reply.barabashflow.pl, edge mail-in).
+// Until its MX is verified, replies go to office@ (Hostinger → Gmail).
+const REPLY_DOMAIN = 'reply.barabashflow.pl';
+let readyCache: { at: number; ok: boolean } | null = null;
+async function inboxReady(svc: any) {
+  if (readyCache && Date.now() - readyCache.at < 5 * 60_000) return readyCache.ok;
+  try {
+    const { data: rk } = await svc.rpc('get_secret', { p_name: 'resend_api_key' });
+    const d = await (await fetch('https://api.resend.com/domains/019a6899-eb09-49a8-b170-3176eda0d0eb', { headers: { Authorization: `Bearer ${rk}` } })).json();
+    const mx = (d.records || []).find((x: any) => x.record === 'Receiving');
+    readyCache = { at: Date.now(), ok: (mx?.status || d.status) === 'verified' };
+  } catch { readyCache = { at: Date.now(), ok: false }; }
+  return readyCache.ok;
 }
 
 // ── personal landing (public) ───────────────────────────────────────────────
@@ -521,7 +543,7 @@ async function publicBrief(svc: any, cfg: Cfg, b: any) {
     const text = `${l.name} (${l.city || ''}) zostawił brief na swojej stronie oferty.\n\nKontakt: ${String(b.name || '').slice(0, 80)} <${String(b.email || '').slice(0, 120)}>\n\n${String(b.summary || '').slice(0, 2000)}\n\nStrona: ${personalUrl(l.public_token)}\n\n— Twoja oferta (${l.sent_at ? new Date(l.sent_at).toLocaleDateString('pl-PL') : 'niewysłana'}): ${l.subject || ''}\n\n${l.body || ''}`;
     await fetch('https://api.resend.com/emails', {
       method: 'POST', headers: { Authorization: `Bearer ${rkey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: `BarabashFlow Leady <${cfg.from_email}>`, to: [cfg.reply_to], reply_to: String(b.email || l.email), subject: `🔥 ${l.name} zostawił brief`, text }),
+      body: JSON.stringify({ from: `BarabashFlow Leady <${cfg.from_email}>`, to: [cfg.notify_email], reply_to: String(b.email || l.email), subject: `🔥 ${l.name} zostawił brief`, text }),
     }).catch(() => null);
   }
   return { ok: true };

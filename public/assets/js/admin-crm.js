@@ -3,6 +3,8 @@
 // due date, deal value, activity timeline (notes / calls / e-mails /
 // meetings / status changes), files (private crm-files bucket, signed
 // URLs) and the enquiries linked to the client. List + Kanban views.
+// Korespondencja: the whole e-mail thread with the client (offers, replies
+// received through edge mail-in, answers sent from here via Resend).
 import { sb, $, $$, banner, escapeHtml, attr, fmtDate, relDays, modal, ask, readForm } from './admin-core.js?v=2026-11-10a';
 
 export const STATUSES = [
@@ -19,15 +21,18 @@ const KANBAN = ['lead', 'contact', 'offer', 'won', 'active', 'done'];
 const KINDS = [['note', 'Notatka'], ['call', 'Telefon'], ['email', 'E-mail'], ['meeting', 'Spotkanie'], ['task', 'Zadanie'], ['status', 'Zmiana statusu']];
 const KIND_ICON = { note: '✎', call: '☎', email: '✉', meeting: '◷', task: '☐', status: '⇄', file: '⎘' };
 
-const C = { clients: [], tags: [], view: 'list', q: '', status: 'all', tag: '' };
+const C = { clients: [], tags: [], view: 'list', q: '', status: 'all', tag: '', lastMail: {} };
 
 export async function loadCrm() {
-  const [{ data: clients, error }, { data: tags }] = await Promise.all([
+  const [{ data: clients, error }, { data: tags }, { data: mails }] = await Promise.all([
     sb.from('crm_clients').select('*').order('updated_at', { ascending: false }),
     sb.from('crm_tags').select('*').order('sort_order'),
+    sb.from('crm_activities').select('client_id, happened_at, body, meta').eq('kind', 'email').order('happened_at', { ascending: false }).limit(1000),
   ]);
   if (error) console.error(error);
   C.clients = clients || []; C.tags = tags || [];
+  C.lastMail = {};
+  for (const a of mails || []) if (!C.lastMail[a.client_id]) C.lastMail[a.client_id] = mailDir(a);
   const n = C.clients.filter((c) => !['archive', 'lost'].includes(c.status)).length;
   $('#crm-count').textContent = n ? String(n) : '';
 }
@@ -51,6 +56,9 @@ function filtered() {
     return true;
   });
 }
+// direction of an e-mail activity (old rows have no meta.dir)
+const mailDir = (a) => a.meta?.dir || (/^(Wysłano ofertę|Wysłano)/.test(a.body || '') ? 'out' : 'in');
+const replyBadge = (c) => (C.lastMail[c.id] === 'in' && !['archive', 'lost'].includes(c.status) ? '<span class="pill reply-badge">↩ nowa odpowiedź</span>' : '');
 const statusLabel = (s) => STATUSES.find((x) => x[0] === s)?.[1] || s;
 function dueBadge(c) {
   if (!c.next_action_at) return '';
@@ -75,7 +83,7 @@ export function renderCrm() {
   body.innerHTML = `<div class="crm-table">
     <div class="crm-tr crm-th"><span>Klient</span><span>Status</span><span>Kontakt</span><span>Następny krok</span><span>Wartość</span><span>Ostatni kontakt</span></div>
     ${items.map((c) => `<div class="crm-tr" data-client="${c.id}">
-      <span><strong>${escapeHtml(c.name)}</strong>${c.company ? `<br><small>${escapeHtml(c.company)}</small>` : ''}<div class="tags">${tagChips(c)}</div></span>
+      <span><strong>${escapeHtml(c.name)}</strong>${c.company ? `<br><small>${escapeHtml(c.company)}</small>` : ''}<div class="tags">${replyBadge(c)}${tagChips(c)}</div></span>
       <span><span class="status s-${c.status}">${statusLabel(c.status)}</span></span>
       <span><a href="mailto:${attr(c.email)}">${escapeHtml(c.email)}</a>${c.phone ? `<br><a href="tel:${attr(c.phone)}">${escapeHtml(c.phone)}</a>` : ''}</span>
       <span>${dueBadge(c) || '<small class="soft">—</small>'}</span>
@@ -89,7 +97,7 @@ function renderBoard(body, items) {
   body.innerHTML = `<div class="kanban">${KANBAN.map((s) => {
     const col = items.filter((c) => c.status === s);
     return `<div class="kcol" data-col="${s}"><div class="kcol-head"><span>${statusLabel(s)}</span><span class="count">${col.length}</span></div>
-      ${col.map((c) => `<div class="kcard" draggable="true" data-client="${c.id}"><strong>${escapeHtml(c.name)}</strong>${c.company ? `<small>${escapeHtml(c.company)}</small>` : ''}${c.value_pln ? `<small>${Number(c.value_pln).toLocaleString('pl-PL')} zł</small>` : ''}${dueBadge(c)}<div class="tags">${tagChips(c)}</div></div>`).join('')}
+      ${col.map((c) => `<div class="kcard" draggable="true" data-client="${c.id}"><strong>${escapeHtml(c.name)}</strong>${c.company ? `<small>${escapeHtml(c.company)}</small>` : ''}${c.value_pln ? `<small>${Number(c.value_pln).toLocaleString('pl-PL')} zł</small>` : ''}${dueBadge(c)}<div class="tags">${replyBadge(c)}${tagChips(c)}</div></div>`).join('')}
     </div>`;
   }).join('')}</div>`;
   let dragId = null;
@@ -146,8 +154,8 @@ export async function openClient(id) {
         <button class="icon-btn" data-modal-close aria-label="Zamknij">×</button>
       </div>
     </div>
-    <nav class="mtabs"><button class="is-active" data-mtab="data">Dane</button><button data-mtab="timeline" ${c ? '' : 'disabled'}>Aktywności</button><button data-mtab="files" ${c ? '' : 'disabled'}>Pliki</button><button data-mtab="messages" ${c ? '' : 'disabled'}>Zapytania</button></nav>
-    <div class="mpanel is-active" data-mpanel="data">
+    <nav class="mtabs"><button class="${c ? '' : 'is-active'}" data-mtab="data">Dane</button><button class="${c ? 'is-active' : ''}" data-mtab="mail" ${c ? '' : 'disabled'}>Korespondencja</button><button data-mtab="timeline" ${c ? '' : 'disabled'}>Aktywności</button><button data-mtab="files" ${c ? '' : 'disabled'}>Pliki</button><button data-mtab="messages" ${c ? '' : 'disabled'}>Zapytania</button></nav>
+    <div class="mpanel${c ? '' : ' is-active'}" data-mpanel="data">
       <div class="row-2">
         <div class="field"><label class="field-label">Imię i nazwisko / nazwa</label><input data-f="name" value="${attr(d.name)}" /></div>
         <div class="field"><label class="field-label">Firma</label><input data-f="company" value="${attr(d.company)}" /></div>
@@ -163,6 +171,16 @@ export async function openClient(id) {
       <div class="field"><label class="field-label">Tagi</label><div class="conn-chips" id="cl-tags">${C.tags.map((t) => `<button type="button" class="conn-chip${d.tags.includes(t.slug) ? ' is-on' : ''}" data-tag="${attr(t.slug)}" style="--chip-accent:${attr(t.color || '#0e0e0e')}"><span class="chip-dot"></span>${escapeHtml(t.label_pl)}</button>`).join('')}</div></div>
       <div class="field"><label class="field-label">Notatki</label><textarea data-f="notes" rows="5">${attr(d.notes)}</textarea></div>
       <div class="button-row"><button class="btn danger" id="cl-delete" ${c ? '' : 'disabled'}>Usuń klienta</button><span class="spread"></span><button class="btn primary" id="cl-save">Zapisz</button></div>
+    </div>
+    <div class="mpanel${c ? ' is-active' : ''}" data-mpanel="mail">
+      <div class="mail-note" id="cl-mail-note" hidden></div>
+      <div class="thread" id="cl-thread"><div class="empty-state">Ładowanie…</div></div>
+      <form class="mail-compose" id="cl-compose">
+        <div class="field"><label class="field-label">Do</label><input value="${attr(d.email)}" disabled /></div>
+        <div class="field"><label class="field-label">Temat</label><input name="subject" required /></div>
+        <div class="field"><label class="field-label">Wiadomość</label><textarea name="text" rows="6" required placeholder="Dzień dobry,&#10;&#10;…"></textarea></div>
+        <div class="button-row"><label class="check"><input type="checkbox" name="signature" checked /> Dodaj podpis</label><span class="spread"></span><button class="btn primary" type="submit">Wyślij ✉</button></div>
+      </form>
     </div>
     <div class="mpanel" data-mpanel="timeline">
       <form class="act-form" id="cl-act-form">
@@ -217,6 +235,50 @@ export async function openClient(id) {
     tl.innerHTML = (data || []).length ? data.map((a) => `<div class="tl-item k-${a.kind}"><span class="tl-ico">${KIND_ICON[a.kind] || '•'}</span><div><div class="tl-meta">${KINDS.find((k) => k[0] === a.kind)?.[1] || a.kind} · ${fmtDate(a.happened_at)}</div><div class="tl-body">${escapeHtml(a.body || '')}</div></div><button class="icon-btn mini" data-del-act="${a.id}" title="Usuń">×</button></div>`).join('') : '<div class="empty-state">Brak aktywności</div>';
   };
   loadTimeline();
+
+  // correspondence
+  const loadThread = async () => {
+    const { data } = await sb.from('crm_activities').select('*').eq('client_id', c.id).eq('kind', 'email').order('happened_at', { ascending: true });
+    const items = data || [];
+    const th = $('#cl-thread', card);
+    th.innerHTML = items.length ? items.map((a) => {
+      const dir = mailDir(a), m = a.meta || {};
+      let subject = m.subject || '', text = a.body || '';
+      const old = text.match(/^Wysłano ofertę: (.*)\n\n([\s\S]*)$/);
+      if (old) { subject = old[1]; text = old[2]; }
+      const who = dir === 'out' ? 'Ja' : escapeHtml(m.from_name || m.from || c.name);
+      const full = m.full_text && m.full_text.trim() !== text.trim() ? `<details class="mail-full"><summary>Pokaż całą wiadomość z cytatem</summary><pre>${escapeHtml(m.full_text)}</pre></details>` : '';
+      const files = (m.attachments || []).map((f) => f.path ? `<button class="pill" data-open-file="${attr(f.path)}">⎘ ${escapeHtml(f.filename)}</button>` : `<span class="pill">⎘ ${escapeHtml(f.filename)}</span>`).join('');
+      return `<article class="mail-msg is-${dir}">
+        <div class="mail-meta"><strong>${who}</strong>${m.label ? ` · ${escapeHtml(m.label)}` : ''} · ${fmtDate(a.happened_at)}${dir === 'in' && m.matched_by === 'new' ? ' · nowy nadawca' : ''}</div>
+        ${subject ? `<div class="mail-subj">${escapeHtml(subject)}</div>` : ''}
+        <div class="mail-body">${escapeHtml(text)}</div>${full}${files ? `<div class="tags">${files}</div>` : ''}
+      </article>`;
+    }).join('') : '<div class="empty-state">Brak korespondencji. Napisz pierwszą wiadomość poniżej.</div>';
+    th.scrollTop = th.scrollHeight;
+    const last = [...items].reverse().find((a) => (a.meta?.subject || /^Wysłano ofertę: /.test(a.body || '')));
+    const subj = last ? (last.meta?.subject || (last.body || '').match(/^Wysłano ofertę: (.*)/)?.[1] || '') : '';
+    const f = $('#cl-compose', card);
+    if (!f.subject.value) f.subject.value = subj ? (/^re:/i.test(subj) ? subj : `Re: ${subj}`) : '';
+  };
+  loadThread();
+  sb.functions.invoke('mail-in', { body: { action: 'status' } }).then(({ data }) => {
+    if (data && !data.ready) { const n = $('#cl-mail-note', card); n.hidden = false; n.textContent = 'Odbiór odpowiedzi jeszcze nieaktywny (rekord MX dla reply.barabashflow.pl). Do tego czasu odpowiedzi trafiają na office@ → Gmail.'; }
+  });
+  $('#cl-thread', card).addEventListener('click', async (e) => {
+    const o = e.target.closest('[data-open-file]'); if (!o) return;
+    const { data, error } = await sb.storage.from('crm-files').createSignedUrl(o.dataset.openFile, 300);
+    if (error) banner(error.message, 'error'); else window.open(data.signedUrl, '_blank');
+  });
+  $('#cl-compose', card).addEventListener('submit', async (e) => {
+    e.preventDefault(); const f = e.target; const btn = f.querySelector('[type=submit]');
+    if (!ask(`Wysłać e-mail do ${c.email}?`)) return;
+    btn.disabled = true; banner('Wysyłanie…', null);
+    const { data, error } = await sb.functions.invoke('mail-in', { body: { action: 'send', client_id: c.id, subject: f.subject.value.trim(), text: f.text.value, signature: f.signature.checked } });
+    btn.disabled = false;
+    if (error || data?.error) { banner(data?.error || error.message, 'error'); return; }
+    f.text.value = ''; await loadThread(); loadTimeline(); loadCrm().then(renderCrm); banner('Wysłano', 'ok');
+  });
   $('#cl-act-form', card).addEventListener('submit', async (e) => {
     e.preventDefault(); const f = e.target;
     const { error } = await sb.from('crm_activities').insert({ client_id: c.id, kind: f.kind.value, body: f.body.value.trim(), happened_at: f.happened_at.value ? new Date(f.happened_at.value).toISOString() : new Date().toISOString() });
