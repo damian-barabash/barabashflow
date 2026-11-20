@@ -19,6 +19,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 const REPLY_DOMAIN = 'reply.barabashflow.pl';
 const REPLY_DOMAIN_ID = '019a6899-eb09-49a8-b170-3176eda0d0eb';
 const ADMIN_URL = 'https://barabashflow.pl/admin/#crm';
+const OFFICE = 'office@barabashflow.pl';
 const OWNER_GMAIL = 'dmytrii.barabash@gmail.com';
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -151,6 +152,18 @@ async function onReceived(svc: any, d: any) {
   const fullText = (em.text && String(em.text).trim()) || htmlToText(em.html || '');
   const clean = stripQuote(fullText) || fullText.slice(0, 4000);
 
+  // office@barabashflow.pl is forwarded here as well (Hostinger forwarder → office@reply…).
+  // Our own mail must never come back in (loop guard), and the copy the owner
+  // already has in Gmail needs no second notification.
+  if (/@(reply\.)?barabashflow\.pl$/.test(from.email)) return { ok: true, ignored: 'own address' };
+  const viaOffice = toList.some((a) => parseAddr(a).email === OFFICE);
+  const precedence = hdr(em.headers, 'precedence').toLowerCase();
+  const autoSub = hdr(em.headers, 'auto-submitted').toLowerCase();
+  const automated = /^(no[-_.]?reply|do[-_.]?not[-_.]?reply|mailer-daemon|postmaster|bounces?|notifications?|newsletter|news|info-noreply|alerts?)([+@.-]|$)/i.test(from.email)
+    || !!hdr(em.headers, 'list-unsubscribe') || !!hdr(em.headers, 'list-id')
+    || /bulk|list|junk/.test(precedence) || (!!autoSub && autoSub !== 'no')
+    || (em.authentication?.spf === 'fail' && em.authentication?.dkim === 'fail');
+
   // match the client
   let client: any = null, how = '';
   if (tag) { client = (await svc.from('crm_clients').select('*').eq('mail_tag', tag).maybeSingle()).data; how = client ? 'tag' : ''; }
@@ -161,6 +174,15 @@ async function onReceived(svc: any, d: any) {
       const { data: act } = await svc.from('crm_activities').select('client_id').eq('meta->>message_id', mid).limit(1).maybeSingle();
       if (act) { client = (await svc.from('crm_clients').select('*').eq('id', act.client_id).maybeSingle()).data; how = 'thread'; break; }
     }
+  }
+  if (!client && automated) {
+    // newsletters, system mail, spam: no CRM card. Pass it on only if it was
+    // addressed straight to the reply domain (so it is not in Gmail yet).
+    const cfg = await leadsCfg(svc);
+    if (!viaOffice && cfg.notify_email) {
+      await resend(svc, '/emails', { method: 'POST', body: JSON.stringify({ from: `BarabashFlow CRM <${cfg.from_email}>`, to: [cfg.notify_email], subject: `[auto] ${em.subject || 'wiadomość'}`, text: `Od: ${from.name ? from.name + ' ' : ''}<${from.email}>\n\n${fullText.slice(0, 8000)}`, tags: [{ name: 'kind', value: 'crm-notify' }] }) }).catch((e) => console.warn('[mail-in] notify auto', e));
+    }
+    return { ok: true, skipped: 'automated', forwarded: !viaOffice };
   }
   if (!client) {
     const { data: c, error } = await svc.from('crm_clients').insert({ name: from.name || from.email, email: from.email, source: 'inbound', status: 'lead', tags: ['lead'], next_action: 'Odpowiedzieć na e-mail', next_action_at: new Date().toISOString().slice(0, 10) }).select('*').single();
@@ -212,7 +234,7 @@ async function onReceived(svc: any, d: any) {
 
   // notify the owner (not a copy of the thread: answer from the CRM card)
   const cfg = await leadsCfg(svc);
-  if (cfg.notify_email) {
+  if (cfg.notify_email && !viaOffice) {
     const text = `${client.name} odpisał(a)${optOut ? ' (NIE, wypisany)' : ''}.\n\nTemat: ${em.subject || ''}\nOd: ${from.name ? from.name + ' ' : ''}<${from.email}>\n${files.length ? `Załączniki: ${files.map((f) => f.filename).join(', ')}\n` : ''}\n${clean.slice(0, 3000)}\n\nOdpowiedz w karcie klienta (historia zostanie w CRM):\n${ADMIN_URL}`;
     await resend(svc, '/emails', { method: 'POST', body: JSON.stringify({ from: `BarabashFlow CRM <${cfg.from_email}>`, to: [cfg.notify_email], subject: `↩ ${client.name}: ${em.subject || 'odpowiedź'}`, text: noDash(text), tags: [{ name: 'kind', value: 'crm-notify' }] }) }).catch((e) => console.warn('[mail-in] notify', e));
   }
