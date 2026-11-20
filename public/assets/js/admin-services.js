@@ -1,14 +1,14 @@
 // Usługi (services collection) + FAQ editor. Same list/editor pattern as
 // projects. Services drive the home grid, /uslugi/, the project filter and
 // the "Czego potrzebujesz?" select in every contact form.
-import { sb, $, $$, state, banner, escapeHtml, attr, autoTranslateRow, autoTranslateList, trio, readForm, ask, slugify } from './admin-core.js?v=2026-11-10a';
+import { sb, $, $$, state, banner, escapeHtml, attr, autoTranslateRow, autoTranslateList, trio, readForm, ask, slugify, swapList, markExit, invalid } from './admin-core.js?v=2026-11-20a';
 
 const ICONS = [['site', 'Strona'], ['shop', 'Sklep'], ['platform', 'Platforma'], ['care', 'Opieka'], ['seo', 'SEO'], ['design', 'Design'], ['other', 'Inne']];
 const S = { selectedId: null, draft: null, faq: [] };
 
 export async function loadServices() {
   const { data, error } = await sb.from('services').select('*').order('sort_order');
-  if (error) console.error(error);
+  if (error) { console.error(error); banner(`Nie udało się wczytać usług: ${error.message}`, 'error'); }
   state.services = data || [];
 }
 export async function loadFaq() {
@@ -31,8 +31,7 @@ export function bindServicesUI() {
 export function renderServiceList() {
   const list = $('#sv-list'); if (!list) return;
   $('#services-count').textContent = state.services.length ? String(state.services.length) : '';
-  if (!state.services.length) { list.innerHTML = '<div class="empty-state">Brak usług</div>'; return; }
-  list.innerHTML = state.services.map((s, i) => `
+  swapList(list, !state.services.length ? '<div class="empty-state">Brak usług</div>' : state.services.map((s, i) => `
     <div class="lrow${s.id === S.selectedId ? ' is-active' : ''}${s.is_published ? '' : ' is-off'}" data-id="${s.id}">
       <div class="lrow-num">0${i + 1}</div>
       <div class="lrow-main">
@@ -43,7 +42,7 @@ export function renderServiceList() {
         <button class="icon-btn mini" data-move="-1" data-id="${s.id}" ${i === 0 ? 'disabled' : ''}>↑</button>
         <button class="icon-btn mini" data-move="1" data-id="${s.id}" ${i === state.services.length - 1 ? 'disabled' : ''}>↓</button>
       </div>
-    </div>`).join('');
+    </div>`).join(''), '.lrow[data-id]');
 }
 
 async function moveService(id, dir) {
@@ -123,7 +122,7 @@ async function saveService() {
   const host = $('#sv-editor'); readForm(host, S.draft);
   const d = S.draft;
   d.is_published = !!host.querySelector('[data-f="is_published"]').checked;
-  if (!d.title_pl) { banner('Nazwa PL jest wymagana', 'error'); return; }
+  if (!d.title_pl) { invalid(host.querySelector('[data-f="title"][data-l="pl"]')); banner('Nazwa PL jest wymagana', 'error'); return; }
   if (!d.slug) d.slug = slugify(d.title_pl);
   banner('Zapisywanie…', null);
   try {
@@ -144,18 +143,18 @@ async function saveService() {
 }
 async function deleteService() {
   const d = S.draft; if (!d?.id) return;
-  if (!ask(`Usunąć usługę „${d.title_pl}”?`)) return;
+  if (!(await ask(`Usunąć usługę „${d.title_pl}”?\nZniknie też jej podstrona /uslugi/${d.slug}/.`))) return;
+  banner('Usuwanie…', null);
   const { error } = await sb.from('services').delete().eq('id', d.id);
   if (error) { banner(error.message, 'error'); return; }
-  await loadServices(); closeService(); banner('Usunięto', 'ok');
+  await loadServices(); closeService(); banner(`Usługa „${d.title_pl}” usunięta`, 'ok');
 }
 
 // ── FAQ ─────────────────────────────────────────────────────────────────────
 export function renderFaq() {
   const list = $('#faq-list'); if (!list) return;
-  if (!S.faq.length) { list.innerHTML = '<div class="empty-state">Brak pytań</div>'; return; }
-  list.innerHTML = S.faq.map((f, i) => `
-    <details class="faq-ed${f.is_published ? '' : ' is-off'}" data-i="${i}" ${f._open ? 'open' : ''}>
+  swapList(list, !S.faq.length ? '<div class="empty-state">Brak pytań</div>' : S.faq.map((f, i) => `
+    <details class="faq-ed${f.is_published ? '' : ' is-off'}" data-fk="${f.id || `new-${i}`}" data-i="${i}" ${f._open ? 'open' : ''}>
       <summary><span class="faq-ed-q">${escapeHtml(f.question_pl || 'Nowe pytanie')}</span><span class="faq-ed-meta">${f.is_published ? '' : 'ukryte · '}#${f.sort_order}</span></summary>
       <div class="faq-ed-body">
         <div class="field"><label class="field-label">Pytanie</label>${trio('question', f)}</div>
@@ -167,7 +166,7 @@ export function renderFaq() {
         </div>
         <div class="button-row"><button class="btn small danger" data-faq-del="${i}">Usuń</button><span class="spread"></span><button class="btn small primary" data-faq-save="${i}">Zapisz</button></div>
       </div>
-    </details>`).join('');
+    </details>`).join(''), '[data-fk]');
 }
 async function onFaqClick(e) {
   const save = e.target.closest('[data-faq-save]'); const del = e.target.closest('[data-faq-del]');
@@ -175,11 +174,11 @@ async function onFaqClick(e) {
   const i = Number((save || del).dataset.faqSave ?? (save || del).dataset.faqDel);
   const f = S.faq[i]; const root = e.target.closest('.faq-ed');
   if (del) {
-    if (f.id) { if (!ask('Usunąć pytanie?')) return; const { error } = await sb.from('faq_items').delete().eq('id', f.id); if (error) { banner(error.message, 'error'); return; } }
-    S.faq.splice(i, 1); renderFaq(); banner('Usunięto', 'ok'); return;
+    if (f.id) { if (!(await ask(`Usunąć pytanie „${f.question_pl || ''}”?`))) return; const { error } = await sb.from('faq_items').delete().eq('id', f.id); if (error) { banner(error.message, 'error'); return; } }
+    S.faq.splice(i, 1); renderFaq(); banner('Pytanie usunięte', 'ok'); return;
   }
   readForm(root, f); f.is_published = !!root.querySelector('[data-f="is_published"]').checked;
-  if (!f.question_pl || !f.answer_pl) { banner('Pytanie i odpowiedź PL są wymagane', 'error'); return; }
+  if (!f.question_pl || !f.answer_pl) { invalid(root.querySelector(`[data-f="${f.question_pl ? 'answer' : 'question'}"][data-l="pl"]`)); banner('Pytanie i odpowiedź PL są wymagane', 'error'); return; }
   banner('Zapisywanie…', null);
   try { await autoTranslateRow(f, ['question', 'answer'], 'FAQ na stronie studia web-developmentu'); } catch {}
   const payload = { placement: f.placement || 'home', sort_order: f.sort_order ?? 0, is_published: !!f.is_published, question_pl: f.question_pl, question_en: f.question_en || null, question_ru: f.question_ru || null, answer_pl: f.answer_pl, answer_en: f.answer_en || null, answer_ru: f.answer_ru || null };

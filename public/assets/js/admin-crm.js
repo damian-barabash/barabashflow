@@ -5,7 +5,7 @@
 // URLs) and the enquiries linked to the client. List + Kanban views.
 // Korespondencja: the whole e-mail thread with the client (offers, replies
 // received through edge mail-in, answers sent from here via Resend).
-import { sb, $, $$, banner, escapeHtml, attr, fmtDate, relDays, modal, ask, readForm } from './admin-core.js?v=2026-11-10a';
+import { sb, $, $$, banner, escapeHtml, attr, fmtDate, relDays, modal, ask, readForm, swapList, markExit, invalid } from './admin-core.js?v=2026-11-20a';
 
 export const STATUSES = [
   ['lead', 'Lead', 'Nowy kontakt — jeszcze bez rozmowy'],
@@ -29,7 +29,7 @@ export async function loadCrm() {
     sb.from('crm_tags').select('*').order('sort_order'),
     sb.from('crm_activities').select('client_id, happened_at, body, meta').eq('kind', 'email').order('happened_at', { ascending: false }).limit(1000),
   ]);
-  if (error) console.error(error);
+  if (error) { console.error(error); banner(`Nie udało się wczytać klientów: ${error.message}`, 'error'); return; }
   C.clients = clients || []; C.tags = tags || [];
   C.lastMail = {};
   for (const a of mails || []) if (!C.lastMail[a.client_id]) C.lastMail[a.client_id] = mailDir(a);
@@ -79,8 +79,7 @@ export function renderCrm() {
   const due = C.clients.filter((c) => c.next_action_at && relDays(c.next_action_at) <= 0 && !['archive', 'lost', 'done'].includes(c.status));
   $('#crm-due').innerHTML = due.length ? `<strong>${due.length}</strong> do zrobienia dziś / po terminie: ${due.slice(0, 5).map((c) => `<a href="#" data-client="${c.id}">${escapeHtml(c.name)}</a>`).join(', ')}${due.length > 5 ? '…' : ''}` : 'Brak zaległych działań — czysto.';
   if (C.view === 'board') { renderBoard(body, items); return; }
-  if (!items.length) { body.innerHTML = '<div class="empty-state">Brak klientów</div>'; return; }
-  body.innerHTML = `<div class="crm-table">
+  swapList(body, !items.length ? '<div class="empty-state">Brak klientów</div>' : `<div class="crm-table">
     <div class="crm-tr crm-th"><span>Klient</span><span>Status</span><span>Kontakt</span><span>Następny krok</span><span>Wartość</span><span>Ostatni kontakt</span></div>
     ${items.map((c) => `<div class="crm-tr" data-client="${c.id}">
       <span><strong>${escapeHtml(c.name)}</strong>${c.company ? `<br><small>${escapeHtml(c.company)}</small>` : ''}<div class="tags">${replyBadge(c)}${tagChips(c)}</div></span>
@@ -90,16 +89,16 @@ export function renderCrm() {
       <span>${c.value_pln ? Number(c.value_pln).toLocaleString('pl-PL') + ' zł' : '<small class="soft">—</small>'}</span>
       <span><small>${c.last_contact_at ? fmtDate(c.last_contact_at, false) : '—'}</small></span>
     </div>`).join('')}
-  </div>`;
+  </div>`, '[data-client]');
 }
 
 function renderBoard(body, items) {
-  body.innerHTML = `<div class="kanban">${KANBAN.map((s) => {
+  swapList(body, `<div class="kanban">${KANBAN.map((s) => {
     const col = items.filter((c) => c.status === s);
     return `<div class="kcol" data-col="${s}"><div class="kcol-head"><span>${statusLabel(s)}</span><span class="count">${col.length}</span></div>
       ${col.map((c) => `<div class="kcard" draggable="true" data-client="${c.id}"><strong>${escapeHtml(c.name)}</strong>${c.company ? `<small>${escapeHtml(c.company)}</small>` : ''}${c.value_pln ? `<small>${Number(c.value_pln).toLocaleString('pl-PL')} zł</small>` : ''}${dueBadge(c)}<div class="tags">${replyBadge(c)}${tagChips(c)}</div></div>`).join('')}
     </div>`;
-  }).join('')}</div>`;
+  }).join('')}</div>`, '[data-client]');
   let dragId = null;
   $$('.kcard', body).forEach((el) => {
     el.addEventListener('dragstart', () => { dragId = el.dataset.client; el.classList.add('is-dragging'); });
@@ -175,7 +174,7 @@ export async function openClient(id) {
     <div class="mpanel${c ? ' is-active' : ''}" data-mpanel="mail">
       <div class="mail-note" id="cl-mail-note" hidden></div>
       <div class="thread" id="cl-thread"><div class="empty-state">Ładowanie…</div></div>
-      <form class="mail-compose" id="cl-compose">
+      <form class="mail-compose" id="cl-compose" novalidate>
         <div class="field"><label class="field-label">Do</label><input value="${attr(d.email)}" disabled /></div>
         <div class="field"><label class="field-label">Temat</label><input name="subject" required /></div>
         <div class="field"><label class="field-label">Wiadomość</label><textarea name="text" rows="6" required placeholder="Dzień dobry,&#10;&#10;…"></textarea></div>
@@ -183,7 +182,7 @@ export async function openClient(id) {
       </form>
     </div>
     <div class="mpanel" data-mpanel="timeline">
-      <form class="act-form" id="cl-act-form">
+      <form class="act-form" id="cl-act-form" novalidate>
         <select name="kind">${KINDS.filter((k) => k[0] !== 'status').map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
         <input name="happened_at" type="datetime-local" value="${new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}" />
         <textarea name="body" rows="2" placeholder="Co ustaliliśmy…" required></textarea>
@@ -208,7 +207,8 @@ export async function openClient(id) {
     readForm($('[data-mpanel="data"]', card), d);
     d.status = $('#cl-status', card).value;
     d.tags = $$('#cl-tags .conn-chip.is-on', card).map((t) => t.dataset.tag);
-    if (!d.name || !d.email) { banner('Nazwa i e-mail są wymagane', 'error'); return; }
+    if (!d.name || !d.email) { invalid(card.querySelector(`[data-f="${d.name ? 'email' : 'name'}"]`)); banner('Nazwa i e-mail są wymagane', 'error'); return; }
+    banner('Zapisywanie…', null);
     const payload = { name: d.name, email: d.email.toLowerCase(), phone: d.phone || null, company: d.company || null, position: d.position || null, website: d.website || null, source: d.source || 'manual', status: d.status, tags: d.tags, notes: d.notes || null, value_pln: d.value_pln ?? null, next_action: d.next_action || null, next_action_at: d.next_action_at || null };
     const q = d.id ? sb.from('crm_clients').update(payload).eq('id', d.id).select().single() : sb.from('crm_clients').insert(payload).select().single();
     const { data, error } = await q;
@@ -219,12 +219,13 @@ export async function openClient(id) {
   });
   $('#cl-status', card).addEventListener('change', async (e) => { if (c) await setStatus(c.id, e.target.value); });
   $('#cl-delete', card).addEventListener('click', async () => {
-    if (!c || !ask(`Usunąć klienta „${c.name}” z całą historią i plikami?`)) return;
+    if (!c || !(await ask(`Usunąć klienta „${c.name}”?\nZniknie cała historia, korespondencja i pliki. Tego nie da się cofnąć.`))) return;
+    banner('Usuwanie…', null);
     const { data: files } = await sb.from('crm_files').select('storage_path').eq('client_id', c.id);
     if (files?.length) await sb.storage.from('crm-files').remove(files.map((f) => f.storage_path));
     const { error } = await sb.from('crm_clients').delete().eq('id', c.id);
     if (error) { banner(error.message, 'error'); return; }
-    m.close(); await loadCrm(); renderCrm(); banner('Usunięto', 'ok');
+    m.close(); await loadCrm(); renderCrm(); banner(`Usunięto klienta ${c.name}`, 'ok');
   });
   if (!c) return;
 
@@ -232,7 +233,7 @@ export async function openClient(id) {
   const loadTimeline = async () => {
     const { data } = await sb.from('crm_activities').select('*').eq('client_id', c.id).order('happened_at', { ascending: false });
     const tl = $('#cl-timeline', card);
-    tl.innerHTML = (data || []).length ? data.map((a) => `<div class="tl-item k-${a.kind}"><span class="tl-ico">${KIND_ICON[a.kind] || '•'}</span><div><div class="tl-meta">${KINDS.find((k) => k[0] === a.kind)?.[1] || a.kind} · ${fmtDate(a.happened_at)}</div><div class="tl-body">${escapeHtml(a.body || '')}</div></div><button class="icon-btn mini" data-del-act="${a.id}" title="Usuń">×</button></div>`).join('') : '<div class="empty-state">Brak aktywności</div>';
+    swapList(tl, (data || []).length ? data.map((a) => `<div class="tl-item k-${a.kind}" data-aid="${a.id}"><span class="tl-ico">${KIND_ICON[a.kind] || '•'}</span><div><div class="tl-meta">${KINDS.find((k) => k[0] === a.kind)?.[1] || a.kind} · ${fmtDate(a.happened_at)}</div><div class="tl-body">${escapeHtml(a.body || '')}</div></div><button class="icon-btn mini" data-del-act="${a.id}" title="Usuń">×</button></div>`).join('') : '<div class="empty-state">Brak aktywności</div>', '[data-aid]');
   };
   loadTimeline();
 
@@ -241,7 +242,7 @@ export async function openClient(id) {
     const { data } = await sb.from('crm_activities').select('*').eq('client_id', c.id).eq('kind', 'email').order('happened_at', { ascending: true });
     const items = data || [];
     const th = $('#cl-thread', card);
-    th.innerHTML = items.length ? items.map((a) => {
+    swapList(th, items.length ? items.map((a) => {
       const dir = mailDir(a), m = a.meta || {};
       let subject = m.subject || '', text = a.body || '';
       const old = text.match(/^Wysłano ofertę: (.*)\n\n([\s\S]*)$/);
@@ -249,12 +250,12 @@ export async function openClient(id) {
       const who = dir === 'out' ? 'Ja' : escapeHtml(m.from_name || m.from || c.name);
       const full = m.full_text && m.full_text.trim() !== text.trim() ? `<details class="mail-full"><summary>Pokaż całą wiadomość z cytatem</summary><pre>${escapeHtml(m.full_text)}</pre></details>` : '';
       const files = (m.attachments || []).map((f) => f.path ? `<button class="pill" data-open-file="${attr(f.path)}">⎘ ${escapeHtml(f.filename)}</button>` : `<span class="pill">⎘ ${escapeHtml(f.filename)}</span>`).join('');
-      return `<article class="mail-msg is-${dir}">
+      return `<article class="mail-msg is-${dir}" data-mid="${a.id}">
         <div class="mail-meta"><strong>${who}</strong>${m.label ? ` · ${escapeHtml(m.label)}` : ''} · ${fmtDate(a.happened_at)}${dir === 'in' && m.matched_by === 'new' ? ' · nowy nadawca' : ''}</div>
         ${subject ? `<div class="mail-subj">${escapeHtml(subject)}</div>` : ''}
         <div class="mail-body">${escapeHtml(text)}</div>${full}${files ? `<div class="tags">${files}</div>` : ''}
       </article>`;
-    }).join('') : '<div class="empty-state">Brak korespondencji. Napisz pierwszą wiadomość poniżej.</div>';
+    }).join('') : '<div class="empty-state">Brak korespondencji. Napisz pierwszą wiadomość poniżej.</div>', '[data-mid]');
     th.scrollTop = th.scrollHeight;
     const last = [...items].reverse().find((a) => (a.meta?.subject || /^Wysłano ofertę: /.test(a.body || '')));
     const subj = last ? (last.meta?.subject || (last.body || '').match(/^Wysłano ofertę: (.*)/)?.[1] || '') : '';
@@ -272,48 +273,61 @@ export async function openClient(id) {
   });
   $('#cl-compose', card).addEventListener('submit', async (e) => {
     e.preventDefault(); const f = e.target; const btn = f.querySelector('[type=submit]');
-    if (!ask(`Wysłać e-mail do ${c.email}?`)) return;
-    btn.disabled = true; banner('Wysyłanie…', null);
-    const { data, error } = await sb.functions.invoke('mail-in', { body: { action: 'send', client_id: c.id, subject: f.subject.value.trim(), text: f.text.value, signature: f.signature.checked } });
+    if (!f.subject.value.trim()) { invalid(f.subject); banner('Wpisz temat wiadomości', 'error'); return; }
+    if (!f.text.value.trim()) { invalid(f.text); banner('Wiadomość jest pusta', 'error'); return; }
+    if (!(await ask(`Wysłać e-mail do ${c.email}?\nTemat: ${f.subject.value.trim()}`))) return;
+    btn.disabled = true; banner(`Wysyłanie do ${c.email}…`, null);
+    const { data, error } = await sb.functions.invoke('mail-in', { body: { action: 'send', client_id: c.id, subject: f.subject.value.trim(), text: f.text.value, signature: f.signature.checked } }).catch((err) => ({ error: err }));
     btn.disabled = false;
-    if (error || data?.error) { banner(data?.error || error.message, 'error'); return; }
-    f.text.value = ''; await loadThread(); loadTimeline(); loadCrm().then(renderCrm); banner('Wysłano', 'ok');
+    if (error || data?.error) {
+      let msg = data?.error || error.message;
+      try { msg = (await error.context.json()).error || msg; } catch { /* keep */ }
+      banner(`Nie wysłano: ${msg}`, 'error'); return;
+    }
+    f.text.value = ''; await loadThread(); loadTimeline(); loadCrm().then(renderCrm); banner(`Wysłano do ${c.email}`, 'ok');
   });
   $('#cl-act-form', card).addEventListener('submit', async (e) => {
     e.preventDefault(); const f = e.target;
+    if (!f.body.value.trim()) { invalid(f.body); banner('Wpisz treść aktywności', 'error'); return; }
     const { error } = await sb.from('crm_activities').insert({ client_id: c.id, kind: f.kind.value, body: f.body.value.trim(), happened_at: f.happened_at.value ? new Date(f.happened_at.value).toISOString() : new Date().toISOString() });
     if (error) { banner(error.message, 'error'); return; }
     f.body.value = ''; loadTimeline(); loadCrm().then(renderCrm); banner('Dodano', 'ok');
   });
-  $('#cl-timeline', card).addEventListener('click', async (e) => { const b = e.target.closest('[data-del-act]'); if (!b) return; await sb.from('crm_activities').delete().eq('id', b.dataset.delAct); loadTimeline(); });
+  $('#cl-timeline', card).addEventListener('click', async (e) => { const b = e.target.closest('[data-del-act]'); if (!b) return; const { error } = await sb.from('crm_activities').delete().eq('id', b.dataset.delAct); if (error) { banner(error.message, 'error'); return; } await loadTimeline(); banner('Usunięto wpis', 'ok'); });
 
   // files
   const loadFiles = async () => {
     const { data } = await sb.from('crm_files').select('*').eq('client_id', c.id).order('created_at', { ascending: false });
     const wrap = $('#cl-files', card);
-    if (!data?.length) { wrap.innerHTML = '<div class="empty-state">Brak plików</div>'; return; }
-    wrap.innerHTML = data.map((f) => `<div class="file-row"><span>${escapeHtml(f.original_name)}</span><small>${(f.size_bytes / 1024).toFixed(0)} KB · ${fmtDate(f.created_at, false)}</small><button class="btn small" data-open-file="${f.storage_path}">Otwórz</button><button class="btn small danger" data-del-file="${f.id}" data-path="${attr(f.storage_path)}">Usuń</button></div>`).join('');
+    swapList(wrap, !data?.length ? '<div class="empty-state">Brak plików</div>' : data.map((f) => `<div class="file-row" data-fid="${f.id}"><span>${escapeHtml(f.original_name)}</span><small>${(f.size_bytes / 1024).toFixed(0)} KB · ${fmtDate(f.created_at, false)}</small><button class="btn small" data-open-file="${f.storage_path}">Otwórz</button><button class="btn small danger" data-del-file="${f.id}" data-path="${attr(f.storage_path)}">Usuń</button></div>`).join(''), '[data-fid]');
   };
   loadFiles();
   $('#cl-upload', card).addEventListener('click', async () => {
     const input = document.createElement('input'); input.type = 'file'; input.multiple = true;
     input.onchange = async () => {
+      let failed = 0;
       for (const file of input.files) {
         banner(`Wysyłanie ${file.name}…`, null);
         const path = `client/${c.id}/${crypto.randomUUID()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
         const { error } = await sb.storage.from('crm-files').upload(path, file, { contentType: file.type || undefined });
-        if (error) { banner(error.message, 'error'); continue; }
+        if (error) { failed++; banner(`${file.name}: ${error.message}`, 'error'); continue; }
         await sb.from('crm_files').insert({ client_id: c.id, storage_path: path, original_name: file.name, mime: file.type, size_bytes: file.size });
         await sb.from('crm_activities').insert({ client_id: c.id, kind: 'file', body: `Plik: ${file.name}` });
       }
-      loadFiles(); loadTimeline(); banner('Wgrano', 'ok');
+      loadFiles(); loadTimeline(); if (!failed) banner(input.files.length > 1 ? `Wgrano ${input.files.length} pliki` : 'Plik wgrany', 'ok');
     };
     input.click();
   });
   $('#cl-files', card).addEventListener('click', async (e) => {
     const o = e.target.closest('[data-open-file]'); const del = e.target.closest('[data-del-file]');
     if (o) { const { data, error } = await sb.storage.from('crm-files').createSignedUrl(o.dataset.openFile, 300); if (error) banner(error.message, 'error'); else window.open(data.signedUrl, '_blank'); }
-    if (del) { if (!ask('Usunąć plik?')) return; await sb.storage.from('crm-files').remove([del.dataset.path]); await sb.from('crm_files').delete().eq('id', del.dataset.delFile); loadFiles(); }
+    if (del) {
+      if (!(await ask('Usunąć plik?\nTego nie da się cofnąć.'))) return;
+      await sb.storage.from('crm-files').remove([del.dataset.path]);
+      const { error } = await sb.from('crm_files').delete().eq('id', del.dataset.delFile);
+      if (error) { banner(error.message, 'error'); return; }
+      await loadFiles(); banner('Plik usunięty', 'ok');
+    }
   });
 
   // linked messages

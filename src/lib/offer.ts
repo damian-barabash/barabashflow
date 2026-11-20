@@ -22,24 +22,22 @@ export function caseFor(service: Service, projects: Project[]): Project | null {
 }
 
 const TRAINING = /szkolen/i;
-const PRICE_OR_CMS = /\bcms\b|panel administracyjny|koszt|\bcen[aey]\b|cennik|wycen|ile kosztuje|wizyt[oó]wk/i;
 const SHOP = /sklep|e-commerce/i;
-// Price-like titles that aren't about websites (print, notary, translations, taxes…).
-const OFF_TOPIC = /wydruk|ksero|\ba4\b|notarial|magistersk|t[lł]umacz|dokumentacji medycznej|uzyskania przychodu|\bkurs\b/i;
 
+// Every post gets an offer block: training pitch for training-company topics,
+// the shop service for e-commerce topics, "Strony internetowe" for everything else.
 export function offerForPost(
   post: { slug: string; title_pl: string; tags?: string[] | null },
   services: Service[],
   projects: Project[],
 ): Offer | null {
-  // Slug + title only: tags are too loose ("koszt" tags on off-topic posts).
+  // Slug + title only: tags are too loose.
   const hay = `${post.slug.replace(/-/g, ' ')} ${post.title_pl}`;
   const site = services.find((s) => s.slug === 'strony-internetowe');
   if (!site) return null;
   if (TRAINING.test(hay)) {
     return { kind: 'training', service: site, project: projects.find((p) => p.slug === TRAINING_CASE) || caseFor(site, projects) };
   }
-  if (OFF_TOPIC.test(hay) || !PRICE_OR_CMS.test(hay)) return null;
   const service = (SHOP.test(hay) && services.find((s) => s.slug === 'sklepy-internetowe')) || site;
   return { kind: 'offer', service, project: caseFor(service, projects) };
 }

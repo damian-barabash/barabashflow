@@ -2,7 +2,7 @@
 // storage upload (WebP downscale), AI translation, HTML escaping, dates.
 // Every admin module imports from here; nothing here imports the modules.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-11-10a';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl } from './supabase-config.js?v=2026-11-20a';
 
 export { SUPABASE_URL, SUPABASE_ANON_KEY, MEDIA_BUCKET, mediaUrl };
 
@@ -23,15 +23,8 @@ export const state = {
   photosByProject: new Map(),
 };
 
-let bannerTimer;
-export function banner(text, kind) {
-  const el = $('#banner');
-  if (!el) return;
-  el.textContent = text;
-  el.className = 'banner is-shown ' + (kind || '');
-  clearTimeout(bannerTimer);
-  if (kind === 'ok' || kind === 'error') bannerTimer = setTimeout(() => el.classList.remove('is-shown'), 2600);
-}
+// Toasts, button/card feedback, confirm dialog and list transitions live in admin-fx.
+export { banner, ask, swapList, markExit, invalid } from './admin-fx.js?v=2026-11-20a';
 
 export function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -54,10 +47,6 @@ export function slugify(s) {
     .replace(/[ąàáâä]/g, 'a').replace(/[ćç]/g, 'c').replace(/[ęèéêë]/g, 'e').replace(/[łl]/g, 'l').replace(/[ńñ]/g, 'n').replace(/[óòôö]/g, 'o').replace(/[śš]/g, 's').replace(/[źżž]/g, 'z').replace(/[ùúûü]/g, 'u').replace(/[ìíîï]/g, 'i')
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 }
-
-// Tiny confirm that avoids native dialogs blocking automation: still native
-// confirm() by default (the user is a human), but centralised.
-export function ask(msg) { return window.confirm(msg); }
 
 // ── Storage ─────────────────────────────────────────────────────────────────
 // Downscale + WebP in the browser before upload (4–5 MB PNG → ~80 KB).
@@ -183,8 +172,8 @@ export function modal(html, { wide = false } = {}) {
   root.innerHTML = `<div class="modal-backdrop"></div><div class="modal-card" role="dialog" aria-modal="true">${html}</div>`;
   document.body.appendChild(root);
   requestAnimationFrame(() => root.classList.add('is-open'));
-  const close = () => { root.classList.remove('is-open'); setTimeout(() => root.remove(), 220); document.removeEventListener('keydown', onKey); };
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const close = () => { root.classList.remove('is-open'); setTimeout(() => root.remove(), 260); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.ask-root')) close(); };
   document.addEventListener('keydown', onKey);
   root.querySelector('.modal-backdrop').addEventListener('click', close);
   $$('[data-modal-close]', root).forEach((b) => b.addEventListener('click', close));

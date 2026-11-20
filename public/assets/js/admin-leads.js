@@ -3,7 +3,7 @@
 // 10 min). The owner reviews each card: edit subject/body, rewrite with AI,
 // send (Resend from leads_config.from_email, replies land in the CRM card via edge mail-in), skip.
 // Undecided leads simply stay in "Do decyzji". Settings → site_settings.leads_config.
-import { sb, $, state, banner, escapeHtml } from './admin-core.js?v=2026-11-10a';
+import { sb, $, state, banner, escapeHtml, ask, swapList, markExit, invalid } from './admin-core.js?v=2026-11-20a';
 
 const INDUSTRIES = {
   beauty: 'Beauty i wellness', gastro: 'Gastronomia', budowa: 'Budowa i remonty', zdrowie: 'Zdrowie i medycyna',
@@ -26,7 +26,7 @@ export async function loadLeads() {
     .select('id,source,ext_id,name,legal_form,registered_at,city,voivodeship,address,email,website,nip,capital,pkd_code,pkd_desc,pkd_other,board,industry,fit_score,fit_reason,subject,body,status,composed_at,sent_at,error,crm_client_id,public_token,views,viewed_at,last_viewed_at,briefed_at')
     .in('status', ['ready', 'sent', 'skipped', 'failed', 'rejected', 'scored'])
     .order('composed_at', { ascending: false, nullsFirst: false }).order('fit_score', { ascending: false }).limit(400);
-  if (error) { console.error(error); return; }
+  if (error) { console.error(error); banner(`Nie udało się wczytać leadów: ${error.message}`, 'error'); return; }
   state.leads = data || [];
 }
 
@@ -52,7 +52,7 @@ export function renderLeads() {
   const list = state.leads.filter((x) => (state.leadsFilter === 'rejected' ? ['rejected', 'scored'].includes(x.status) : x.status === state.leadsFilter));
   if (state.leadsFilter === 'ready' || state.leadsFilter === 'rejected') list.sort((a, b) => (b.fit_score ?? 0) - (a.fit_score ?? 0));
   else list.sort((a, b) => String(b.sent_at || b.composed_at || '').localeCompare(String(a.sent_at || a.composed_at || '')));
-  $('#leads-list').innerHTML = list.length ? list.map(card).join('') : `<div class="empty-state">${state.leadsFilter === 'ready' ? 'Wszystko rozpatrzone — nowe leady pojawią się jutro rano' : 'Pusto'}</div>`;
+  swapList($('#leads-list'), list.length ? list.map(card).join('') : `<div class="empty-state">${state.leadsFilter === 'ready' ? 'Wszystko rozpatrzone — nowe leady pojawią się jutro rano' : 'Pusto'}</div>`, '[data-lead]');
   $('#leads-list').querySelectorAll('textarea[data-f="body"]').forEach(autoGrow);
   renderLeadSettings();
 }
@@ -166,7 +166,7 @@ async function act(kind, id, btn) {
     if (kind === 'skip' || kind === 'restore') {
       const status = kind === 'skip' ? 'skipped' : (lead.subject ? 'ready' : 'scored');
       const { error } = await sb.from('leads').update({ status, decided_at: new Date().toISOString() }).eq('id', id); if (error) throw error;
-      lead.status = status; renderLeads(); banner(kind === 'skip' ? 'Pominięto' : 'Przywrócono', 'ok'); return;
+      lead.status = status; markExit(leadEl(id), kind === 'skip' ? 'skip' : 'out'); renderLeads(); banner(kind === 'skip' ? 'Pominięto' : 'Przywrócono do decyzji', 'ok'); return;
     }
     if (kind === 'rewrite' || (kind === 'restore-compose')) {
       busy(true); banner('AI przepisuje ofertę…', null);
@@ -176,20 +176,22 @@ async function act(kind, id, btn) {
       renderLeads(); banner('Nowa wersja gotowa', 'ok'); return;
     }
     if (kind === 'test') {
-      busy(true); const d = draft(id);
+      busy(true); banner('Wysyłam test…', null); const d = draft(id);
       const r = await call({ action: 'send', id, ...d, test: true });
       banner(`Test wysłany na ${r.to}`, 'ok'); return;
     }
     if (kind === 'send') {
       const d = draft(id); const c = cfg();
-      if (!c.test_mode && !confirm(`Wysłać ofertę do ${lead.email}?\n\nTemat: ${d.subject}`)) return;
+      if (!d.subject.trim()) { invalid(leadEl(id)?.querySelector('[data-f="subject"]')); banner('Temat jest pusty', 'error'); return; }
+      if (!d.body.trim()) { invalid(leadEl(id)?.querySelector('[data-f="body"]')); banner('Treść jest pusta', 'error'); return; }
+      if (!c.test_mode && !(await ask(`Wysłać ofertę do ${lead.email}?\nTemat: ${d.subject}`))) return;
       busy(true); banner('Wysyłanie…', null);
       const r = await call({ action: 'send', id, ...d });
       if (r.test) { banner(`Tryb testowy: wysłano do ${r.to}`, 'ok'); return; }
       Object.assign(lead, d, { status: 'sent', sent_at: new Date().toISOString(), crm_client_id: r.crm_client_id });
-      renderLeads(); banner('Wysłano · klient dodany do CRM', 'ok');
+      markExit(leadEl(id), 'send'); renderLeads(); banner(`Wysłano do ${lead.email} · klient dodany do CRM`, 'ok');
     }
-  } catch (err) { banner(err.message || 'Błąd', 'error'); }
+  } catch (err) { banner(`${kind === 'send' || kind === 'test' ? 'Nie wysłano: ' : kind === 'rewrite' ? 'AI nie przepisało oferty: ' : ''}${err.message || 'Błąd'}`, 'error'); }
   finally { busy(false); }
 }
 
@@ -202,11 +204,12 @@ async function saveSettings() {
   });
   v.industries = [...box.querySelectorAll('[data-ind].is-on')].map((b) => b.dataset.ind);
   v.voivodeships = [...box.querySelectorAll('[data-voiv].is-on')].map((b) => b.dataset.voiv);
-  if (!v.industries.length) { banner('Zaznacz przynajmniej jedną branżę', 'error'); return; }
-  if (!/@barabashflow\.pl$/i.test(v.from_email)) { banner('Nadawca musi być w domenie barabashflow.pl (zweryfikowana w Resend)', 'error'); return; }
+  if (!v.industries.length) { invalid(box.querySelector('[data-ind]')?.parentElement); banner('Zaznacz przynajmniej jedną branżę', 'error'); return; }
+  if (!/@barabashflow\.pl$/i.test(v.from_email)) { invalid(box.querySelector('[data-c="from_email"]')); banner('Nadawca musi być w domenie barabashflow.pl (zweryfikowana w Resend)', 'error'); return; }
   v.per_day = Math.min(Math.max(Math.round(v.per_day || 10), 1), 40);
   v.max_age_days = Math.min(Math.max(Math.round(v.max_age_days || 21), 3), 90);
   v.min_fit = Math.min(Math.max(Math.round(v.min_fit || 0), 0), 95);
+  banner('Zapisywanie ustawień…', null);
   const { error } = await sb.from('site_settings').upsert({ key: 'leads_config', value_meta: v }, { onConflict: 'key' });
   if (error) { banner(error.message, 'error'); return; }
   state.settings.leads_config = { ...(state.settings.leads_config || { key: 'leads_config' }), value_meta: v };

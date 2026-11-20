@@ -4,7 +4,7 @@
 // published list. Generator settings are read by the Mac Studio agent on its
 // next run (every 3 h); estimator settings are baked into the static pages, so
 // they go live after a rebuild (button here, or the next daily publication).
-import { sb, $, state, banner, escapeHtml, mediaUrl, MEDIA_BUCKET, slugify } from './admin-core.js?v=2026-11-10a';
+import { sb, $, state, banner, escapeHtml, mediaUrl, MEDIA_BUCKET, slugify, ask, swapList, markExit, invalid } from './admin-core.js?v=2026-11-20a';
 
 // ── defaults (mirror blog-agent/blog-writer.ts and src/lib/estimate-model.ts) ─
 const PILLARS = {
@@ -69,11 +69,12 @@ const servicePrice = (slug) => {
 // ── data ────────────────────────────────────────────────────────────────────
 state.blogPosts = []; state.blogTopics = []; state.aiUsage = [];
 export async function loadBlog() {
-  const [{ data: posts }, { data: topics }, { data: usage }] = await Promise.all([
+  const [{ data: posts, error }, { data: topics }, { data: usage }] = await Promise.all([
     sb.from('blog_posts').select('id,slug,title_pl,cover_path,status,published_at,scheduled_for,pillar,format,body_en,body_ru').neq('status', 'archived').order('published_at', { ascending: false }).limit(1000),
     sb.from('blog_topics').select('id,title,slug,pillar,format,angle,priority,source,status,created_at').in('status', ['queued', 'writing']).order('priority', { ascending: false }).order('created_at').limit(200),
     sb.from('ai_usage').select('feature,cost_usd,ts').gte('ts', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()).limit(5000),
   ]);
+  if (error) { console.error(error); banner(`Nie udało się wczytać bloga: ${error.message}`, 'error'); return; }
   state.blogPosts = posts || []; state.blogTopics = topics || []; state.aiUsage = usage || [];
 }
 
@@ -102,6 +103,7 @@ function renderBudget() {
 }
 async function saveBudget() {
   const v = Math.min(Math.max(Math.round(Number($('#ai-cap').value) || 15), 1), 200);
+  banner('Zapisywanie limitu…', null);
   const { error } = await sb.from('site_settings').upsert({ key: 'ai_budget', value_meta: { monthly_usd: v } }, { onConflict: 'key' });
   if (error) { banner(error.message, 'error'); return; }
   state.settings.ai_budget = { key: 'ai_budget', value_meta: { monthly_usd: v } }; renderBudget(); banner(`Limit: $${v} / miesiąc`, 'ok');
@@ -175,7 +177,7 @@ function renderGenForm() {
 
 function renderQueue(scheduled) {
   $('#blog-sched-aside').textContent = scheduled.length ? `${scheduled.length} w kolejce` : '';
-  $('#blog-scheduled').innerHTML = scheduled.length ? scheduled.map((p, i) => `
+  swapList($('#blog-scheduled'), scheduled.length ? scheduled.map((p, i) => `
     <div class="blog-row" data-id="${p.id}">
       <div class="blog-row-thumb" style="${p.cover_path ? `background-image:url('${thumb(p.cover_path)}')` : ''}"></div>
       <div class="blog-row-main">
@@ -187,12 +189,12 @@ function renderQueue(scheduled) {
         <button class="btn small" data-act="publish-now" data-id="${p.id}">Opublikuj teraz</button>
         <button class="btn small danger" data-act="delete" data-id="${p.id}">Usuń</button>
       </div>
-    </div>`).join('') : '<div class="empty-state">Kolejka pusta</div>';
+    </div>`).join('') : '<div class="empty-state">Kolejka pusta</div>', '.blog-row[data-id]');
 }
 
 function renderTopics() {
   $('#blog-topics-aside').textContent = state.blogTopics.length ? `${state.blogTopics.length} tematów` : '';
-  $('#blog-topics').innerHTML = state.blogTopics.length ? state.blogTopics.map((t) => `
+  swapList($('#blog-topics'), state.blogTopics.length ? state.blogTopics.map((t) => `
     <div class="blog-row is-topic" data-topic="${t.id}">
       <div class="blog-row-main">
         <div class="blog-row-title">${t.priority > 0 ? '★ ' : ''}${escapeHtml(t.title)}</div>
@@ -202,7 +204,7 @@ function renderTopics() {
         <button class="btn small" data-act="prio" data-id="${t.id}">${t.priority > 0 ? '☆ Zwykły' : '★ Następny'}</button>
         <button class="btn small" data-act="reject" data-id="${t.id}">Odrzuć</button>
       </div>
-    </div>`).join('') : '<div class="empty-state">Planer uzupełni tematy przy najbliższym przebiegu</div>';
+    </div>`).join('') : '<div class="empty-state">Planer uzupełni tematy przy najbliższym przebiegu</div>', '[data-topic]');
 }
 
 function renderEstForm() {
@@ -282,8 +284,7 @@ function updateEstPreview() {
 function renderPublished(published) {
   const list = $('#blog-posts');
   $('#blog-posts-aside').textContent = published.length ? `${published.length} wpisów` : '';
-  if (!published.length) { list.innerHTML = '<div class="empty-state">Jeszcze nie ma wpisów</div>'; return; }
-  list.innerHTML = published.map((p) => `
+  swapList(list, !published.length ? '<div class="empty-state">Jeszcze nie ma wpisów</div>' : published.map((p) => `
     <div class="blog-row${p.status !== 'published' ? ' is-draft' : ''}" data-id="${p.id}">
       <div class="blog-row-thumb" style="${p.cover_path ? `background-image:url('${thumb(p.cover_path)}')` : ''}"></div>
       <div class="blog-row-main">
@@ -295,7 +296,7 @@ function renderPublished(published) {
         <button class="btn small" data-act="toggle" data-id="${p.id}">${p.status === 'published' ? 'Ukryj' : 'Pokaż'}</button>
         <button class="btn small danger" data-act="delete" data-id="${p.id}">Usuń</button>
       </div>
-    </div>`).join('');
+    </div>`).join(''), '.blog-row[data-id]');
 }
 
 // ── actions ─────────────────────────────────────────────────────────────────
@@ -357,12 +358,15 @@ async function rebuild() {
   banner('Przebudowa ruszyła — strona odświeży się za ok. 3–5 min', 'ok');
 }
 
+const rowEl = (id) => document.querySelector(`.blog-row[data-id="${id}"]`);
+
 async function publishNow(id) {
   const post = state.blogPosts.find((p) => p.id === id); if (!post) return;
-  if (!confirm(`Opublikować teraz „${post.title_pl}”? (poza codziennym rytmem; kolejka się przesunie)`)) return;
+  if (!(await ask(`Opublikować teraz „${post.title_pl}”?\nPoza codziennym rytmem — kolejka się przesunie.`))) return;
+  banner('Publikuję…', null);
   const { data, error } = await sb.rpc('blog_publish_now', { p_id: id });
   if (error || !data?.ok) { banner(error?.message || data?.error || 'Błąd', 'error'); return; }
-  await loadBlog(); renderBlog(); banner('Opublikowano — strona przebuduje się za ok. 3–5 min', 'ok');
+  markExit(rowEl(id), 'send'); await loadBlog(); renderBlog(); banner('Opublikowano — strona przebuduje się za ok. 3–5 min', 'ok');
 }
 
 async function moveUp(id) {
@@ -372,7 +376,7 @@ async function moveUp(id) {
   const r2 = await sb.from('blog_posts').update({ scheduled_for: a.scheduled_for, published_at: a.scheduled_for }).eq('id', b.id);
   if (r1.error || r2.error) { banner((r1.error || r2.error).message, 'error'); return; }
   [a.scheduled_for, b.scheduled_for] = [b.scheduled_for, a.scheduled_for];
-  renderBlog();
+  renderBlog(); banner('Kolejność zmieniona', 'ok');
 }
 
 async function togglePost(id) {
@@ -385,11 +389,12 @@ async function togglePost(id) {
 
 async function deletePost(id) {
   const post = state.blogPosts.find((p) => p.id === id); if (!post) return;
-  if (!confirm(`Usunąć wpis "${post.title_pl}"? Tego nie da się cofnąć.`)) return;
+  if (!(await ask(`Usunąć wpis „${post.title_pl}”?\nTego nie da się cofnąć.`))) return;
+  banner('Usuwanie…', null);
   const { error } = await sb.from('blog_posts').delete().eq('id', id);
   if (error) { banner(error.message, 'error'); return; }
   if (post.cover_path && !/^https?:/.test(post.cover_path)) await sb.storage.from(MEDIA_BUCKET).remove([post.cover_path]).catch(() => {});
-  state.blogPosts = state.blogPosts.filter((p) => p.id !== id); renderBlog(); banner('Usunięto', 'ok');
+  state.blogPosts = state.blogPosts.filter((p) => p.id !== id); renderBlog(); banner('Wpis usunięty', 'ok');
 }
 
 async function topicPrio(id) {
@@ -403,10 +408,11 @@ async function topicPrio(id) {
 async function topicReject(id) {
   const { error } = await sb.from('blog_topics').update({ status: 'rejected' }).eq('id', id);
   if (error) { banner(error.message, 'error'); return; }
+  markExit(document.querySelector(`[data-topic="${id}"]`), 'skip');
   state.blogTopics = state.blogTopics.filter((t) => t.id !== id); renderTopics(); banner('Temat odrzucony', 'ok');
 }
 async function addTopic() {
-  const inp = $('#blog-topic-new'); const title = inp.value.trim(); if (!title) return;
+  const inp = $('#blog-topic-new'); const title = inp.value.trim(); if (!title) { invalid(inp); banner('Wpisz temat', 'error'); return; }
   const { data, error } = await sb.from('blog_topics').insert({ title, slug: slugify(title).slice(0, 72), primary_keyword: title.toLowerCase(), source: 'admin', priority: 10 }).select().single();
   if (error) { banner(/duplicate/.test(error.message) ? 'Taki temat już jest w planie' : error.message, 'error'); return; }
   state.blogTopics.unshift(data); inp.value = ''; renderTopics(); banner('Dodano na początek planu', 'ok');
@@ -419,7 +425,7 @@ export function bindBlogUI() {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const id = b.dataset.id;
     ({
-      'save-gen': saveGen, 'save-budget': saveBudget, 'save-est': () => saveEst(false), 'est-reset': () => confirm('Przywrócić domyślne ceny i czasy kalkulatora?') && saveEst(true),
+      'save-gen': saveGen, 'save-budget': saveBudget, 'save-est': () => saveEst(false), 'est-reset': async () => (await ask('Przywrócić domyślne ceny i czasy kalkulatora?\nTwoje obecne wartości zostaną nadpisane.')) && saveEst(true),
       rebuild, 'publish-now': () => publishNow(id), up: () => moveUp(id), toggle: () => togglePost(id), delete: () => deletePost(id),
       prio: () => topicPrio(id), reject: () => topicReject(id), 'add-topic': addTopic,
     })[b.dataset.act]?.();

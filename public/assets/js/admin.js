@@ -1,13 +1,13 @@
 // BarabashFlow admin — entry point. Auth, tabs, Strona (site settings +
 // stats + FAQ), Blog (AI autopilot), Statystyki; the collection editors live
 // in admin-projects / admin-services / admin-inbox / admin-crm.
-import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, MEDIA_BUCKET, uploadImage, removeMedia, pickFile, translateItems, readForm, slugify } from './admin-core.js?v=2026-11-10a';
-import { loadProjects, bindProjectsUI, renderProjectList } from './admin-projects.js?v=2026-11-10a';
-import { loadServices, loadFaq, bindServicesUI, renderServiceList, renderFaq } from './admin-services.js?v=2026-11-10a';
-import { loadInbox, bindInboxUI, renderInbox } from './admin-inbox.js?v=2026-11-10a';
-import { loadCrm, bindCrmUI, renderCrm, openClient } from './admin-crm.js?v=2026-11-17a';
-import { loadBlog, renderBlog, bindBlogUI } from './admin-blog.js?v=2026-11-16a';
-import { loadLeads, renderLeads, bindLeadsUI } from './admin-leads.js?v=2026-11-17a';
+import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, MEDIA_BUCKET, uploadImage, removeMedia, pickFile, translateItems, readForm, slugify, ask, invalid } from './admin-core.js?v=2026-11-20a';
+import { loadProjects, bindProjectsUI, renderProjectList } from './admin-projects.js?v=2026-11-20a';
+import { loadServices, loadFaq, bindServicesUI, renderServiceList, renderFaq } from './admin-services.js?v=2026-11-20a';
+import { loadInbox, bindInboxUI, renderInbox } from './admin-inbox.js?v=2026-11-20a';
+import { loadCrm, bindCrmUI, renderCrm, openClient } from './admin-crm.js?v=2026-11-20a';
+import { loadBlog, renderBlog, bindBlogUI } from './admin-blog.js?v=2026-11-20a';
+import { loadLeads, renderLeads, bindLeadsUI } from './admin-leads.js?v=2026-11-20a';
 
 init().catch((err) => console.error('[admin] init failed', err));
 
@@ -48,7 +48,7 @@ function bindAuthUI() {
     e.preventDefault();
     const status = $('#auth-status'); status.textContent = 'Logowanie…'; status.style.color = '';
     const { error } = await sb.auth.signInWithPassword({ email: e.target.elements.email.value.trim(), password: e.target.elements.password.value });
-    if (error) { status.style.color = 'var(--danger)'; status.textContent = error.message; } else { status.style.color = 'var(--ok)'; status.textContent = 'OK'; }
+    if (error) { status.style.color = 'var(--danger)'; status.textContent = /invalid login/i.test(error.message) ? 'Nieprawidłowy e-mail lub hasło' : error.message; invalid(e.target.elements.password); } else { status.style.color = 'var(--ok)'; status.textContent = 'OK'; }
   });
   $('#signout').addEventListener('click', () => sb.auth.signOut());
 }
@@ -79,7 +79,7 @@ function bindShellUI() {
   $('[data-remove-owner-photo]').addEventListener('click', (e) => { e.stopPropagation(); state.pendingOwnerPhoto = null; state.removeOwnerPhoto = true; paintOwnerPhoto(null); });
   $('#save-settings').addEventListener('click', saveSettings);
   $('#translate-settings')?.addEventListener('click', async () => {
-    if (!confirm('Przetłumaczyć WSZYSTKIE pola z polskiego i nadpisać EN/RU?')) return;
+    if (!(await ask('Przetłumaczyć wszystkie pola z polskiego?\nObecne wersje EN i RU zostaną nadpisane.'))) return;
     banner('Tłumaczenie PL → EN/RU…', null);
     try { const n = await autoTranslateSettings(true); banner(`Przetłumaczono ${n} pól — sprawdź i kliknij Zapisz`, 'ok'); }
     catch (err) { banner(err.message || 'Błąd tłumaczenia', 'error'); }
@@ -103,7 +103,7 @@ function setupTabAway() {
 // ── Strona (site_settings) ──────────────────────────────────────────────────
 async function loadSettings() {
   const { data, error } = await sb.from('site_settings').select('*');
-  if (error) { console.error(error); return; }
+  if (error) { console.error(error); banner(`Nie udało się wczytać ustawień: ${error.message}`, 'error'); return; }
   state.settings = Object.fromEntries((data || []).map((r) => [r.key, r]));
 }
 function renderSettings() {

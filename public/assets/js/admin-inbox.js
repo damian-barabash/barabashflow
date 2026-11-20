@@ -1,14 +1,14 @@
 // Wiadomości — every enquiry from the site forms (home/footer/kontakt).
 // Read/replied/archive flags, internal note, reply via mail client, one-click
 // "add to CRM" (creates the client + a timeline entry and links the message).
-import { sb, $, $$, banner, escapeHtml, attr, fmtDate, ask } from './admin-core.js?v=2026-11-10a';
-import { upsertClientFromMessage, openClient } from './admin-crm.js?v=2026-11-17a';
+import { sb, $, $$, banner, escapeHtml, attr, fmtDate, ask, swapList, markExit } from './admin-core.js?v=2026-11-20a';
+import { upsertClientFromMessage, openClient } from './admin-crm.js?v=2026-11-20a';
 
 const I = { items: [], filter: 'inbox' };
 
 export async function loadInbox() {
   const { data, error } = await sb.from('contact_submissions').select('*').order('created_at', { ascending: false }).limit(500);
-  if (error) console.error(error);
+  if (error) { console.error(error); banner(`Nie udało się wczytać wiadomości: ${error.message}`, 'error'); return; }
   I.items = data || [];
   const unread = I.items.filter((m) => !m.is_read && !m.is_archived).length;
   const b = $('#inbox-badge'); if (b) { b.style.display = unread ? '' : 'none'; b.textContent = String(unread); }
@@ -37,8 +37,7 @@ export function renderInbox() {
   if (I.filter === 'replied') items = items.filter((m) => m.is_replied && !m.is_archived);
   if (I.filter === 'archive') items = items.filter((m) => m.is_archived);
   $('#inbox-aside').textContent = `${items.length} z ${I.items.length}`;
-  if (!items.length) { list.innerHTML = '<div class="empty-state">Pusto</div>'; return; }
-  list.innerHTML = items.map((m) => `
+  swapList(list, !items.length ? '<div class="empty-state">Pusto</div>' : items.map((m) => `
     <article class="msg${m.is_read ? '' : ' is-unread'}${m.is_replied ? ' is-replied' : ''}" data-id="${m.id}">
       <header class="msg-head">
         <div>
@@ -61,7 +60,7 @@ export function renderInbox() {
         <button class="btn small" data-act="archive" data-id="${m.id}">${m.is_archived ? 'Przywróć' : 'Archiwizuj'}</button>
         <button class="btn small danger" data-act="delete" data-id="${m.id}">Usuń</button>
       </footer>
-    </article>`).join('');
+    </article>`).join(''), '.msg[data-id]');
 }
 
 async function onAction(e) {
@@ -73,8 +72,9 @@ async function onAction(e) {
     if (act === 'reply') { await patch({ is_read: true }); await loadInbox(); renderInbox(); return; }
     if (act === 'read') await patch({ is_read: !m.is_read });
     if (act === 'replied') await patch({ is_replied: !m.is_replied, is_read: true });
+    if (act === 'archive') markExit(b.closest('.msg'), 'skip');
     if (act === 'archive') await patch({ is_archived: !m.is_archived, is_read: true });
-    if (act === 'delete') { if (!ask('Usunąć wiadomość bezpowrotnie?')) return; const { error } = await sb.from('contact_submissions').delete().eq('id', m.id); if (error) throw error; }
+    if (act === 'delete') { if (!(await ask(`Usunąć wiadomość od ${m.name || m.email}?\nTego nie da się cofnąć.`))) return; markExit(b.closest('.msg'), 'out'); const { error } = await sb.from('contact_submissions').delete().eq('id', m.id); if (error) throw error; }
     if (act === 'crm') {
       const client = await upsertClientFromMessage(m);
       await patch({ client_id: client.id, is_read: true });
@@ -83,6 +83,6 @@ async function onAction(e) {
     }
     if (act === 'open-client') { openClient(m.client_id); return; }
     await loadInbox(); renderInbox();
-    if (act !== 'crm') banner('OK', 'ok');
+    if (act !== 'crm') banner({ read: m.is_read ? 'Oznaczono jako przeczytane' : 'Oznaczono jako nieprzeczytane', replied: m.is_replied ? 'Oznaczono: odpowiedziano' : 'Cofnięto „odpowiedziano”', archive: m.is_archived ? 'Przeniesiono do archiwum' : 'Przywrócono z archiwum', delete: 'Wiadomość usunięta' }[act] || 'Gotowe', 'ok');
   } catch (err) { console.error(err); banner(err.message || 'Błąd', 'error'); }
 }

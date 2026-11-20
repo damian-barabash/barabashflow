@@ -3,7 +3,7 @@
 // first = cover unless cover_path is set; case-study fields (client, year,
 // services, stack, results, tagline, long body); PL-first with AI fill of
 // EN/RU on save.
-import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, uploadImage, removeMedia, pickFile, autoTranslateRow, trio, readForm, ask, slugify } from './admin-core.js?v=2026-11-10a';
+import { sb, $, $$, state, banner, escapeHtml, attr, mediaUrl, uploadImage, removeMedia, pickFile, autoTranslateRow, trio, readForm, ask, slugify, swapList, invalid } from './admin-core.js?v=2026-11-20a';
 
 const CATS = [['site', 'Strona'], ['shop', 'Sklep'], ['platform', 'Platforma'], ['app', 'Aplikacja'], ['panel', 'Panel'], ['other', 'Inne']];
 const CAT_LABEL = { site: ['Strona', 'Website', 'Сайт'], shop: ['Sklep', 'Store', 'Магазин'], platform: ['Platforma', 'Platform', 'Платформа'], app: ['Aplikacja', 'App', 'Приложение'], panel: ['Panel', 'Panel', 'Панель'], other: ['Projekt', 'Project', 'Проект'] };
@@ -39,8 +39,7 @@ export function renderProjectList() {
   const list = $('#pr-list'); if (!list) return;
   $('#projects-count').textContent = state.projects.length ? String(state.projects.length) : '';
   const items = state.projects.filter((p) => !P.filter || `${p.title_pl} ${p.client || ''} ${p.slug}`.toLowerCase().includes(P.filter));
-  if (!items.length) { list.innerHTML = '<div class="empty-state">Brak projektów</div>'; return; }
-  list.innerHTML = items.map((p, i) => {
+  swapList(list, !items.length ? '<div class="empty-state">Brak projektów</div>' : items.map((p, i) => {
     const cover = p.cover_path || state.photosByProject.get(p.id)?.[0]?.storage_path;
     return `<div class="lrow${p.id === P.selectedId ? ' is-active' : ''}${p.is_published ? '' : ' is-off'}" data-id="${p.id}">
       <div class="lrow-thumb" style="${cover ? `background-image:url('${mediaUrl(cover)}')` : ''}"></div>
@@ -53,7 +52,7 @@ export function renderProjectList() {
         <button class="icon-btn mini" data-move="1" data-id="${p.id}" title="Niżej" ${i === items.length - 1 ? 'disabled' : ''}>↓</button>
       </div>
     </div>`;
-  }).join('');
+  }).join(''), '.lrow[data-id]');
 }
 
 async function moveProject(id, dir) {
@@ -65,7 +64,7 @@ async function moveProject(id, dir) {
   const updates = arr.map((p, idx) => ({ id: p.id, sort_order: idx + 1 }));
   state.projects = arr.map((p, idx) => ({ ...p, sort_order: idx + 1 }));
   renderProjectList();
-  for (const u of updates) await sb.from('projects').update({ sort_order: u.sort_order }).eq('id', u.id);
+  for (const u of updates) { const { error } = await sb.from('projects').update({ sort_order: u.sort_order }).eq('id', u.id); if (error) { banner(`Kolejność nie zapisała się: ${error.message}`, 'error'); return; } }
   banner('Kolejność zapisana', 'ok');
 }
 
@@ -238,10 +237,10 @@ function syncResults() {
 function renderPhotos() {
   const wrap = $('#pr-photos'); if (!wrap) return;
   const cover = P.draft.cover_path;
-  wrap.innerHTML = P.photos.map((ph, i) => {
+  swapList(wrap, P.photos.map((ph, i) => {
     const url = ph.file ? ph.url : mediaUrl(ph.existing.storage_path);
     const isCover = cover ? ph.existing?.storage_path === cover : i === 0;
-    return `<div class="photo-slot has-image${isCover ? ' is-cover' : ''}" style="background-image:url('${url}')" data-i="${i}" draggable="true">
+    return `<div class="photo-slot has-image${isCover ? ' is-cover' : ''}" style="background-image:url('${url}')" data-pk="${attr(ph.existing?.id || url)}" data-i="${i}" draggable="true">
       <span class="ph-badge">${isCover ? 'okładka' : i + 1}</span>
       <div class="ph-tools">
         <button type="button" data-ph="left" title="W lewo" ${i === 0 ? 'disabled' : ''}>←</button>
@@ -250,7 +249,7 @@ function renderPhotos() {
         <button type="button" data-ph="rm" title="Usuń" class="rm">×</button>
       </div>
     </div>`;
-  }).join('') + `<div class="photo-slot is-add" id="pr-photo-add"><span>+ zdjęcie</span></div>`;
+  }).join('') + `<div class="photo-slot is-add" id="pr-photo-add"><span>+ zdjęcie</span></div>`, '[data-pk]');
   $('#pr-photo-add').addEventListener('click', () => $('#pr-add-photos').click());
   wrap.onclick = (e) => {
     const b = e.target.closest('[data-ph]'); if (!b) return;
@@ -299,7 +298,7 @@ function closeEditor() {
 async function saveProject() {
   collectDraft();
   const d = P.draft;
-  if (!d.title_pl) { banner('Tytuł PL jest wymagany', 'error'); return; }
+  if (!d.title_pl) { invalid($('#pr-editor [data-f="title"][data-l="pl"]')); banner('Tytuł PL jest wymagany', 'error'); return; }
   banner('Zapisywanie…', null);
   try {
     try {
@@ -346,13 +345,13 @@ async function saveProject() {
 
 async function deleteProject() {
   const d = P.draft; if (!d?.id) return;
-  if (!ask(`Usunąć projekt „${d.title_pl}” razem ze zdjęciami?`)) return;
+  if (!(await ask(`Usunąć projekt „${d.title_pl}”?\nRazem ze zdjęciami. Tego nie da się cofnąć.`))) return;
   banner('Usuwanie…', null);
   try {
     const photos = state.photosByProject.get(d.id) || [];
     await Promise.all(photos.map((p) => removeMedia(p.storage_path)));
     const { error } = await sb.from('projects').delete().eq('id', d.id);
     if (error) throw error;
-    await loadProjects(); closeEditor(); banner('Usunięto', 'ok');
+    await loadProjects(); closeEditor(); banner(`Projekt „${d.title_pl}” usunięty`, 'ok');
   } catch (err) { banner(err.message || 'Błąd', 'error'); }
 }

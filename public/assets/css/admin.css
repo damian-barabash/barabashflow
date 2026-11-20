@@ -452,3 +452,97 @@ details[open].adv > summary::before { content: '▾ '; }
 .mail-note[hidden] { display: none; }
 .reply-badge { background: #98ff03; border-color: #98ff03; color: #030712; font-weight: 600; }
 @media (max-width: 760px) { .mail-msg { max-width: 100%; } }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Motion + feedback layer (2026-11-20) — pairs with admin-fx.js.
+   Every action: spinner on its button → check / cross, lime sweep or red
+   shake on its card, toast that morphs pending → result. Lists animate in JS.
+   ══════════════════════════════════════════════════════════════════════════ */
+#banner { display: none; }
+
+/* ── toasts ── */
+.toasts { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 140; display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(560px, calc(100vw - 24px)); pointer-events: none; }
+.toast { position: relative; overflow: hidden; pointer-events: auto; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; max-width: 100%; padding: 11px 12px 11px 14px; border-radius: var(--r-md); background: var(--ink); color: #fff; font-family: var(--font-head); font-size: 13px; font-weight: 500; line-height: 1.4; box-shadow: 0 18px 40px -16px rgba(3, 7, 18, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08); animation: toast-in 0.5s var(--ease) both; transition: background 0.35s, opacity 0.3s, transform 0.3s var(--ease), margin 0.3s var(--ease); }
+.toast.is-leaving { opacity: 0; transform: translateY(10px) scale(0.96); margin-bottom: -46px; }
+.toast-ico { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, 0.12); }
+.toast-ico svg { width: 14px; height: 14px; }
+.toast-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: toast-draw 0.45s 0.08s var(--ease) forwards; }
+.toast-spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.28); border-top-color: var(--lime); animation: fx-spin 0.7s linear infinite; }
+.toast.is-ok .toast-ico { background: var(--lime); color: var(--lime-ink); }
+.toast.is-error { background: var(--danger); }
+.toast.is-error .toast-ico { background: #fff; color: var(--danger); }
+.toast.is-morph .toast-ico { animation: toast-pop 0.45s var(--ease); }
+.toast-text { overflow-wrap: anywhere; }
+.toast-x { display: none; width: 24px; height: 24px; border: 0; border-radius: 8px; background: rgba(255, 255, 255, 0.16); color: #fff; font-size: 16px; line-height: 1; cursor: pointer; }
+.toast-x:hover { background: rgba(255, 255, 255, 0.3); }
+.toast.is-error .toast-x { display: block; }
+.toast-bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; transform-origin: left; background: rgba(255, 255, 255, 0.45); display: none; }
+.toast.is-ok .toast-bar, .toast.is-error .toast-bar { display: block; animation: toast-bar var(--toast-ms, 2800ms) linear forwards; }
+.toast.is-ok .toast-bar { background: var(--lime); }
+.toast.is-held .toast-bar { animation-play-state: paused; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(18px) scale(0.94); } }
+@keyframes toast-pop { 0% { transform: scale(0.4); } 60% { transform: scale(1.18); } 100% { transform: none; } }
+@keyframes toast-draw { to { stroke-dashoffset: 0; } }
+@keyframes toast-bar { to { transform: scaleX(0); } }
+@keyframes fx-spin { to { transform: rotate(360deg); } }
+
+/* ── buttons: busy → done / fail ── */
+.btn { position: relative; }
+.btn.fx-busy, .btn.fx-busy[disabled], .btn.fx-busy.is-busy { color: transparent !important; opacity: 1; pointer-events: none; transform: none; }
+.btn.fx-busy > * { opacity: 0; }
+.btn.fx-busy::after { content: ''; position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 2px solid rgba(3, 7, 18, 0.18); border-top-color: var(--ink); animation: fx-spin 0.7s linear infinite; }
+.btn.primary.fx-busy::after { border-color: rgba(255, 255, 255, 0.25); border-top-color: var(--lime); }
+.btn.fx-done, .btn.fx-fail { color: transparent !important; transition: none; }
+.btn.fx-done > *, .btn.fx-fail > * { opacity: 0; }
+.btn.fx-done { background: var(--lime); border-color: transparent; animation: fx-btn-pop 0.5s var(--ease); }
+.btn.fx-fail { background: var(--danger); border-color: transparent; }
+.btn.fx-done::after, .btn.fx-fail::after { content: ''; position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; background: var(--lime-ink); -webkit-mask: var(--fx-ico) center / contain no-repeat; mask: var(--fx-ico) center / contain no-repeat; animation: toast-pop 0.45s var(--ease); }
+.btn.fx-done::after { --fx-ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M4.5 10.5 8.5 14.5 15.5 6' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.btn.fx-fail::after { background: #fff; --fx-ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5.5 5.5 14.5 14.5M14.5 5.5 5.5 14.5' stroke='%23000' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.btn.danger-solid { background: var(--danger); color: #fff; border: 0; box-shadow: 0 10px 22px -12px rgba(208, 32, 42, 0.8); }
+@keyframes fx-btn-pop { 0% { transform: scale(0.94); } 55% { transform: scale(1.05); } 100% { transform: none; } }
+
+/* ── cards: result of the action that started inside ── */
+.fx-ok { animation: fx-ok 1.1s var(--ease); }
+.fx-err { animation: fx-err 2.6s ease-out; }
+@keyframes fx-ok { 0% { box-shadow: 0 0 0 0 rgba(152, 255, 3, 0); } 22% { box-shadow: 0 0 0 3px rgba(152, 255, 3, 0.9), 0 0 0 10px rgba(152, 255, 3, 0.18); } 100% { box-shadow: 0 0 0 3px rgba(152, 255, 3, 0), 0 0 0 16px rgba(152, 255, 3, 0); } }
+@keyframes fx-err { 0%, 70% { box-shadow: 0 0 0 2px var(--danger), 0 0 0 9px rgba(208, 32, 42, 0.14); background-color: #fff6f6; } 100% { box-shadow: 0 0 0 2px rgba(208, 32, 42, 0), 0 0 0 9px rgba(208, 32, 42, 0); } }
+
+/* ── fields ── */
+.fx-invalid, .fx-invalid input, .fx-invalid textarea, input.fx-invalid, textarea.fx-invalid, select.fx-invalid { border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgba(208, 32, 42, 0.16) !important; background-color: #fff6f6 !important; }
+
+/* ── confirm dialog ── */
+.ask-root { z-index: 130; }
+.ask-card { width: min(420px, 100%); gap: 10px; padding: 26px 24px 22px; text-align: left; transform: translateY(16px) scale(0.94); transition: transform 0.42s var(--ease); }
+.ask-mark { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--lime); color: var(--lime-ink); font: 700 20px/1 var(--font-head); }
+.ask-card.is-danger .ask-mark { background: #ffe3e3; color: var(--danger); }
+.ask-title { font-size: 18px; line-height: 1.3; margin-top: 6px; overflow-wrap: anywhere; }
+.ask-text { font-size: 13.5px; color: var(--body); line-height: 1.55; overflow-wrap: anywhere; }
+.ask-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.ask-actions .btn { min-width: 108px; justify-content: center; }
+
+/* ── modals, tabs, panels ── */
+.modal-root { transition: opacity 0.26s ease; }
+.modal-card { transform: translateY(18px) scale(0.97); transition: transform 0.42s var(--ease); }
+.modal-root.is-open .modal-card { transform: none; }
+.panel-page.is-active { animation: fx-panel 0.45s var(--ease); }
+.mpanel.is-active { animation: fx-panel 0.35s var(--ease); }
+.editor-pane > * { animation: fx-panel 0.4s var(--ease); }
+.tab-btn, .filter-chips button, .seg button, .conn-chip { transition: background 0.25s, color 0.25s, border-color 0.25s, transform 0.3s var(--ease); }
+.conn-chip:active, .filter-chips button:active, .seg button:active { transform: scale(0.95); }
+@keyframes fx-panel { from { opacity: 0; transform: translateY(10px); } }
+
+/* Kanban is wider than a phone: it must scroll inside its card, not widen the page
+   (an auto grid track grows to its content; found while testing on iPhone width). */
+.section { grid-template-columns: minmax(0, 1fr); }
+#crm-body { min-width: 0; }
+
+@media (max-width: 760px) {
+  .toasts { bottom: max(12px, env(safe-area-inset-bottom)); }
+  .ask-actions .btn { flex: 1 1 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast, .toast-ico, .toast-draw, .fx-ok, .fx-err, .btn.fx-done, .btn.fx-done::after, .btn.fx-fail::after, .panel-page.is-active, .mpanel.is-active, .editor-pane > * { animation: none !important; }
+  .toast-draw { stroke-dashoffset: 0; }
+  .modal-card, .ask-card { transition: none; transform: none; }
+}
